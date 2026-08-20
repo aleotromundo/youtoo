@@ -1510,6 +1510,24 @@
             } catch (e) { return []; }
         }
 
+        const ROCK_METAL_DISCOVERY_QUERY = 'rock metal official music';
+
+        async function recoverWithRockMetal() {
+            const recovery = await fetchYouTubeSearch(ROCK_METAL_DISCOVERY_QUERY, 'video,playlist,channel', { maxResults: 20 });
+            if (recovery.length) {
+                renderYouTubeSearchResults(recovery, 'Sugerencias de rock y metal');
+                showToast('Sin coincidencias asociadas: te mostramos rock y metal', 'fa-guitar');
+                return true;
+            }
+            try {
+                await searchOpenverse('rock metal');
+                showToast('Sin coincidencias asociadas: te mostramos rock y metal', 'fa-guitar');
+                return true;
+            } catch (error) {
+                return false;
+            }
+        }
+
         async function performSmartSearch(query) {
             searchQuery = query;
             renderTasteChips(query);
@@ -1533,17 +1551,15 @@
                 if (merged.length > 0) {
                     renderYouTubeSearchResults(merged, query);
                 } else if (!channelFilter) {
-                    await searchOpenverse(query);
+                    if (!(await recoverWithRockMetal())) renderEmptyState(`Sin resultados para "${query}"`, 'No encontramos coincidencias ni propuestas de rock y metal disponibles ahora.');
                 } else {
                     renderEmptyState(`Sin resultados para "${query}" en este canal`);
                 }
             } catch (e) {
-                console.warn("YouTube falló, probando Openverse...", e);
-                try {
-                    if (channelFilter) throw e;
-                    await searchOpenverse(query);
+                console.warn('No se pudo completar la búsqueda solicitada', e);
+                if (channelFilter || !(await recoverWithRockMetal())) {
+                    renderEmptyState(`Sin resultados para "${query}"`, 'No encontramos coincidencias ni propuestas de rock y metal disponibles ahora.');
                 }
-                catch (e2) { renderEmptyState(`Sin resultados para "${query}"`); showToast('No encontramos resultados', 'fa-circle-exclamation'); }
             } finally {
                 if (loader.style.display === 'flex') loader.style.display = 'none';
             }
@@ -1619,11 +1635,11 @@
         async function loadHomeCatalogSources() {
             // La portada es una biblioteca general: no toma el último artista ni la última reproducción como consulta base.
             const results = await Promise.allSettled([
-                fetchYouTubeSearch('official music video', 'video', { maxResults: 20 }),
-                fetchYouTubeSearch('official music audio', 'video', { maxResults: 20 }),
-                fetchYouTubeSearch('music playlist', 'playlist', { maxResults: 20 }),
-                fetchOpenverseTracks('music', 20),
-                fetchOpenverseTracks('instrumental music album', 20)
+                fetchYouTubeSearch('rock metal official music videos', 'video', { maxResults: 20 }),
+                fetchYouTubeSearch('rock metal official audio', 'video', { maxResults: 20 }),
+                fetchYouTubeSearch('rock metal playlists', 'playlist', { maxResults: 20 }),
+                fetchOpenverseTracks('rock metal music', 20),
+                fetchOpenverseTracks('rock instrumental metal', 20)
             ]);
             const value = index => results[index]?.status === 'fulfilled' ? results[index].value || [] : [];
             homeVideos = uniqueMediaByUrl(value(0), 20);
@@ -1912,7 +1928,7 @@
                 return;
             }
             if (state?.returnMode === 'home') { resetView(); return; }
-            performSmartSearch(state?.returnQuery || searchQuery || state?.playlist?.title || 'música');
+            performSmartSearch(state?.returnQuery || searchQuery || state?.playlist?.title || ROCK_METAL_DISCOVERY_QUERY);
         }
 
         function renderOpenedPlaylist() {
@@ -2388,8 +2404,12 @@
             return raw.slice(0, count);
         }
 
+        async function fetchRockMetalTracks(count) {
+            return fetchYouTubeSearch(ROCK_METAL_DISCOVERY_QUERY, 'video', { maxResults: Math.min(Math.max(count, 6), 20) });
+        }
+
         async function fetchSimilarArtistTracks(seedSong, count) {
-            if (!seedSong || !seedSong.artist) return [];
+            if (!seedSong || !seedSong.artist) return fetchRockMetalTracks(count);
             const artist = seedSong.artist;
             try {
                 const [radio, related] = await Promise.all([
@@ -2420,6 +2440,7 @@
                 } else {
                     added = await fetchSimilarArtistTracks(seed, QUEUE_BATCH);
                 }
+                if (added.length < 6) added = added.concat(await fetchRockMetalTracks(QUEUE_BATCH - added.length));
                 added = added
                     .filter(s => s && s.url)
                     .filter(s => { const k = songKey(s); if (queueSeenKeys.has(k)) return false; queueSeenKeys.add(k); return true; })
