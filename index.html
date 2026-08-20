@@ -226,7 +226,10 @@
             transition: background .2s var(--ease), color .2s var(--ease), border-color .2s var(--ease), transform .15s var(--ease);
         }
         .song-row-addq:hover { background: var(--accent); border-color: var(--accent); color: black; transform: scale(1.08); }
-        @media (max-width: 560px) { .results-view-switcher { align-items: flex-start; flex-direction: column; } .song-row { grid-template-columns: 28px 44px minmax(0, 1fr) auto; gap: 10px; padding: 9px 10px; } .song-row-img { width: 44px; height: 44px; } }
+        .song-row-favorite { border-color: rgba(255,123,144,.34); color: #f0c5ce; }
+        .song-row-favorite.active { border-color: #ff7b90; color: #ff7b90; background: rgba(255,123,144,.12); }
+        .song-row-favorite:hover { background: rgba(255,123,144,.16); border-color: #ff7b90; color: #ff8ea0; transform: scale(1.08); }
+        @media (max-width: 560px) { .results-view-switcher { align-items: flex-start; flex-direction: column; } .song-row { grid-template-columns: 28px 44px minmax(0, 1fr) auto; gap: 10px; padding: 9px 10px; } .song-row-img { width: 44px; height: 44px; } .song-row-actions { gap: 7px; } }
 
         .card {
             background-color: var(--bg-card); padding: 16px; border-radius: 10px; cursor: pointer;
@@ -276,6 +279,9 @@
         }
         .card:hover .card-addq { opacity: 1; transform: translateY(0); }
         .card:hover .card-addq:hover { background: var(--accent); border-color: var(--accent); color: black; transform: scale(1.08); }
+        .card-favorite { position: absolute; z-index: 8; top: 9px; right: 9px; width: 34px; height: 34px; border: 1px solid rgba(255,255,255,.23); border-radius: 50%; color: #fff; background: rgba(8,8,18,.78); display: inline-flex; align-items: center; justify-content: center; cursor: pointer; backdrop-filter: blur(5px); transition: transform .18s var(--ease), color .18s var(--ease), background .18s var(--ease), border-color .18s var(--ease); }
+        .card-favorite:hover { transform: scale(1.08); border-color: #ff7b90; color: #ff9cad; }
+        .card-favorite.active { border-color: #ff7b90; color: #ff7b90; background: rgba(65,17,30,.86); }
 
         /* Loader / empty state */
         .loader-wrap { display: none; flex-direction: column; align-items: center; justify-content: center; gap: 14px; padding: 60px 20px; color: var(--text-gray); }
@@ -2104,11 +2110,16 @@
                     </span>
                     <span class="song-row-actions">
                         <span class="song-row-duration">${formatContentDuration(song.duration)}</span>
+                        <button type="button" class="song-row-addq song-row-favorite${isFavoriteSong(song) ? ' active' : ''}" title="Guardar en favoritos" aria-label="Guardar en favoritos"><i class="${isFavoriteSong(song) ? 'fas' : 'far'} fa-heart"></i></button>
                         <button type="button" class="song-row-addq" title="Agregar a la cola" aria-label="Agregar a la cola"><i class="fas fa-list"></i></button>
                         <i class="fas fa-play song-row-play" aria-hidden="true"></i>
                     </span>`;
                 row.onclick = () => selectSong(song, song.sourceIndex ?? idx);
-                row.querySelector('.song-row-addq').onclick = (e) => {
+                row.querySelector('.song-row-favorite').onclick = (e) => {
+                    e.stopPropagation();
+                    toggleFavoriteSong(song, e.currentTarget);
+                };
+                row.querySelector('.song-row-addq:not(.song-row-favorite)').onclick = (e) => {
                     e.stopPropagation();
                     addToQueue(song);
                 };
@@ -2232,6 +2243,7 @@
                         <span>Cargando</span>
                     </div>
                 </div>
+                <button type="button" class="card-favorite${isFavoriteSong(song) ? ' active' : ''}" title="Guardar en favoritos" aria-label="Guardar en favoritos"><i class="${isFavoriteSong(song) ? 'fas' : 'far'} fa-heart"></i></button>
                 <button type="button" class="card-addq" title="Agregar a la cola" aria-label="Agregar a la cola"><i class="fas fa-list"></i></button>
                 <div class="play-btn"><i class="fas fa-play"></i></div>
                 <div class="card-title" title="${escapeHtml(song.title)}">${escapeHtml(song.title)}</div>
@@ -2239,6 +2251,10 @@
                 <div class="card-meta">${escapeHtml(contentMetaLabel(song))}</div>
                 ${descriptionExcerpt(song.description) ? `<p class="card-summary" title="${escapeHtml(song.description)}">${escapeHtml(descriptionExcerpt(song.description))}</p>` : ''}`;
             div.onclick = () => selectSong(song, song.sourceIndex ?? idx);
+            div.querySelector('.card-favorite').onclick = (e) => {
+                e.stopPropagation();
+                toggleFavoriteSong(song, e.currentTarget);
+            };
             div.querySelector('.card-addq').onclick = (e) => {
                 e.stopPropagation();
                 addToQueue(song);
@@ -3406,16 +3422,47 @@
         }
         function format(sec) { if (!sec || isNaN(sec)) return "0:00"; const m = Math.floor(sec / 60); const s = Math.floor(sec % 60); return `${m}:${s < 10 ? '0' + s : s}`; }
 
-        function toggleFavorite() {
-            if (currentIndex === -1 || !queue[currentIndex]) return;
-            const song = queue[currentIndex];
-            const idx = favorites.findIndex(f => f.title === song.title && f.artist === song.artist);
-            if (idx >= 0) { favorites.splice(idx, 1); showToast('Quitado de favoritos', 'fa-heart-crack'); }
-            else { favorites.push(song); showToast('Añadido a favoritos', 'fa-heart'); }
-            localStorage.setItem('nowarfy_favs', JSON.stringify(favorites));
-            updateFavButton(song);
+        function isFavoriteSong(song) {
+            return !!song && favorites.some(favorite => favorite.title === song.title && favorite.artist === song.artist);
         }
-        function updateFavButton(song) { const exists = favorites.some(f => f.title === song.title && f.artist === song.artist); document.getElementById('favBtn').className = exists ? "fas fa-heart fav-btn active" : "far fa-heart fav-btn"; }
+
+        function syncFavoriteControl(control, song) {
+            if (!control) return;
+            const active = isFavoriteSong(song);
+            control.classList.toggle('active', active);
+            control.title = active ? 'Quitar de favoritos' : 'Guardar en favoritos';
+            control.setAttribute('aria-label', control.title);
+            const icon = control.querySelector('i');
+            if (icon) icon.className = `${active ? 'fas' : 'far'} fa-heart`;
+        }
+
+        function toggleFavoriteSong(song, control = null) {
+            if (!song) return false;
+            const idx = favorites.findIndex(favorite => favorite.title === song.title && favorite.artist === song.artist);
+            if (idx >= 0) {
+                favorites.splice(idx, 1);
+                showToast('Quitado de favoritos', 'fa-heart-crack');
+            } else {
+                favorites.push(song);
+                showToast('Añadido a favoritos', 'fa-heart');
+            }
+            localStorage.setItem('nowarfy_favs', JSON.stringify(favorites));
+            syncFavoriteControl(control, song);
+            updateFavButton(currentQueueSong());
+            return idx < 0;
+        }
+
+        function toggleFavorite() {
+            const song = currentQueueSong();
+            if (song) toggleFavoriteSong(song);
+        }
+
+        function updateFavButton(song) {
+            const button = document.getElementById('favBtn');
+            if (!button) return;
+            const exists = isFavoriteSong(song);
+            button.className = exists ? 'fas fa-heart fav-btn active' : 'far fa-heart fav-btn';
+        }
         function toggleShuffle() { shuffleMode = !shuffleMode; const icon = document.getElementById('shuffleIcon'); icon.classList.toggle('on', shuffleMode); icon.style.opacity = shuffleMode ? '1' : '0.5'; }
 
         // --- VOLUMEN ---
