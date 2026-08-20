@@ -1109,6 +1109,33 @@
             return div.innerHTML;
         }
 
+        function hasValidArtwork(item) {
+            const source = String(item?.img || item?.thumbnail || '').trim();
+            if (!source || !/^https:\/\//i.test(source)) return false;
+            try {
+                const parsed = new URL(source);
+                return !!parsed.hostname && !/^(?:data|blob):/i.test(parsed.protocol);
+            } catch (e) {
+                return false;
+            }
+        }
+
+        function itemsWithArtwork(items) {
+            return (items || []).filter(hasValidArtwork);
+        }
+
+        function removeCardForMissingArtwork(image) {
+            const card = image?.closest?.('.card');
+            if (!card) return;
+            const parent = card.parentElement;
+            card.remove();
+            if (!parent?.querySelector?.('.card')) {
+                const librarySection = parent.closest?.('.library-rail-section');
+                if (librarySection) librarySection.remove();
+                else parent.parentElement?.remove();
+            }
+        }
+
         const TASTE_STORAGE_KEY = 'youtoo_taste_v1';
         const EMPTY_TASTE = Object.freeze({ version: 3, personalization: true, searches: [], plays: [], channels: [], playlists: [] });
 
@@ -2034,7 +2061,7 @@
         }
 
         function renderSavedChannelsRail() {
-            const channels = readTaste().channels;
+            const channels = itemsWithArtwork(readTaste().channels);
             if (!channels.length) return;
             const container = document.getElementById('dynamicSections');
             const section = document.createElement('section');
@@ -2046,7 +2073,7 @@
                 const card = document.createElement('button');
                 card.type = 'button';
                 card.className = 'card playlist-card library-card';
-                card.innerHTML = `<div class="card-img-wrap"><span class="playlist-source-badge"><i class="fas fa-satellite-dish"></i> Canal</span><img src="${escapeHtml(channel.img || '')}" class="card-img loaded" loading="lazy" alt="" onerror="this.closest('.card-img-wrap').classList.add('img-error'); this.style.display='none';"></div><div class="playlist-open"><i class="fas fa-arrow-up-right-from-square"></i> Abrir canal</div><div class="card-title">${escapeHtml(channel.title)}</div>${descriptionExcerpt(channel.description) ? `<p class="card-summary">${escapeHtml(descriptionExcerpt(channel.description))}</p>` : ''}`;
+                card.innerHTML = `<div class="card-img-wrap"><span class="playlist-source-badge"><i class="fas fa-satellite-dish"></i> Canal</span><img src="${escapeHtml(channel.img || '')}" class="card-img loaded" loading="lazy" alt="" onerror="removeCardForMissingArtwork(this)"></div><div class="playlist-open"><i class="fas fa-arrow-up-right-from-square"></i> Abrir canal</div><div class="card-title">${escapeHtml(channel.title)}</div>${descriptionExcerpt(channel.description) ? `<p class="card-summary">${escapeHtml(descriptionExcerpt(channel.description))}</p>` : ''}`;
                 card.style.animationDelay = `${Math.min(index * 0.03, 0.5)}s`;
                 card.onclick = () => browseChannel(channel.id, channel.title);
                 rail.appendChild(card);
@@ -2232,18 +2259,20 @@
         }
 
         function renderChannelRow(channels, title) {
+            const visibleChannels = itemsWithArtwork(channels);
+            if (!visibleChannels.length) return;
             const container = document.getElementById('dynamicSections');
             const section = document.createElement('div');
             section.innerHTML = `<div class="section-title"><i class="fas fa-satellite-dish"></i> ${escapeHtml(title)}</div>`;
             const scroll = document.createElement('div');
             scroll.className = 'channel-scroll';
 
-            channels.forEach(ch => {
+            visibleChannels.forEach(ch => {
                 const chip = document.createElement('div');
                 chip.className = 'channel-chip';
                 chip.innerHTML = `
                     <div class="channel-avatar-wrap">
-                        <img src="${ch.img || ''}" alt="" loading="lazy" onerror="this.style.visibility='hidden';">
+                        <img src="${escapeHtml(ch.img || '')}" alt="" loading="lazy" onerror="this.closest('.channel-chip').remove();">
                         <span class="channel-badge"><i class="fas fa-play"></i></span>
                     </div>
                     <span class="channel-chip-title">${escapeHtml(ch.title)}</span>
@@ -2257,13 +2286,15 @@
         }
 
         function renderSongList(list, title, icon) {
+            const visibleSongs = itemsWithArtwork(list);
+            if (!visibleSongs.length) return;
             const container = document.getElementById('dynamicSections');
             const section = document.createElement('div');
             section.innerHTML = `<div class="section-title">${icon} ${escapeHtml(title)}</div>`;
             const songList = document.createElement('div');
             songList.className = 'song-list';
 
-            list.forEach((song, idx) => {
+            visibleSongs.forEach((song, idx) => {
                 const row = document.createElement('button');
                 row.type = 'button';
                 row.className = 'song-row';
@@ -2271,7 +2302,7 @@
                 const artistClickable = !!song.channelId;
                 row.innerHTML = `
                     <span class="song-row-number">${idx + 1}</span>
-                    <img src="${song.img || ''}" class="song-row-img" loading="lazy" alt="" onerror="this.style.visibility='hidden';">
+                    <img src="${escapeHtml(song.img || '')}" class="song-row-img" loading="lazy" alt="" onerror="this.closest('.song-row').remove();">
                     <span class="song-row-details">
                         <span class="song-row-title" title="${escapeHtml(song.title)}">${escapeHtml(song.title)}</span>
                         <span class="song-row-artist${artistClickable ? ' artist-link' : ''}">${escapeHtml(song.artist)}</span>
@@ -2306,12 +2337,14 @@
         }
 
         function renderPlaylistGrid(list, title) {
+            const visiblePlaylists = itemsWithArtwork(list);
+            if (!visiblePlaylists.length) return;
             const container = document.getElementById('dynamicSections');
             const section = document.createElement('div');
             section.innerHTML = `<div class="section-title"><i class="fas fa-layer-group"></i> ${escapeHtml(title)}</div>`;
             const grid = document.createElement('div');
             grid.className = 'grid';
-            list.forEach((playlist, idx) => grid.appendChild(buildPlaylistCard(playlist, idx)));
+            visiblePlaylists.forEach((playlist, idx) => grid.appendChild(buildPlaylistCard(playlist, idx)));
             section.appendChild(grid);
             container.appendChild(section);
         }
@@ -2411,16 +2444,14 @@
             const isFreeVideo = song.type === 'freevideo' || song.resourceKind === 'commons#video';
             const isVideo = song.resourceKind === 'youtube#video' || isFreeVideo;
             const isDirectAudio = song.type === 'mp3';
-            const imageErrorAction = isDirectAudio
-                ? "this.closest('.card').remove();"
-                : "this.closest('.card-img-wrap').classList.add('img-error'); this.style.display='none';";
+            const imageErrorAction = "removeCardForMissingArtwork(this)";
             div.classList.toggle('video-card', isVideo);
             div.classList.toggle('audio-card', isDirectAudio);
             div.innerHTML = `
                 <div class="card-img-wrap">
                     ${isVideo ? `<span class="video-source-badge"><i class="fas ${isFreeVideo ? 'fa-leaf' : 'fa-play'}"></i> ${isFreeVideo ? 'Libre' : 'Video'}</span><span class="card-duration">${formatContentDuration(song.duration)}</span>` : ''}
                     <div class="skeleton"></div>
-                    <img src="${song.img || ''}" class="card-img" loading="lazy"
+                    <img src="${escapeHtml(song.img || '')}" class="card-img" loading="lazy"
                          onload="this.classList.add('loaded')"
                          onerror="${imageErrorAction}">
                     <div class="card-spinner">
@@ -2461,7 +2492,7 @@
             div.innerHTML = `
                 <div class="card-img-wrap">
                     <span class="playlist-source-badge"><i class="fas fa-list"></i> Lista</span>
-                    <img src="${playlist.img || ''}" class="card-img loaded" loading="lazy" alt="" onerror="this.closest('.card-img-wrap').classList.add('img-error'); this.style.display='none';">
+                    <img src="${escapeHtml(playlist.img || '')}" class="card-img loaded" loading="lazy" alt="" onerror="removeCardForMissingArtwork(this)">
                 </div>
                 <div class="playlist-open"><i class="fas fa-list-music"></i> ${escapeHtml(contentMetaLabel(playlist))}</div>
                 <div class="card-title" title="${escapeHtml(playlist.title)}">${escapeHtml(playlist.title)}</div>
@@ -2472,7 +2503,8 @@
         }
 
         function renderLibraryRail(list, title, icon, isPlaylist = false, options = {}) {
-            if (!list?.length) return;
+            const visibleItems = itemsWithArtwork(list);
+            if (!visibleItems.length) return;
             const container = document.getElementById('dynamicSections');
             const section = document.createElement('section');
             section.className = `library-rail-section ${options.className || ''}`.trim();
@@ -2485,7 +2517,7 @@
             const batchSize = 5;
             let rendered = 0;
             const appendBatch = () => {
-                const nextItems = list.slice(rendered, rendered + batchSize);
+                const nextItems = visibleItems.slice(rendered, rendered + batchSize);
                 if (!nextItems.length) return false;
                 nextItems.forEach((item, offset) => {
                     const index = rendered + offset;
@@ -2494,7 +2526,7 @@
                     rail.appendChild(card);
                 });
                 rendered += nextItems.length;
-                return rendered < list.length;
+                return rendered < visibleItems.length;
             };
             appendBatch();
             rail.addEventListener('scroll', () => {
@@ -2514,13 +2546,14 @@
         }
 
         function renderGrid(list, title, icon) {
-            if (!list || list.length === 0) return;
+            const visibleMedia = itemsWithArtwork(list);
+            if (!visibleMedia.length) return;
             const container = document.getElementById('dynamicSections');
             const section = document.createElement('div');
             section.innerHTML = `<div class="section-title">${icon} ${escapeHtml(title)}</div>`;
             const grid = document.createElement('div');
             grid.className = 'grid';
-            list.forEach((song, idx) => grid.appendChild(buildMediaCard(song, idx)));
+            visibleMedia.forEach((song, idx) => grid.appendChild(buildMediaCard(song, idx)));
             section.appendChild(grid);
             container.appendChild(section);
         }
@@ -3082,7 +3115,7 @@
                 row.dataset.qid = String(song._qid);
                 row.innerHTML = `
                     <i class="fas fa-grip-lines queue-drag-handle" title="Arrastrar para reordenar o quitar"></i>
-                    <img src="${song.img || ''}" class="queue-row-img" loading="lazy" alt="" onerror="this.style.visibility='hidden';">
+                    <img src="${escapeHtml(song.img || '')}" class="queue-row-img" loading="lazy" alt="" onerror="this.closest('.queue-row').remove();">
                     <div class="queue-row-info">
                         <div class="queue-row-title">${escapeHtml(song.title)}</div>
                         <div class="queue-row-artist">${escapeHtml(song.artist)}</div>
@@ -3212,7 +3245,7 @@
                 const button = document.createElement('button');
                 button.type = 'button';
                 button.className = 'video-suggestion';
-                button.innerHTML = `<span class="video-suggestion-thumb"><img src="${item.img || ''}" alt="" loading="lazy" onerror="this.style.visibility='hidden';"><i class="fas fa-play"></i></span><span><span class="video-suggestion-title">${escapeHtml(item.title || 'Video')}</span><span class="video-suggestion-artist">${escapeHtml(item.channelTitle || item.artist || 'YouTube')}</span></span>`;
+                button.innerHTML = `<span class="video-suggestion-thumb"><img src="${escapeHtml(item.img || '')}" alt="" loading="lazy" onerror="this.closest('button').remove();"><i class="fas fa-play"></i></span><span><span class="video-suggestion-title">${escapeHtml(item.title || 'Video')}</span><span class="video-suggestion-artist">${escapeHtml(item.channelTitle || item.artist || 'YouTube')}</span></span>`;
                 button.onclick = () => selectSong(item, item.sourceIndex ?? 0);
                 list.appendChild(button);
             });
