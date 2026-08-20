@@ -1149,7 +1149,7 @@
         let isPlaying = false;
 
         // --- COLA DE REPRODUCCIÓN PERSISTENTE (radio automática) ---
-        const QUEUE_BATCH = 22;       // canciones que se suman en cada ronda de autogeneración
+        const QUEUE_BATCH = 20;       // canciones que se suman en cada ronda de autogeneración
         const QUEUE_LOW_WATER = 5;    // cuando quedan <= a esto por delante, se pide otra ronda
         let queue = [];                // lista completa de la cola actual
         let queueSeenKeys = new Set(); // para no repetir canciones dentro de la cola
@@ -2801,7 +2801,7 @@
         function withQid(song) { return { ...song, _qid: ++queueIdCounter }; }
 
         // Elegir una canción NUEVA desde resultados/tarjetas: arranca una cola nueva de golpe,
-        // reemplazando la anterior, y dispara la autogeneración (22 del mismo artista, luego similares...).
+        // reemplazando la anterior, y dispara la autogeneración (20 del mismo artista, luego similares...).
         function selectSong(song, sourceIdx) {
             const q = withQid(song);
             queue = [q];
@@ -3107,8 +3107,8 @@
         }
 
         // --- AUTOGENERACIÓN DE LA COLA ---
-        // Ronda 0: hasta 22 canciones del mismo artista (sin repetir).
-        // Ronda 1+: hasta 22 canciones de artistas similares, y así sucesivamente sin fin.
+        // Ronda 0: hasta 20 canciones del mismo artista (sin repetir).
+        // Ronda 1+: hasta 20 canciones de artistas similares, y así sucesivamente sin fin.
         async function fetchSameArtistTracks(seedSong, count) {
             if (!seedSong || seedSong.type !== 'yt' || !seedSong.artist) return [];
             let raw = [];
