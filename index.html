@@ -605,6 +605,10 @@
         .video-suggestions-header { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
         .video-suggestions-header h3 { margin: 0; color: #f5f3ff; font: 800 1rem 'Sora', sans-serif; letter-spacing: -.03em; }
         .video-suggestions-header span { color: #9293ae; font-size: .7rem; }
+        .video-suggestions-tools { display: flex; align-items: center; gap: 9px; flex-wrap: wrap; justify-content: flex-end; }
+        .video-autoplay-toggle { display: inline-flex; align-items: center; gap: 6px; border: 1px solid rgba(190,188,255,.2); border-radius: 999px; padding: 6px 9px; color: #a8a9c2; background: rgba(255,255,255,.035); font: 800 .66rem 'Manrope', sans-serif; cursor: pointer; transition: .18s var(--ease); }
+        .video-autoplay-toggle:hover { border-color: rgba(94,234,212,.5); color: #edfffa; }
+        .video-autoplay-toggle.on { border-color: rgba(94,234,212,.55); color: #071016; background: #5eead4; }
         .video-suggestions-list { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
         .video-suggestion { display: grid; min-width: 0; grid-template-columns: 84px minmax(0, 1fr); gap: 9px; align-items: center; border: 0; border-radius: 10px; padding: 7px; color: #eeedff; background: rgba(255,255,255,.035); text-align: left; cursor: pointer; transition: background .18s var(--ease), transform .18s var(--ease); }
         .video-suggestion:hover { background: rgba(94,234,212,.1); transform: translateY(-2px); }
@@ -764,7 +768,7 @@
                     </div>
                 </div>
                 <div class="video-suggestions" id="videoSuggestions" aria-label="Más videos sugeridos">
-                    <div class="video-suggestions-header"><h3>Más videos para seguir viendo</h3><span id="videoSuggestionsContext"></span></div>
+                    <div class="video-suggestions-header"><h3>Más videos para seguir viendo</h3><div class="video-suggestions-tools"><span id="videoSuggestionsContext"></span><button type="button" class="video-autoplay-toggle" id="videoAutoplayToggle" onclick="toggleVideoAutoplay()" aria-pressed="true"><i class="fas fa-forward"></i> Autoplay</button></div></div>
                     <div class="video-suggestions-list" id="videoSuggestionsList"></div>
                 </div>
             </section>
@@ -885,6 +889,8 @@
         let shuffleMode = false;
         let isSeeking = false;
         let lastVolume = 0.8;
+        const VIDEO_AUTOPLAY_STORAGE_KEY = 'youtoo_video_autoplay_v1';
+        let videoAutoplay = localStorage.getItem(VIDEO_AUTOPLAY_STORAGE_KEY) !== 'false';
         let channelFilter = null; // { id, title } cuando el usuario entra a ver el contenido de un canal
         let activeBrowseMode = 'home';
         let homeFeedLoaded = false;
@@ -2379,6 +2385,21 @@
             return [...sameChannel, ...otherVideos].slice(0, 8);
         }
 
+        function renderVideoAutoplayToggle() {
+            const button = document.getElementById('videoAutoplayToggle');
+            if (!button) return;
+            button.classList.toggle('on', videoAutoplay);
+            button.setAttribute('aria-pressed', String(videoAutoplay));
+            button.innerHTML = `<i class="fas fa-forward"></i> Autoplay ${videoAutoplay ? 'activo' : 'pausado'}`;
+        }
+
+        function toggleVideoAutoplay() {
+            videoAutoplay = !videoAutoplay;
+            localStorage.setItem(VIDEO_AUTOPLAY_STORAGE_KEY, String(videoAutoplay));
+            renderVideoAutoplayToggle();
+            showToast(videoAutoplay ? 'Reproducción automática activada' : 'Reproducción automática pausada', 'fa-forward');
+        }
+
         function renderVideoSuggestions(song) {
             const wrapper = document.getElementById('videoSuggestions');
             const list = document.getElementById('videoSuggestionsList');
@@ -2400,6 +2421,23 @@
                 list.appendChild(button);
             });
             wrapper.classList.add('visible');
+            renderVideoAutoplayToggle();
+        }
+
+        function continueVideoAutoplay() {
+            const current = queue[currentIndex];
+            if (!current || current.type !== 'yt' || !videoAutoplay) return false;
+            const currentQueueIndex = queue.findIndex(item => item._qid === currentPlayingQid);
+            if (currentQueueIndex >= 0 && currentQueueIndex + 1 < queue.length) {
+                playQueueAt(currentQueueIndex + 1);
+                return true;
+            }
+            const suggested = getVideoSuggestions(current)[0];
+            if (suggested) {
+                selectSong(suggested, suggested.sourceIndex ?? 0);
+                return true;
+            }
+            return false;
         }
 
         function showVideoStage(song) {
@@ -2477,6 +2515,16 @@
         function nextSong(manual = false) {
             if (queue.length === 0) return;
             if (manual && shuffleMode) { playQueueAt(Math.floor(Math.random() * queue.length)); return; }
+            const current = queue[currentIndex];
+            if (!manual && current?.type === 'yt') {
+                if (continueVideoAutoplay()) return;
+                isPlaying = false;
+                updateIcon();
+                updatePlaybackState();
+                if (!videoAutoplay) showToast('Autoplay pausado: el video terminó', 'fa-forward');
+                else showToast('No hay más videos sugeridos por ahora', 'fa-circle-info');
+                return;
+            }
             const idx = queue.findIndex(s => s._qid === currentPlayingQid);
             let next = idx + 1;
             if (next >= queue.length) next = 0;
