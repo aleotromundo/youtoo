@@ -156,6 +156,18 @@
         .library-rail::-webkit-scrollbar { height: 7px; }
         .library-rail::-webkit-scrollbar-thumb { border-radius: 20px; background: rgba(167,139,250,.65); }
         .library-rail .library-card { flex: 0 0 calc((100% - 72px) / 5); min-width: 170px; scroll-snap-align: start; }
+        .featured-rail { position: relative; isolation: isolate; overflow: hidden; margin-top: 18px; padding: 17px 15px 8px; border: 1px solid rgba(190,188,255,.15); border-radius: 20px; box-shadow: 0 20px 44px rgba(0,0,0,.16); }
+        .featured-rail::before { content: ''; position: absolute; z-index: -1; width: 250px; height: 250px; border-radius: 50%; right: -92px; top: -138px; background: radial-gradient(circle, rgba(255,255,255,.17), transparent 68%); filter: blur(1px); animation: featured-ambient-flow 16s ease-in-out infinite; pointer-events: none; }
+        .featured-rail::after { content: ''; position: absolute; z-index: -1; inset: 0; opacity: .34; background-image: repeating-linear-gradient(135deg, rgba(255,255,255,.06) 0 1px, transparent 1px 12px); pointer-events: none; }
+        .featured-rail .library-rail-title { margin-bottom: 13px; }
+        .featured-rail .library-rail { padding-bottom: 14px; }
+        .featured-rail--violet { background: radial-gradient(500px 220px at 8% -24%, rgba(167,139,250,.27), transparent 72%), linear-gradient(126deg, rgba(47,37,79,.62), rgba(16,17,33,.9) 58%, rgba(12,40,49,.68)); }
+        .featured-rail--aqua { background: radial-gradient(460px 210px at 4% -20%, rgba(94,234,212,.20), transparent 72%), linear-gradient(126deg, rgba(11,52,59,.62), rgba(15,17,33,.9) 58%, rgba(38,31,70,.64)); }
+        .featured-rail--ember { background: radial-gradient(460px 210px at 4% -20%, rgba(251,146,60,.18), transparent 72%), linear-gradient(126deg, rgba(66,31,43,.63), rgba(17,17,32,.9) 58%, rgba(44,33,68,.66)); }
+        .featured-rail--electric { background: radial-gradient(460px 210px at 4% -20%, rgba(96,165,250,.20), transparent 72%), linear-gradient(126deg, rgba(20,42,76,.62), rgba(15,17,33,.9) 58%, rgba(48,31,73,.66)); }
+        .featured-edition { margin-left: 1px; color: rgba(229,227,255,.74); font-size: .62rem; font-weight: 800; letter-spacing: .11em; text-transform: uppercase; }
+        @keyframes featured-ambient-flow { 0%, 100% { transform: translate3d(0,0,0) scale(1); } 50% { transform: translate3d(-32px,34px,0) scale(1.13); } }
+        @media (prefers-reduced-motion: reduce) { .featured-rail::before { animation: none; } }
         @media (max-width: 1180px) { .library-rail .library-card { flex-basis: calc((100% - 36px) / 3); } }
         @media (max-width: 700px) { .library-rail .library-card { flex-basis: 74vw; } .library-rail-hint { display: none; } }
         .discovery-intro { max-width: 720px; margin: 10px 0 24px; color: var(--text-gray); font-size: .9rem; line-height: 1.55; }
@@ -595,7 +607,7 @@
         body.mode-youtoo .nav-links li { border-radius: 11px; padding: 11px 13px; }
         body.mode-youtoo .nav-links li.active { background: linear-gradient(90deg, rgba(167,139,250,.2), rgba(94,234,212,.05)); }
         body.mode-youtoo .nav-links li.active::before { background: var(--accent-2); box-shadow: 0 0 10px rgba(94,234,212,.45); }
-        body.mode-youtoo .content-area { padding: 25px 32px; background: radial-gradient(900px 480px at 58% -18%, rgba(139,92,246,.21), transparent 61%), radial-gradient(730px 430px at 100% 26%, rgba(45,212,191,.08), transparent 67%), var(--bg-dark); }
+        body.mode-youtoo .content-area { padding: 25px 32px; background: radial-gradient(900px 480px at 58% -18%, rgba(139,92,246,.21), transparent 61%), radial-gradient(730px 430px at 100% 26%, rgba(45,212,191,.08), transparent 67%), radial-gradient(580px 360px at 12% 80%, rgba(69,45,125,.12), transparent 73%), repeating-linear-gradient(125deg, rgba(255,255,255,.018) 0 1px, transparent 1px 13px), var(--bg-dark); }
         body.mode-youtoo .search-container { display: flex; align-items: center; padding: 7px 0 21px; background: rgba(15,16,32,.82); }
         body.mode-youtoo .search-wrap { max-width: 720px; width: 100%; }
         body.mode-youtoo .search-input { background: #1a1b30; border: 1px solid rgba(190,188,255,.18); color: white; border-radius: 13px; padding: 15px 46px; }
@@ -978,6 +990,9 @@
         let activeBrowseMode = 'home';
         let homeFeedLoaded = false;
         let homeFeedLoading = false;
+        const FEATURED_ROTATION_STORAGE_KEY = 'nowarfy_featured_rotation_v1';
+        const FEATURED_EDITION_SIZE = 5;
+        const FEATURED_THEMES = ['violet', 'aqua', 'ember', 'electric'];
         let homeVideos = [];
         let homeMusicVideos = [];
         let homeShortVideos = [];
@@ -1742,11 +1757,38 @@
             }
         }
 
+        function featuredHash(value) {
+            return Array.from(String(value)).reduce((total, char) => ((total << 5) - total + char.charCodeAt(0)) | 0, 0);
+        }
+
+        function getFeaturedEdition(videos) {
+            const source = uniqueMediaByUrl(videos || [], (videos || []).length);
+            if (!source.length) return { items: [], edition: 1, theme: FEATURED_THEMES[0] };
+            const signature = source.map(item => String(item.url || '')).join('|');
+            let previous = null;
+            try { previous = JSON.parse(localStorage.getItem(FEATURED_ROTATION_STORAGE_KEY)); } catch (e) { /* estado nuevo */ }
+            const seed = Math.abs(featuredHash(signature));
+            const offset = previous?.signature === signature
+                ? (Number(previous.offset || 0) + FEATURED_EDITION_SIZE) % source.length
+                : seed % source.length;
+            const edition = Math.floor(offset / FEATURED_EDITION_SIZE) + 1;
+            const theme = FEATURED_THEMES[edition % FEATURED_THEMES.length];
+            try { localStorage.setItem(FEATURED_ROTATION_STORAGE_KEY, JSON.stringify({ signature, offset, edition, at: Date.now() })); } catch (e) { /* almacenamiento no disponible */ }
+            return { items: source.slice(offset).concat(source.slice(0, offset)), edition, theme };
+        }
+
         function renderHomeFeed() {
             const container = document.getElementById('dynamicSections');
             container.innerHTML = '';
             currentList = [];
-            if (homeVideos.length) renderLibraryRail(homeVideos, 'Videos destacados', "<i class='fas fa-clapperboard'></i>");
+            if (homeVideos.length) {
+                const featured = getFeaturedEdition(homeVideos);
+                renderLibraryRail(featured.items, 'Videos destacados', "<i class='fas fa-clapperboard'></i>", false, {
+                    className: `featured-rail featured-rail--${featured.theme}`,
+                    eyebrow: `Edición ${featured.edition}`,
+                    hint: '5 visibles · selección rotativa'
+                });
+            }
             if (homeMusicVideos.length) renderLibraryRail(homeMusicVideos, 'Música para escuchar', "<i class='fab fa-youtube'></i>");
             if (homePlaylists.length) renderLibraryRail(homePlaylists, 'Listas y álbumes', "<i class='fas fa-layer-group'></i>", true);
             if (!homeVideos.length && !homeMusicVideos.length && !homePlaylists.length && !homeMusic.length) renderEmptyState('No hay opciones disponibles ahora', 'Probá buscar un artista o volvé a intentar más tarde.');
@@ -2145,12 +2187,14 @@
             return div;
         }
 
-        function renderLibraryRail(list, title, icon, isPlaylist = false) {
+        function renderLibraryRail(list, title, icon, isPlaylist = false, options = {}) {
             if (!list?.length) return;
             const container = document.getElementById('dynamicSections');
             const section = document.createElement('section');
-            section.className = 'library-rail-section';
-            section.innerHTML = `<div class="library-rail-title">${icon} <span>${escapeHtml(title)}</span><span class="library-rail-hint">5 visibles · deslizá para explorar</span></div>`;
+            section.className = `library-rail-section ${options.className || ''}`.trim();
+            const eyebrow = options.eyebrow ? `<span class="featured-edition">${escapeHtml(options.eyebrow)}</span>` : '';
+            const hint = options.hint || '5 visibles · deslizá para explorar';
+            section.innerHTML = `<div class="library-rail-title">${icon} <span>${escapeHtml(title)}</span>${eyebrow}<span class="library-rail-hint">${escapeHtml(hint)}</span></div>`;
             const rail = document.createElement('div');
             rail.className = 'library-rail';
             const batchSize = 5;
