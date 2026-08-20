@@ -80,6 +80,8 @@
             -webkit-background-clip: text; background-clip: text; color: transparent;
             filter: drop-shadow(0 0 10px var(--accent-glow));
         }
+        .brand-nowarfi { display: inline-flex; align-items: center; gap: 10px; }
+        .brand-nowarfi-mark { width: 30px; height: 30px; object-fit: contain; filter: drop-shadow(0 0 9px rgba(139,92,246,.35)); }
 
         .nav-links li {
             list-style: none; margin-bottom: 6px; cursor: pointer; padding: 10px 14px; border-radius: 8px;
@@ -764,7 +766,7 @@
     <div class="main-container">
         <!-- SIDEBAR -->
         <aside class="sidebar" aria-label="Navegación principal de Nowarfy">
-            <div class="logo"><span class="brand-nowarfi"><i class="fas fa-eye"></i> Nowarfy</span><span class="brand-youtoo"><img src="assets/nowarfy-icon-512.png" alt="Ojo de Nowarfy"> Nowarfy <small>· YouToo</small></span></div>
+            <div class="logo"><span class="brand-nowarfi"><img class="brand-nowarfi-mark" src="assets/nowarfy-icon-512.png" alt=""> Nowarfy</span><span class="brand-youtoo"><img src="assets/nowarfy-icon-512.png" alt="Paloma de Nowarfy"> Nowarfy <small>· YouToo</small></span></div>
             <div class="nowarfy-nav-groups">
                 <section class="nowarfy-nav-group" aria-label="Descubrir">
                     <span class="nowarfy-nav-label">Descubrir</span>
@@ -947,6 +949,11 @@
         let lastVolume = 0.8;
         const VIDEO_AUTOPLAY_STORAGE_KEY = 'youtoo_video_autoplay_v1';
         let videoAutoplay = localStorage.getItem(VIDEO_AUTOPLAY_STORAGE_KEY) !== 'false';
+        let playbackStoppedByUser = false;
+        let automaticAdvanceTimer = null;
+        let automaticAdvanceTargetQid = null;
+        let automaticQueueRecoveryInFlight = false;
+        const PLAYBACK_CONTINUITY_CHECK_MS = 9000;
         let channelFilter = null; // { id, title } cuando el usuario entra a ver el contenido de un canal
         let activeBrowseMode = 'home';
         let homeFeedLoaded = false;
@@ -985,6 +992,7 @@
         restoreQueueFromStorage();
         setupQueueTrashDropzone();
         setupBackgroundPersistence();
+        setupPlaybackContinuity();
         setupInstallableApp();
         renderQueue();
 
@@ -2338,17 +2346,26 @@
                 const remaining = Number(audio.duration) - Number(audio.currentTime);
                 if (!crossfadeInProgress && current?.type === 'mp3' && next?.type === 'mp3' && Number.isFinite(remaining) && remaining > 0 && remaining <= CROSSFADE_SECONDS) beginDirectAudioCrossfade();
             };
-            audio.onended = () => { if (audio === activeAudioEl && !crossfadeInProgress) nextSong(); };
+            audio.onended = () => {
+                if (audio === activeAudioEl && !crossfadeInProgress) queueAutomaticAdvance('direct-ended');
+            };
             audio.onwaiting = () => { if (audio === activeAudioEl) setTrackLoading(true, currentSourceIdx); };
             audio.onplaying = () => {
                 if (audio !== activeAudioEl) return;
+                playbackStoppedByUser = false;
                 isPlaying = true;
                 updateIcon();
+                updatePlaybackState();
                 setTrackLoading(false);
                 if (!progressInterval) startProgress(audio);
                 prepareNextDirectAudio();
             };
-            audio.onerror = () => { if (audio === activeAudioEl) { setTrackLoading(false); showToast('No se pudo reproducir esta pista', 'fa-triangle-exclamation'); } };
+            audio.onerror = () => {
+                if (audio !== activeAudioEl) return;
+                setTrackLoading(false);
+                showToast('No se pudo reproducir esta pista; seguimos con la siguiente', 'fa-triangle-exclamation');
+                queueAutomaticAdvance('direct-error');
+            };
         }
 
         function cancelDirectCrossfade() {
@@ -2407,12 +2424,14 @@
                 };
                 tick();
                 crossfadeTimer = setInterval(tick, 50);
-            }).catch(() => { crossfadeInProgress = false; nextSong(); });
+            }).catch(() => { crossfadeInProgress = false; queueAutomaticAdvance('crossfade-error'); });
         }
 
         // Reproduce el ítem "idx" de la cola (fuente de verdad para next/prev/togglePlay).
         function playQueueAt(idx, options = {}) {
             if (idx < 0 || idx >= queue.length) return;
+            clearAutomaticAdvance();
+            playbackStoppedByUser = false;
             currentIndex = idx;
             const song = queue[idx];
             currentPlayingQid = song._qid;
@@ -2712,14 +2731,14 @@
             if (!button) return;
             button.classList.toggle('on', videoAutoplay);
             button.setAttribute('aria-pressed', String(videoAutoplay));
-            button.innerHTML = `<i class="fas fa-forward"></i> Autoplay ${videoAutoplay ? 'activo' : 'pausado'}`;
+            button.innerHTML = `<i class="fas fa-forward"></i> ${videoAutoplay ? 'Sugerencias auto' : 'Solo cola'}`;
         }
 
         function toggleVideoAutoplay() {
             videoAutoplay = !videoAutoplay;
             localStorage.setItem(VIDEO_AUTOPLAY_STORAGE_KEY, String(videoAutoplay));
             renderVideoAutoplayToggle();
-            showToast(videoAutoplay ? 'Reproducción automática activada' : 'Reproducción automática pausada', 'fa-forward');
+            showToast(videoAutoplay ? 'Sugerencias automáticas activadas' : 'Sugerencias pausadas; la cola sigue sonando', 'fa-forward');
         }
 
         function renderVideoSuggestions(song) {
@@ -2748,18 +2767,86 @@
 
         function continueVideoAutoplay() {
             const current = queue[currentIndex];
-            if (!current || current.type !== 'yt' || !videoAutoplay) return false;
+            if (!current || current.type !== 'yt') return false;
             const currentQueueIndex = queue.findIndex(item => item._qid === currentPlayingQid);
+            // Aunque se apaguen las sugerencias automáticas de video, una cola ya armada nunca debe cortarse sola.
             if (currentQueueIndex >= 0 && currentQueueIndex + 1 < queue.length) {
                 playQueueAt(currentQueueIndex + 1);
                 return true;
             }
+            if (!videoAutoplay) return false;
             const suggested = getVideoSuggestions(current)[0];
             if (suggested) {
                 selectSong(suggested, suggested.sourceIndex ?? 0);
                 return true;
             }
             return false;
+        }
+
+        function clearAutomaticAdvance() {
+            if (automaticAdvanceTimer) window.clearTimeout(automaticAdvanceTimer);
+            automaticAdvanceTimer = null;
+            automaticAdvanceTargetQid = null;
+        }
+
+        function appendAutomaticFallback(song) {
+            if (!song?.url) return false;
+            const key = songKey(song);
+            if (queueSeenKeys.has(key)) return false;
+            const queued = withQid(song);
+            queueSeenKeys.add(key);
+            queue.push(queued);
+            persistQueue();
+            renderQueue();
+            playQueueAt(queue.length - 1, { sourceIdx: song.sourceIndex ?? null });
+            return true;
+        }
+
+        function findAutomaticFallback(current) {
+            const currentId = String(current?.url || '');
+            const candidates = [...currentList, ...homeMusic, ...homeMusicVideos, ...homeVideos]
+                .filter(item => item?.url && String(item.url) !== currentId);
+            return candidates.find(item => !queueSeenKeys.has(songKey(item))) || null;
+        }
+
+        async function recoverAutomaticQueue(targetQid) {
+            if (automaticQueueRecoveryInFlight || playbackStoppedByUser || currentPlayingQid !== targetQid) return false;
+            automaticQueueRecoveryInFlight = true;
+            try {
+                const current = currentQueueSong();
+                const immediateFallback = findAutomaticFallback(current);
+                if (appendAutomaticFallback(immediateFallback)) return true;
+
+                await growQueueIfNeeded();
+                if (playbackStoppedByUser || currentPlayingQid !== targetQid) return false;
+                const currentQueueIndex = queue.findIndex(item => item._qid === targetQid);
+                if (currentQueueIndex >= 0 && currentQueueIndex + 1 < queue.length) {
+                    playQueueAt(currentQueueIndex + 1);
+                    return true;
+                }
+                return false;
+            } catch (error) {
+                console.warn('No se pudo recuperar una pista para continuar la cola', error);
+                return false;
+            } finally {
+                automaticQueueRecoveryInFlight = false;
+            }
+        }
+
+        function queueAutomaticAdvance(reason = 'ended') {
+            const targetQid = currentPlayingQid;
+            if (!targetQid || playbackStoppedByUser || automaticAdvanceTargetQid === targetQid) return;
+            automaticAdvanceTargetQid = targetQid;
+            automaticAdvanceTimer = window.setTimeout(async () => {
+                automaticAdvanceTimer = null;
+                if (playbackStoppedByUser || currentPlayingQid !== targetQid) return;
+                if (nextSong(false)) return;
+                if (await recoverAutomaticQueue(targetQid)) return;
+                isPlaying = false;
+                updateIcon();
+                updatePlaybackState();
+                if (reason.endsWith('error')) showToast('No encontramos otra pista reproducible en este momento', 'fa-triangle-exclamation');
+            }, 180);
         }
 
         function updateVideoStageToggle(isVisible) {
@@ -2828,17 +2915,32 @@
             if (ytPlayer.setVolume) ytPlayer.setVolume(v * 100);
         }
         function onYTStateChange(event) {
-            if (event.data === YT.PlayerState.PLAYING) { isPlaying = true; setTrackLoading(false); if (!progressInterval) startProgress(ytPlayer); }
-            else if (event.data === YT.PlayerState.PAUSED) { isPlaying = false; }
-            else if (event.data === YT.PlayerState.BUFFERING) { setTrackLoading(true, currentIndex); }
-            else if (event.data === YT.PlayerState.ENDED) { nextSong(); }
+            if (event?.target && event.target !== ytPlayer) return;
+            if (event.data === YT.PlayerState.PLAYING) {
+                playbackStoppedByUser = false;
+                isPlaying = true;
+                setTrackLoading(false);
+                if (!progressInterval) startProgress(ytPlayer);
+            } else if (event.data === YT.PlayerState.PAUSED) {
+                isPlaying = false;
+            } else if (event.data === YT.PlayerState.BUFFERING) {
+                setTrackLoading(true, currentIndex);
+            } else if (event.data === YT.PlayerState.ENDED) {
+                isPlaying = false;
+                queueAutomaticAdvance('youtube-ended');
+            }
             updateIcon();
             updatePlaybackState();
         }
-        function onYTError() {
+        function onYTError(event) {
+            if (event?.target && event.target !== ytPlayer) return;
             setTrackLoading(false);
+            isPlaying = false;
             document.getElementById('videoStage').classList.add('is-error');
-            showToast('Este video no permite reproducción embebida', 'fa-triangle-exclamation');
+            showToast('Este video no permite reproducción embebida; seguimos con el siguiente', 'fa-triangle-exclamation');
+            queueAutomaticAdvance('youtube-error');
+            updateIcon();
+            updatePlaybackState();
         }
 
         function togglePlay() {
@@ -2846,6 +2948,12 @@
             // Si venimos de restaurar la cola guardada y todavía no se cargó nada en el reproductor, arrancarla.
             if (!ytPlayer && !audioEl.src) { playQueueAt(currentIndex); return; }
             const song = queue[currentIndex];
+            if (isPlaying) {
+                playbackStoppedByUser = true;
+                clearAutomaticAdvance();
+            } else {
+                playbackStoppedByUser = false;
+            }
             if (song.type === 'yt') {
                 if (ytPlayer) { if (isPlaying) ytPlayer.pauseVideo(); else ytPlayer.playVideo(); isPlaying = !isPlaying; }
             } else {
@@ -2857,22 +2965,20 @@
         }
 
         function nextSong(manual = false) {
-            if (queue.length === 0) return;
-            if (manual && shuffleMode) { playQueueAt(Math.floor(Math.random() * queue.length)); return; }
-            const current = queue[currentIndex];
-            if (!manual && current?.type === 'yt') {
-                if (continueVideoAutoplay()) return;
-                isPlaying = false;
-                updateIcon();
-                updatePlaybackState();
-                if (!videoAutoplay) showToast('Autoplay pausado: el video terminó', 'fa-forward');
-                else showToast('No hay más videos sugeridos por ahora', 'fa-circle-info');
-                return;
+            if (queue.length === 0) return false;
+            if (manual && shuffleMode) {
+                playQueueAt(Math.floor(Math.random() * queue.length));
+                return true;
             }
+            const current = queue[currentIndex];
+            if (!manual && current?.type === 'yt') return continueVideoAutoplay();
             const idx = queue.findIndex(s => s._qid === currentPlayingQid);
+            if (idx === -1) return false;
+            if (!manual && queue.length === 1) return false;
             let next = idx + 1;
             if (next >= queue.length) next = 0;
             playQueueAt(next);
+            return true;
         }
         function prevSong() {
             if (queue.length === 0) return;
@@ -2882,6 +2988,7 @@
             playQueueAt(prev);
         }
         function stopAll() {
+            clearAutomaticAdvance();
             if (ytPlayer) { ytPlayer.stopVideo(); ytPlayer.destroy(); ytPlayer = null; }
             pendingYTRequest = null;
             clearInterval(crossfadeTimer);
@@ -2892,6 +2999,7 @@
             progressInterval = null;
             isPlaying = false;
             updateIcon();
+            updatePlaybackState();
             progFill.style.width = '0%';
             progThumb.style.left = '0%';
         }
@@ -3090,6 +3198,20 @@
         function updatePlaybackState() {
             if ('mediaSession' in navigator) navigator.mediaSession.playbackState = isPlaying ? 'playing' : 'paused';
         }
+        function setupPlaybackContinuity() {
+            const inspectCurrentPlayback = () => {
+                if (playbackStoppedByUser || !isPlaying || !currentPlayingQid) return;
+                const current = currentQueueSong();
+                if (!current) return;
+                if (current.type === 'mp3' && activeAudioEl?.ended) queueAutomaticAdvance('direct-ended-fallback');
+                if (current.type === 'yt' && ytPlayer?.getPlayerState && window.YT && ytPlayer.getPlayerState() === YT.PlayerState.ENDED) queueAutomaticAdvance('youtube-ended-fallback');
+            };
+            automaticAdvanceTimer = null;
+            window.setInterval(inspectCurrentPlayback, PLAYBACK_CONTINUITY_CHECK_MS);
+            document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') inspectCurrentPlayback(); });
+            window.addEventListener('focus', inspectCurrentPlayback);
+        }
+
         function setupBackgroundPersistence() {
             const save = () => { persistQueue(); updatePlaybackState(); };
             document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') save(); });
