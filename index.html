@@ -746,16 +746,16 @@
         .catalog-more:hover { transform: translateY(-2px); color: #09111a; background: #5eead4; }
         .catalog-more:disabled { cursor: progress; opacity: .65; transform: none; }
         /* Navegación completa de Nowarfy: solo estado local y acciones ya disponibles en el cliente. */
-        body.mode-youtoo .sidebar { padding: 18px 14px calc(var(--player-height) + 18px); gap: 16px; overflow-y: auto; scroll-padding-bottom: calc(var(--player-height) + 18px); }
+        body.mode-youtoo .sidebar { min-height: 0; padding: 18px 14px calc(var(--player-height) + 18px); gap: 16px; overflow-y: auto; overscroll-behavior: contain; scroll-padding-bottom: calc(var(--player-height) + 18px); }
         body.mode-youtoo .logo { display: flex; align-items: center; min-height: 38px; }
         .brand-youtoo small { color: #8f90aa; font: 800 .62rem 'Manrope', sans-serif; letter-spacing: .08em; }
-        .nowarfy-nav-groups { display: flex; flex: 1; min-height: 0; flex-direction: column; gap: 18px; }
+        .nowarfy-nav-groups { display: flex; flex: 0 0 auto; min-height: auto; flex-direction: column; gap: 18px; }
         .nowarfy-nav-group { margin: 0; }
         .nowarfy-nav-label { display: block; padding: 0 11px 7px; color: #73748f; font: 800 .62rem 'Manrope', sans-serif; letter-spacing: .13em; text-transform: uppercase; }
         body.mode-youtoo .nowarfy-nav-group .nav-links { margin: 0; padding: 0; }
         body.mode-youtoo .nowarfy-nav-group .nav-links li { min-height: 39px; margin-bottom: 2px; }
         .nowarfy-nav-separator { height: 1px; margin: 1px 10px 10px; background: rgba(190,188,255,.12); }
-        .nowarfy-side-status { margin: auto 9px 2px; padding: 11px 10px; border: 1px solid rgba(94,234,212,.16); border-radius: 11px; background: rgba(94,234,212,.045); color: #adaec4; font-size: .68rem; line-height: 1.4; }
+        .nowarfy-side-status { flex: 0 0 auto; margin: 2px 9px 0; padding: 11px 10px; border: 1px solid rgba(94,234,212,.16); border-radius: 11px; background: rgba(94,234,212,.045); color: #adaec4; font-size: .68rem; line-height: 1.4; }
         .nowarfy-side-status strong { display: flex; align-items: center; gap: 7px; margin-bottom: 3px; color: #dcfff8; font-size: .7rem; }
         .nowarfy-side-status i { color: #5eead4; font-size: .56rem; }
         body.mode-youtoo .sidebar::after { display: none; }
