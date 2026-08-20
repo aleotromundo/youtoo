@@ -34,9 +34,12 @@ function commonsLicenseAllowed(value) {
 function mapCommonsVideoPage(page) {
   const info = page?.imageinfo?.[0];
   const mime = String(info?.mime || '').toLowerCase();
+  const width = Number(info?.width || 0);
+  const height = Number(info?.height || 0);
   const license = stripHtml(info?.extmetadata?.LicenseShortName?.value || info?.extmetadata?.UsageTerms?.value || '');
   if (!info?.url || !info?.thumburl || !commonsLicenseAllowed(license)) return null;
-  if (!['video/webm', 'application/ogg'].includes(mime)) return null;
+  const isOggVideo = ['video/ogg', 'application/ogg'].includes(mime) && width > 0 && height > 0;
+  if (mime !== 'video/webm' && !isOggVideo) return null;
   const durationRaw = stripHtml(info?.extmetadata?.Duration?.value || '');
   const duration = Number.parseFloat(durationRaw);
   return {
@@ -50,8 +53,8 @@ function mapCommonsVideoPage(page) {
     thumbnail: info.thumburl,
     sourceUrl: page?.canonicalurl || `https://commons.wikimedia.org/wiki/${encodeURIComponent(String(page?.title || ''))}`,
     duration: Number.isFinite(duration) && duration > 0 ? Math.round(duration) : null,
-    width: Number(info.width || 0),
-    height: Number(info.height || 0)
+    width,
+    height
   };
 }
 
