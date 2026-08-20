@@ -3142,6 +3142,39 @@
             } catch (e) { return []; }
         }
 
+        function appendUniqueSongs(candidates, target, limit) {
+            for (const song of candidates || []) {
+                if (target.length >= limit || !song?.url) break;
+                const key = songKey(song);
+                if (queueSeenKeys.has(key)) continue;
+                queueSeenKeys.add(key);
+                target.push(withQid(song));
+            }
+        }
+
+        async function buildAutomaticBatch(seed) {
+            const added = [];
+            const remaining = () => QUEUE_BATCH - added.length;
+
+            // Primera prioridad: canciones del mismo artista, siempre sin repetir.
+            if (queueRound === 0) {
+                appendUniqueSongs(await fetchSameArtistTracks(seed, remaining()), added, QUEUE_BATCH);
+                queueRound = 1;
+            }
+
+            // Si el artista no tiene suficientes resultados, completar con artistas similares.
+            if (remaining() > 0) {
+                appendUniqueSongs(await fetchSimilarArtistTracks(seed, remaining()), added, QUEUE_BATCH);
+            }
+
+            // Último respaldo para que la radio no se quede sin contenido.
+            if (remaining() > 0) {
+                appendUniqueSongs(await fetchRockMetalTracks(remaining()), added, QUEUE_BATCH);
+            }
+
+            return added;
+        }
+
         async function growQueueIfNeeded() {
             if (queueFetching || queue.length === 0) return;
             const idx = queue.findIndex(s => s._qid === currentPlayingQid);
@@ -3152,19 +3185,7 @@
             queueFetching = true;
             toggleQueueLoadingHint(true);
             try {
-                let added = [];
-                if (queueRound === 0) {
-                    added = await fetchSameArtistTracks(seed, QUEUE_BATCH);
-                    queueRound = 1;
-                    if (added.length < 6) added = added.concat(await fetchSimilarArtistTracks(seed, QUEUE_BATCH - added.length));
-                } else {
-                    added = await fetchSimilarArtistTracks(seed, QUEUE_BATCH);
-                }
-                if (added.length < 6) added = added.concat(await fetchRockMetalTracks(QUEUE_BATCH - added.length));
-                added = added
-                    .filter(s => s && s.url)
-                    .filter(s => { const k = songKey(s); if (queueSeenKeys.has(k)) return false; queueSeenKeys.add(k); return true; })
-                    .map(withQid);
+                const added = await buildAutomaticBatch(seed);
                 if (added.length) {
                     queue = queue.concat(added);
                     persistQueue();
