@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>NowarFi · YouToo</title>
+    <title>YouToo · Descubrí lo que suena</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -528,36 +528,6 @@
             .progress-bar span { display: none; }
         }
 
-        /* --- SELECTOR DE EXPERIENCIA --- */
-        .mode-selector-screen {
-            position: fixed; inset: 0; z-index: 2000; display: grid; place-items: center; overflow: auto;
-            padding: 32px; background: radial-gradient(circle at 16% 18%, rgba(29,185,84,.16), transparent 29%), radial-gradient(circle at 86% 80%, rgba(139,92,246,.19), transparent 31%), #090909;
-            transition: opacity .35s var(--ease), visibility .35s var(--ease);
-        }
-        .mode-selector-screen.hidden { opacity: 0; visibility: hidden; pointer-events: none; }
-        .mode-picker { width: min(1020px, 100%); }
-        .mode-picker-kicker { color: #8d8d8d; font-size: .74rem; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; margin-bottom: 12px; }
-        .mode-picker h1 { font-family: 'Sora', sans-serif; font-size: clamp(2rem, 5vw, 4.3rem); line-height: .98; letter-spacing: -.07em; max-width: 760px; }
-        .mode-picker h1 span { color: #a9a9a9; font-weight: 600; }
-        .mode-picker-subtitle { max-width: 580px; color: #9a9a9a; margin: 20px 0 34px; font-size: 1rem; line-height: 1.6; }
-        .mode-picker-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; }
-        .mode-choice { min-height: 355px; border: 1px solid rgba(255,255,255,.11); border-radius: 22px; padding: 28px; text-align: left; color: white; cursor: pointer; overflow: hidden; position: relative; isolation: isolate; display: flex; flex-direction: column; justify-content: space-between; transition: transform .3s var(--ease), border-color .3s var(--ease), box-shadow .3s var(--ease); }
-        .mode-choice:hover { transform: translateY(-8px); border-color: rgba(255,255,255,.32); box-shadow: 0 24px 60px rgba(0,0,0,.45); }
-        .mode-choice::before { content: ''; position: absolute; width: 320px; height: 320px; border-radius: 50%; z-index: -1; filter: blur(3px); opacity: .9; }
-        .mode-nowarfi { background: linear-gradient(145deg, #181818, #101010); }
-        .mode-nowarfi::before { right: -95px; bottom: -150px; background: radial-gradient(circle, rgba(29,185,84,.68), transparent 68%); }
-        .mode-youtoo { background: linear-gradient(145deg, #17132a, #0e101c); }
-        .mode-youtoo::before { right: -95px; bottom: -150px; background: radial-gradient(circle, rgba(139,92,246,.76), transparent 64%); }
-        .mode-choice-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-        .mode-choice-badge { border: 1px solid rgba(255,255,255,.18); background: rgba(0,0,0,.18); border-radius: 99px; padding: 7px 10px; font-size: .68rem; font-weight: 800; letter-spacing: .07em; text-transform: uppercase; }
-        .mode-brand { display: flex; align-items: center; gap: 11px; font-family: 'Sora', sans-serif; font-weight: 800; font-size: 1.35rem; letter-spacing: -.05em; }
-        .mode-brand i { color: var(--accent); font-size: 1.55rem; }
-        .mode-brand img { width: 36px; height: 36px; object-fit: contain; filter: drop-shadow(0 7px 12px rgba(45,212,191,.2)); }
-        .mode-choice-title { display: block; font-family: 'Sora', sans-serif; max-width: 300px; font-size: clamp(1.55rem, 3vw, 2.25rem); letter-spacing: -.05em; line-height: 1.06; margin-top: auto; }
-        .mode-choice-copy { display: block; color: rgba(255,255,255,.69); font-size: .9rem; line-height: 1.5; max-width: 365px; margin: 12px 0 20px; }
-        .mode-choice-action { display: inline-flex; align-items: center; gap: 9px; width: fit-content; border: 0; border-radius: 10px; padding: 12px 15px; background: white; color: #0c0c0c; font-weight: 800; cursor: pointer; }
-        .mode-youtoo .mode-choice-action { background: linear-gradient(135deg, #a78bfa, #5eead4); }
-
         /* --- MODO YOUTOO: exploración audiovisual original --- */
         body.mode-youtoo { --bg-black: #0a0a12; --bg-dark: #0f1020; --bg-card: #17182b; --bg-hover: #22233b; --accent: #a78bfa; --accent-hover: #c4b5fd; --accent-glow: rgba(167,139,250,.34); --accent-2: #5eead4; --border-soft: rgba(190,188,255,.13); }
         body.mode-youtoo .sidebar { width: 265px; background: rgba(10,10,18,.94); padding: 21px 17px; gap: 28px; }
@@ -593,37 +563,19 @@
         body.mode-youtoo .player-bar { background: rgba(16,16,31,.94); }
         body.mode-youtoo .queue-panel { background: #17182b; }
         body.mode-youtoo .volume-slider { background: linear-gradient(to right, #a78bfa 80%, #484960 80%); }
-        .mode-switch-item { margin-top: 18px !important; border: 1px dashed rgba(255,255,255,.16) !important; }
-        .mode-switch-item i { color: var(--accent-2); }
+        .youtoo-hero { position: relative; overflow: hidden; margin: 3px 0 22px; padding: 18px 0 3px; }
+        .youtoo-hero::after { content: ''; position: absolute; width: 215px; height: 215px; right: 7%; top: -120px; border-radius: 50%; background: radial-gradient(circle, rgba(94,234,212,.22), transparent 68%); pointer-events: none; }
+        .youtoo-hero-kicker { color: #5eead4; font-size: .68rem; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; }
+        .youtoo-hero h1 { font-family: 'Sora', sans-serif; font-size: clamp(1.6rem, 3.4vw, 2.7rem); letter-spacing: -.06em; line-height: 1.08; max-width: 620px; margin: 8px 0; }
+        .youtoo-hero p { color: #9d9eb7; max-width: 550px; font-size: .9rem; line-height: 1.55; }
         @media (max-width: 768px) {
-            .mode-selector-screen { padding: 18px; }
-            .mode-picker h1 { font-size: 2.3rem; }
-            .mode-picker-grid { grid-template-columns: 1fr; }
-            .mode-choice { min-height: 270px; }
             body.mode-youtoo .sidebar { width: 100%; }
             body.mode-youtoo .sidebar::after, body.mode-youtoo .brand-youtoo { display: none; }
+            .youtoo-hero { padding-top: 6px; }
         }
     </style>
 </head>
-<body>
-
-    <section class="mode-selector-screen" id="modeSelector" aria-label="Elegir experiencia">
-        <div class="mode-picker">
-            <p class="mode-picker-kicker">Dos formas de descubrir música</p>
-            <h1>Elegí cómo querés <span>explorar hoy.</span></h1>
-            <p class="mode-picker-subtitle">Conservamos la experiencia musical de siempre y sumamos una mirada audiovisual nueva. Podés volver a este selector cuando quieras.</p>
-            <div class="mode-picker-grid">
-                <button class="mode-choice mode-nowarfi" onclick="chooseExperience('nowarfi')">
-                    <span class="mode-choice-top"><span class="mode-brand"><i class="fab fa-spotify"></i> NowarFi</span><span class="mode-choice-badge">Tu biblioteca</span></span>
-                    <span><strong class="mode-choice-title">Tu radio ilimitada, como siempre.</strong><span class="mode-choice-copy">La experiencia musical enfocada en estados de ánimo, descubrimiento y cola automática.</span><span class="mode-choice-action">Entrar a NowarFi <i class="fas fa-arrow-right"></i></span></span>
-                </button>
-                <button class="mode-choice mode-youtoo" onclick="chooseExperience('youtoo')">
-                    <span class="mode-choice-top"><span class="mode-brand"><img src="assets/youtoo-mark-compact.png" alt=""> YouToo</span><span class="mode-choice-badge">Nueva experiencia</span></span>
-                    <span><strong class="mode-choice-title">Explorá video, audio y creadores.</strong><span class="mode-choice-copy">Una lectura audiovisual con tarjetas grandes, filtros ágiles y una identidad propia.</span><span class="mode-choice-action">Probar YouToo <i class="fas fa-arrow-right"></i></span></span>
-                </button>
-            </div>
-        </div>
-    </section>
+<body class="mode-youtoo">
 
     <div class="main-container">
         <!-- SIDEBAR -->
@@ -632,7 +584,6 @@
             <ul class="nav-links">
                 <li onclick="resetView()" class="active"><i class="fas fa-house"></i> <span>Inicio</span></li>
                 <li onclick="showSection('favorites')"><i class="fas fa-heart"></i> <span>Favoritos</span></li>
-                <li class="mode-switch-item" onclick="openExperiencePicker()"><i class="fas fa-grid-2"></i> <span>Cambiar experiencia</span></li>
             </ul>
         </div>
 
@@ -641,10 +592,16 @@
             <div class="search-container">
                 <div class="search-wrap">
                     <i class="fas fa-magnifying-glass"></i>
-                    <input type="text" class="search-input" id="searchInput" placeholder="Busca cualquier cosa: Nirvana, Tool, Rock..." onkeyup="handleSearchDebounced()">
+                    <input type="text" class="search-input" id="searchInput" placeholder="Buscá videos, artistas o canciones..." onkeyup="handleSearchDebounced()">
                     <button class="search-clear" id="searchClear" onclick="clearSearch()" aria-label="Limpiar búsqueda"><i class="fas fa-xmark"></i></button>
                 </div>
             </div>
+
+            <section class="youtoo-hero" aria-label="Descubrir en YouToo">
+                <p class="youtoo-hero-kicker">Exploración audiovisual</p>
+                <h1>Encontrá algo que quieras ver y escuchar.</h1>
+                <p>Buscá artistas, canciones y videos; YouToo organiza tu próxima reproducción en una experiencia audiovisual propia.</p>
+            </section>
 
             <div class="mood-selector">
                 <button class="mood-btn mood-energy" onclick="setMood('energy')"><i class="fas fa-bolt"></i> Energía</button>
@@ -801,19 +758,6 @@
         const totalTimeEl = document.getElementById('totalTime');
         const searchInput = document.getElementById('searchInput');
         const searchClearBtn = document.getElementById('searchClear');
-        const modeSelector = document.getElementById('modeSelector');
-
-        function chooseExperience(mode) {
-            const isYouToo = mode === 'youtoo';
-            document.body.classList.toggle('mode-youtoo', isYouToo);
-            modeSelector.classList.add('hidden');
-            document.title = isYouToo ? 'YouToo · Descubrí lo que suena' : 'NowarFi · Radio ilimitada';
-            showToast(isYouToo ? 'Bienvenido a YouToo' : 'Bienvenido a NowarFi', isYouToo ? 'fa-wand-magic-sparkles' : 'fa-circle-play');
-        }
-
-        function openExperiencePicker() {
-            modeSelector.classList.remove('hidden');
-        }
 
         initVolume();
         resetView();
