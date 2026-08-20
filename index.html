@@ -141,6 +141,16 @@
         .section-title i { color: var(--accent); font-size: 0.95rem; }
 
         .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 22px; }
+        .library-rail-section { margin-top: 30px; }
+        .library-rail-title { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; font-size: 1.35rem; font-weight: 850; letter-spacing: -.015em; }
+        .library-rail-title i { color: var(--accent); font-size: .95rem; }
+        .library-rail-hint { margin-left: auto; color: var(--text-gray); font-size: .72rem; font-weight: 700; }
+        .library-rail { display: flex; gap: 18px; overflow-x: auto; padding: 3px 2px 16px; scroll-snap-type: x proximity; scrollbar-width: thin; scrollbar-color: var(--accent) rgba(255,255,255,.08); }
+        .library-rail::-webkit-scrollbar { height: 7px; }
+        .library-rail::-webkit-scrollbar-thumb { border-radius: 20px; background: rgba(167,139,250,.65); }
+        .library-rail .library-card { flex: 0 0 calc((100% - 72px) / 5); min-width: 170px; scroll-snap-align: start; }
+        @media (max-width: 1180px) { .library-rail .library-card { flex-basis: calc((100% - 36px) / 3); } }
+        @media (max-width: 700px) { .library-rail .library-card { flex-basis: 74vw; } .library-rail-hint { display: none; } }
 
         .results-view-switcher { display: flex; align-items: center; justify-content: space-between; gap: 14px; margin-top: 30px; margin-bottom: 15px; }
         .results-view-label { color: var(--text-gray); font-size: 0.82rem; font-weight: 700; }
@@ -926,6 +936,7 @@
         let homeFeedLoaded = false;
         let homeFeedLoading = false;
         let homeVideos = [];
+        let homeMusicVideos = [];
         let homeShortVideos = [];
         let homeChannels = [];
         let homePlaylists = [];
@@ -1606,23 +1617,24 @@
         }
 
         async function loadHomeCatalogSources() {
-            const seed = getTasteSeed();
-            const musicQuery = seed ? `${seed} music` : 'music';
-            const musicReserveQuery = seed ? 'music album' : 'instrumental music album';
+            // La portada es una biblioteca general: no toma el último artista ni la última reproducción como consulta base.
             const results = await Promise.allSettled([
-                fetchYouTubeSearch(seed ? `${seed} music video` : 'official music video', 'video', { maxResults: 14 }),
-                fetchYouTubeSearch(seed ? `${seed} playlist` : 'music playlist', 'playlist', { maxResults: 10 }),
-                fetchOpenverseTracks(musicQuery, 20),
-                fetchOpenverseTracks(musicReserveQuery, 20)
+                fetchYouTubeSearch('official music video', 'video', { maxResults: 20 }),
+                fetchYouTubeSearch('official music audio', 'video', { maxResults: 20 }),
+                fetchYouTubeSearch('music playlist', 'playlist', { maxResults: 20 }),
+                fetchOpenverseTracks('music', 20),
+                fetchOpenverseTracks('instrumental music album', 20)
             ]);
             const value = index => results[index]?.status === 'fulfilled' ? results[index].value || [] : [];
-            homeVideos = value(0);
-            homeShortVideos = homeVideos.filter(item => Number.isFinite(item.duration) && item.duration > 0 && item.duration <= 180);
-            homeChannels = deriveChannels(homeVideos);
-            homePlaylists = value(1);
-            // Openverse es complemento: solo completa con música libre cuando ya se priorizó el catálogo oficial de YouTube.
-            homeMusic = uniqueMediaByUrl([...value(2), ...value(3)], 24);
-            return homeVideos.length + homePlaylists.length + homeMusic.length > 0;
+            homeVideos = uniqueMediaByUrl(value(0), 20);
+            homeMusicVideos = uniqueMediaByUrl(value(1), 20);
+            homeShortVideos = uniqueMediaByUrl([...homeVideos, ...homeMusicVideos], 20)
+                .filter(item => Number.isFinite(item.duration) && item.duration > 0 && item.duration <= 180);
+            homeChannels = deriveChannels(uniqueMediaByUrl([...homeVideos, ...homeMusicVideos], 24));
+            homePlaylists = uniqueMediaByUrl(value(2), 20);
+            // Openverse no define la portada; queda disponible como respaldo de música de calidad si YouTube no responde.
+            homeMusic = uniqueMediaByUrl([...value(3), ...value(4)], 24);
+            return homeVideos.length + homeMusicVideos.length + homePlaylists.length + homeMusic.length > 0;
         }
 
         // La portada carga YouTube y Openverse en paralelo; una fuente no bloquea ni vacía a la otra.
@@ -1656,13 +1668,11 @@
             const container = document.getElementById('dynamicSections');
             container.innerHTML = '';
             currentList = [];
-            renderPersonalizedNote();
-            if (homeVideos.length) renderGrid(homeVideos, 'Música y videos de YouTube', "<i class='fab fa-youtube'></i>");
-            if (homePlaylists.length) renderPlaylistGrid(homePlaylists, 'Listas y álbumes de YouTube');
-            if (homeShortVideos.length) renderGrid(homeShortVideos, 'Videos cortos de YouTube', "<i class='fas fa-mobile-screen-button'></i>");
-            if (homeMusic.length) renderGrid(homeMusic, 'Música libre de Openverse', "<i class='fas fa-headphones'></i>");
-            if (homeChannels.length) renderChannelRow(homeChannels, 'Canales para descubrir');
-            if (!homeChannels.length && !homePlaylists.length && !homeVideos.length && !homeMusic.length) renderEmptyState('No hay opciones disponibles ahora', 'Probá buscar un artista o volvé a intentar más tarde.');
+            if (homeVideos.length) renderLibraryRail(homeVideos, 'Videos destacados', "<i class='fas fa-clapperboard'></i>");
+            if (homeMusicVideos.length) renderLibraryRail(homeMusicVideos, 'Música para escuchar', "<i class='fab fa-youtube'></i>");
+            if (homePlaylists.length) renderLibraryRail(homePlaylists, 'Listas y álbumes', "<i class='fas fa-layer-group'></i>", true);
+            if (!homeVideos.length && !homeMusicVideos.length && !homePlaylists.length && !homeMusic.length) renderEmptyState('No hay opciones disponibles ahora', 'Probá buscar un artista o volvé a intentar más tarde.');
+            if (!homeVideos.length && !homeMusicVideos.length && homeMusic.length) renderLibraryRail(homeMusic, 'Música libre disponible', "<i class='fas fa-headphones'></i>");
         }
 
         function activateNavigation(section) {
@@ -1766,10 +1776,10 @@
                 return;
             }
             if (section === 'music') {
-                currentList = [...homeVideos, ...homeMusic];
-                if (homeVideos.length) renderGrid(homeVideos, 'Música y actuaciones de YouTube', "<i class='fab fa-youtube'></i>");
+                currentList = [...homeMusicVideos, ...homeMusic];
+                if (homeMusicVideos.length) renderGrid(homeMusicVideos, 'Música de YouTube', "<i class='fab fa-youtube'></i>");
                 if (homeMusic.length) renderGrid(homeMusic, 'Música libre complementaria', "<i class='fas fa-headphones'></i>");
-                if (!homeVideos.length && !homeMusic.length) renderEmptyState('No hay música disponible ahora', 'Probá buscar un artista o tema.');
+                if (!homeMusicVideos.length && !homeMusic.length) renderEmptyState('No hay música disponible ahora', 'Probá buscar un artista o tema.');
             }
         }
 
@@ -1888,23 +1898,7 @@
             section.innerHTML = `<div class="section-title"><i class="fas fa-layer-group"></i> ${escapeHtml(title)}</div>`;
             const grid = document.createElement('div');
             grid.className = 'grid';
-            list.forEach((playlist, idx) => {
-                const div = document.createElement('button');
-                div.type = 'button';
-                div.className = 'card playlist-card';
-                div.style.animationDelay = `${Math.min(idx * 0.03, 0.5)}s`;
-                div.innerHTML = `
-                    <div class="card-img-wrap">
-                        <span class="playlist-source-badge"><i class="fas fa-list"></i> Lista</span>
-                        <img src="${playlist.img || ''}" class="card-img loaded" loading="lazy" alt="" onerror="this.closest('.card-img-wrap').classList.add('img-error'); this.style.display='none';">
-                    </div>
-                    <div class="playlist-open"><i class="fas fa-list-music"></i> ${escapeHtml(contentMetaLabel(playlist))}</div>
-                    <div class="card-title" title="${escapeHtml(playlist.title)}">${escapeHtml(playlist.title)}</div>
-                    <div class="card-desc">${escapeHtml(playlist.artist || 'Lista de YouTube')}</div>
-                    ${descriptionExcerpt(playlist.description) ? `<p class="card-summary" title="${escapeHtml(playlist.description)}">${escapeHtml(descriptionExcerpt(playlist.description))}</p>` : ''}`;
-                div.onclick = () => openPlaylist(playlist);
-                grid.appendChild(div);
-            });
+            list.forEach((playlist, idx) => grid.appendChild(buildPlaylistCard(playlist, idx)));
             section.appendChild(grid);
             container.appendChild(section);
         }
@@ -1980,6 +1974,100 @@
             renderOpenedPlaylist();
         }
 
+        function buildMediaCard(song, idx) {
+            const div = document.createElement('div');
+            div.className = 'card';
+            div.dataset.idx = song.sourceIndex ?? idx;
+            div.style.animationDelay = `${Math.min(idx * 0.03, 0.5)}s`;
+            const artistClickable = !!song.channelId;
+            const isVideo = song.resourceKind === 'youtube#video';
+            const isDirectAudio = song.type === 'mp3';
+            const imageErrorAction = isDirectAudio
+                ? "this.closest('.card').remove();"
+                : "this.closest('.card-img-wrap').classList.add('img-error'); this.style.display='none';";
+            div.classList.toggle('video-card', isVideo);
+            div.classList.toggle('audio-card', isDirectAudio);
+            div.innerHTML = `
+                <div class="card-img-wrap">
+                    ${isVideo ? `<span class="video-source-badge"><i class="fas fa-play"></i> Video</span><span class="card-duration">${formatContentDuration(song.duration)}</span>` : ''}
+                    <div class="skeleton"></div>
+                    <img src="${song.img || ''}" class="card-img" loading="lazy"
+                         onload="this.classList.add('loaded')"
+                         onerror="${imageErrorAction}">
+                    <div class="card-spinner">
+                        <div class="orbit-spinner" style="--s:26px;--d:5px;"><i></i><i></i><i></i></div>
+                        <span>Cargando</span>
+                    </div>
+                </div>
+                <button type="button" class="card-addq" title="Agregar a la cola" aria-label="Agregar a la cola"><i class="fas fa-list"></i></button>
+                <div class="play-btn"><i class="fas fa-play"></i></div>
+                <div class="card-title" title="${escapeHtml(song.title)}">${escapeHtml(song.title)}</div>
+                <div class="card-desc${artistClickable ? ' artist-link' : ''}">${escapeHtml(song.artist)}</div>
+                <div class="card-meta">${escapeHtml(contentMetaLabel(song))}</div>
+                ${descriptionExcerpt(song.description) ? `<p class="card-summary" title="${escapeHtml(song.description)}">${escapeHtml(descriptionExcerpt(song.description))}</p>` : ''}`;
+            div.onclick = () => selectSong(song, song.sourceIndex ?? idx);
+            div.querySelector('.card-addq').onclick = (e) => {
+                e.stopPropagation();
+                addToQueue(song);
+            };
+            if (artistClickable) {
+                div.querySelector('.card-desc').onclick = (e) => {
+                    e.stopPropagation();
+                    browseChannel(song.channelId, song.channelTitle || song.artist);
+                };
+            }
+            return div;
+        }
+
+        function buildPlaylistCard(playlist, idx) {
+            const div = document.createElement('button');
+            div.type = 'button';
+            div.className = 'card playlist-card';
+            div.style.animationDelay = `${Math.min(idx * 0.03, 0.5)}s`;
+            div.innerHTML = `
+                <div class="card-img-wrap">
+                    <span class="playlist-source-badge"><i class="fas fa-list"></i> Lista</span>
+                    <img src="${playlist.img || ''}" class="card-img loaded" loading="lazy" alt="" onerror="this.closest('.card-img-wrap').classList.add('img-error'); this.style.display='none';">
+                </div>
+                <div class="playlist-open"><i class="fas fa-list-music"></i> ${escapeHtml(contentMetaLabel(playlist))}</div>
+                <div class="card-title" title="${escapeHtml(playlist.title)}">${escapeHtml(playlist.title)}</div>
+                <div class="card-desc">${escapeHtml(playlist.artist || 'Lista de YouTube')}</div>
+                ${descriptionExcerpt(playlist.description) ? `<p class="card-summary" title="${escapeHtml(playlist.description)}">${escapeHtml(descriptionExcerpt(playlist.description))}</p>` : ''}`;
+            div.onclick = () => openPlaylist(playlist);
+            return div;
+        }
+
+        function renderLibraryRail(list, title, icon, isPlaylist = false) {
+            if (!list?.length) return;
+            const container = document.getElementById('dynamicSections');
+            const section = document.createElement('section');
+            section.className = 'library-rail-section';
+            section.innerHTML = `<div class="library-rail-title">${icon} <span>${escapeHtml(title)}</span><span class="library-rail-hint">5 visibles · deslizá para explorar</span></div>`;
+            const rail = document.createElement('div');
+            rail.className = 'library-rail';
+            const batchSize = 5;
+            let rendered = 0;
+            const appendBatch = () => {
+                const nextItems = list.slice(rendered, rendered + batchSize);
+                if (!nextItems.length) return false;
+                nextItems.forEach((item, offset) => {
+                    const index = rendered + offset;
+                    const card = isPlaylist ? buildPlaylistCard(item, index) : buildMediaCard(item, index);
+                    card.classList.add('library-card');
+                    rail.appendChild(card);
+                });
+                rendered += nextItems.length;
+                return rendered < list.length;
+            };
+            appendBatch();
+            rail.addEventListener('scroll', () => {
+                const closeToEnd = rail.scrollLeft + rail.clientWidth >= rail.scrollWidth - 56;
+                if (closeToEnd) appendBatch();
+            }, { passive: true });
+            section.appendChild(rail);
+            container.appendChild(section);
+        }
+
         function renderGrid(list, title, icon) {
             if (!list || list.length === 0) return;
             const container = document.getElementById('dynamicSections');
@@ -1987,50 +2075,7 @@
             section.innerHTML = `<div class="section-title">${icon} ${escapeHtml(title)}</div>`;
             const grid = document.createElement('div');
             grid.className = 'grid';
-            list.forEach((song, idx) => {
-                const div = document.createElement('div');
-                div.className = 'card';
-                div.dataset.idx = song.sourceIndex ?? idx;
-                div.style.animationDelay = `${Math.min(idx * 0.03, 0.5)}s`;
-                const artistClickable = !!song.channelId;
-                const isVideo = song.resourceKind === 'youtube#video';
-                const isDirectAudio = song.type === 'mp3';
-                const imageErrorAction = isDirectAudio
-                    ? "this.closest('.card').remove();"
-                    : "this.closest('.card-img-wrap').classList.add('img-error'); this.style.display='none';";
-                div.classList.toggle('video-card', isVideo);
-                div.classList.toggle('audio-card', isDirectAudio);
-                div.innerHTML = `
-                    <div class="card-img-wrap">
-                        ${isVideo ? `<span class="video-source-badge"><i class="fas fa-play"></i> Video</span><span class="card-duration">${formatContentDuration(song.duration)}</span>` : ''}
-                        <div class="skeleton"></div>
-                        <img src="${song.img || ''}" class="card-img" loading="lazy"
-                             onload="this.classList.add('loaded')"
-                             onerror="${imageErrorAction}">
-                        <div class="card-spinner">
-                            <div class="orbit-spinner" style="--s:26px;--d:5px;"><i></i><i></i><i></i></div>
-                            <span>Cargando</span>
-                        </div>
-                    </div>
-                    <button type="button" class="card-addq" title="Agregar a la cola" aria-label="Agregar a la cola"><i class="fas fa-list"></i></button>
-                    <div class="play-btn"><i class="fas fa-play"></i></div>
-                    <div class="card-title" title="${escapeHtml(song.title)}">${escapeHtml(song.title)}</div>
-                    <div class="card-desc${artistClickable ? ' artist-link' : ''}">${escapeHtml(song.artist)}</div>
-                    <div class="card-meta">${escapeHtml(contentMetaLabel(song))}</div>
-                    ${descriptionExcerpt(song.description) ? `<p class="card-summary" title="${escapeHtml(song.description)}">${escapeHtml(descriptionExcerpt(song.description))}</p>` : ''}`;
-                div.onclick = () => selectSong(song, song.sourceIndex ?? idx);
-                div.querySelector('.card-addq').onclick = (e) => {
-                    e.stopPropagation();
-                    addToQueue(song);
-                };
-                if (artistClickable) {
-                    div.querySelector('.card-desc').onclick = (e) => {
-                        e.stopPropagation();
-                        browseChannel(song.channelId, song.channelTitle || song.artist);
-                    };
-                }
-                grid.appendChild(div);
-            });
+            list.forEach((song, idx) => grid.appendChild(buildMediaCard(song, idx)));
             section.appendChild(grid);
             container.appendChild(section);
         }
