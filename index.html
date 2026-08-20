@@ -1586,6 +1586,25 @@
         }
 
         const ROCK_METAL_DISCOVERY_QUERY = 'rock metal official music';
+        const CONTENT_CATALOG_CACHE_KEY = 'nowarfy_catalog_cache_v1';
+        const CONTENT_CATALOG_CACHE_MAX_AGE_MS = 6 * 60 * 60 * 1000;
+        const EMERGENCY_VIDEO_CATALOG = [
+            { title: 'Metallica: Nothing Else Matters (Official Music Video)', artist: 'Metallica', channelTitle: 'Metallica', url: 'tAGnKpE4NCI', img: 'https://i.ytimg.com/vi/tAGnKpE4NCI/hqdefault.jpg', type: 'yt', resourceKind: 'youtube#video', description: 'Videoclip oficial de Metallica.' },
+            { title: 'Nirvana - Smells Like Teen Spirit (Official Music Video)', artist: 'NirvanaVEVO', channelTitle: 'NirvanaVEVO', url: 'hTWKbfoikeg', img: 'https://i.ytimg.com/vi/hTWKbfoikeg/hqdefault.jpg', type: 'yt', resourceKind: 'youtube#video', description: 'Videoclip oficial de Nirvana.' },
+            { title: 'System Of A Down - Chop Suey! (Official HD Video)', artist: 'systemofadownVEVO', channelTitle: 'systemofadownVEVO', url: 'CSvFpBOe8eY', img: 'https://i.ytimg.com/vi/CSvFpBOe8eY/hqdefault.jpg', type: 'yt', resourceKind: 'youtube#video', description: 'Videoclip oficial de System Of A Down.' },
+            { title: 'System Of A Down - Lonely Day (Official HD Video)', artist: 'systemofadownVEVO', channelTitle: 'systemofadownVEVO', url: 'DnGdoEa1tPg', img: 'https://i.ytimg.com/vi/DnGdoEa1tPg/hqdefault.jpg', type: 'yt', resourceKind: 'youtube#video', description: 'Videoclip oficial de System Of A Down.' },
+            { title: 'Numb (Official Music Video)', artist: 'Linkin Park', channelTitle: 'Linkin Park', url: 'kXYiU_JCYtU', img: 'https://i.ytimg.com/vi/kXYiU_JCYtU/hqdefault.jpg', type: 'yt', resourceKind: 'youtube#video', description: 'Videoclip oficial de Linkin Park.' },
+            { title: 'Foo Fighters - The Pretender', artist: 'foofightersVEVO', channelTitle: 'foofightersVEVO', url: 'SBjQ9tuuTJQ', img: 'https://i.ytimg.com/vi/SBjQ9tuuTJQ/hqdefault.jpg', type: 'yt', resourceKind: 'youtube#video', description: 'Videoclip oficial de Foo Fighters.' },
+            { title: 'MANOWAR - Warriors Of The World United (Live)', artist: 'MANOWAR', channelTitle: 'MANOWAR', url: 'G1G9D8A4Fiw', img: 'https://i.ytimg.com/vi/G1G9D8A4Fiw/hqdefault.jpg', type: 'yt', resourceKind: 'youtube#video', description: 'Video oficial en vivo de MANOWAR.' },
+            { title: 'Slipknot - Psychosocial (Live from Day Of The Gusano)', artist: 'Slipknot', channelTitle: 'Slipknot', url: 'AQ0ktXH3LfI', img: 'https://i.ytimg.com/vi/AQ0ktXH3LfI/hqdefault.jpg', type: 'yt', resourceKind: 'youtube#video', description: 'Presentación en vivo de Slipknot.' },
+            { title: 'ALL FOR METAL - Gods Of Metal (Official Music Video)', artist: 'Reigning Phoenix Music', channelTitle: 'Reigning Phoenix Music', url: '5A04DZNtH-w', img: 'https://i.ytimg.com/vi/5A04DZNtH-w/hqdefault.jpg', type: 'yt', resourceKind: 'youtube#video', description: 'Videoclip oficial de ALL FOR METAL.' }
+        ];
+        const EMERGENCY_PLAYLISTS = [
+            { title: '90s Hard Rock & Metal Videos', artist: 'YouTube', url: 'PL9tY0BWXOZFttlH3kI3b9sHyKOT4H-F9S', img: 'https://i.ytimg.com/vi/hTWKbfoikeg/hqdefault.jpg', type: 'playlist', itemCount: 0, fallbackOffset: 0, description: 'Selección pública de rock y metal de los años noventa.' },
+            { title: 'New Official Music Videos · Heavy Metal & Hard Rock', artist: 'YouTube', url: 'PLxJJcP5YX06cLFAQ5MbdtXRH-0AxUs4ld', img: 'https://i.ytimg.com/vi/5A04DZNtH-w/hqdefault.jpg', type: 'playlist', itemCount: 0, fallbackOffset: 2, description: 'Videoclips oficiales de heavy metal y hard rock.' },
+            { title: 'Greatest Metal Songs of All Time', artist: 'YouTube', url: 'PLmXxqSJJq-yUwqtbp8MHBoTDoDULMoViq', img: 'https://i.ytimg.com/vi/G1G9D8A4Fiw/hqdefault.jpg', type: 'playlist', itemCount: 0, fallbackOffset: 4, description: 'Selección pública de clásicos y canciones de metal.' },
+            { title: 'Rock / Heavy Metal Music Videos', artist: 'YouTube', url: 'PLA95943A38DCA4D46', img: 'https://i.ytimg.com/vi/AQ0ktXH3LfI/hqdefault.jpg', type: 'playlist', itemCount: 0, fallbackOffset: 6, description: 'Videoclips de rock y metal para seguir explorando.' }
+        ];
         const GENRE_CHANNEL_LISTS = [
             { title: 'Rock', icon: 'fa-guitar', query: 'rock official music channels', description: 'Rock clásico, alternativo y contemporáneo.' },
             { title: 'Metal', icon: 'fa-hand-fist', query: 'metal official music channels', description: 'Metal clásico, extremo y moderno.' },
@@ -1735,33 +1754,56 @@
             };
         }
 
+        function restoreCatalogCache() {
+            try {
+                const cached = JSON.parse(localStorage.getItem(CONTENT_CATALOG_CACHE_KEY));
+                if (!cached || Date.now() - Number(cached.savedAt || 0) > CONTENT_CATALOG_CACHE_MAX_AGE_MS) return false;
+                homeVideos = uniqueMediaByUrl(cached.videos || [], 24);
+                homeMusicVideos = uniqueMediaByUrl(cached.musicVideos || [], 24);
+                homePlaylists = uniqueMediaByUrl(cached.playlists || [], 20);
+                homeMusic = uniqueMediaByUrl(cached.music || [], 24);
+                return homeVideos.length + homeMusicVideos.length + homePlaylists.length + homeMusic.length > 0;
+            } catch (e) { return false; }
+        }
+
+        function persistCatalogCache() {
+            try {
+                localStorage.setItem(CONTENT_CATALOG_CACHE_KEY, JSON.stringify({
+                    savedAt: Date.now(), videos: homeVideos, musicVideos: homeMusicVideos, playlists: homePlaylists, music: homeMusic
+                }));
+            } catch (e) { /* almacenamiento no disponible */ }
+        }
+
+        function buildHomeRecommendations() {
+            const taste = readTaste();
+            const localActivity = [...taste.plays, ...favorites].map(normalizeTasteTrack).filter(Boolean);
+            homeRecommended = uniqueMediaByUrl([...localActivity, ...homeMusicVideos, ...homeVideos, ...EMERGENCY_VIDEO_CATALOG], 24);
+        }
+
         async function loadHomeCatalogSources() {
-            // La portada mantiene rock y metal como base, y suma señales locales sin depender de ellas.
-            const tasteSeed = getTasteSeed();
-            const results = await Promise.allSettled([
-                fetchYouTubeSearch('rock metal official music videos', 'video', { maxResults: 20 }),
-                fetchYouTubeSearch('rock metal official audio', 'video', { maxResults: 20 }),
-                fetchYouTubeSearch('rock metal playlists', 'playlist', { maxResults: 20 }),
-                fetchOpenverseTracks('rock metal music', 20),
-                fetchOpenverseTracks('rock instrumental metal', 20),
-                tasteSeed ? fetchYouTubeSearch(`${tasteSeed} official music`, 'video', { maxResults: 12 }) : Promise.resolve([])
-            ]);
-            const value = index => results[index]?.status === 'fulfilled' ? results[index].value || [] : [];
-            homeVideos = uniqueMediaByUrl(value(0), 20);
-            homeMusicVideos = uniqueMediaByUrl(value(1), 20);
-            if (!homeVideos.length) homeVideos = uniqueMediaByUrl(await fetchYouTubeLegacy('rock metal official music videos', 20), 20);
-            if (!homeMusicVideos.length) homeMusicVideos = uniqueMediaByUrl(await fetchYouTubeLegacy('rock metal official audio', 20), 20);
-            if (!homeVideos.length && homeMusicVideos.length) homeVideos = uniqueMediaByUrl(homeMusicVideos, 20);
-            if (!homeMusicVideos.length && homeVideos.length) homeMusicVideos = uniqueMediaByUrl(homeVideos, 20);
+            // Primero se reutiliza la biblioteca de este dispositivo: evita búsquedas repetidas y mantiene la portada visible.
+            const fromCache = restoreCatalogCache();
+            if (!fromCache) {
+                const results = await Promise.allSettled([
+                    fetchYouTubeSearch('rock metal official music videos', 'video', { maxResults: 24 }),
+                    fetchOpenverseTracks('rock metal music', 20),
+                    fetchOpenverseTracks('rock instrumental metal', 20)
+                ]);
+                const value = index => results[index]?.status === 'fulfilled' ? results[index].value || [] : [];
+                const discoveredVideos = uniqueMediaByUrl(value(0), 24);
+                homeVideos = discoveredVideos.length ? discoveredVideos : uniqueMediaByUrl(EMERGENCY_VIDEO_CATALOG, 24);
+                homeMusicVideos = uniqueMediaByUrl([...discoveredVideos, ...EMERGENCY_VIDEO_CATALOG], 24);
+                homePlaylists = uniqueMediaByUrl(EMERGENCY_PLAYLISTS, 20);
+                homeMusic = uniqueMediaByUrl([...value(1), ...value(2)], 24);
+                persistCatalogCache();
+            }
+            if (!homeVideos.length) homeVideos = uniqueMediaByUrl(EMERGENCY_VIDEO_CATALOG, 24);
+            if (!homeMusicVideos.length) homeMusicVideos = uniqueMediaByUrl([...homeVideos, ...EMERGENCY_VIDEO_CATALOG], 24);
+            if (!homePlaylists.length) homePlaylists = uniqueMediaByUrl(EMERGENCY_PLAYLISTS, 20);
             homeShortVideos = uniqueMediaByUrl([...homeVideos, ...homeMusicVideos], 20)
                 .filter(item => Number.isFinite(item.duration) && item.duration > 0 && item.duration <= 180);
             homeChannels = deriveChannels(uniqueMediaByUrl([...homeVideos, ...homeMusicVideos], 24));
-            homePlaylists = uniqueMediaByUrl(value(2), 20);
-            // Openverse no define la portada; queda disponible como respaldo de música de calidad si YouTube no responde.
-            homeMusic = uniqueMediaByUrl([...value(3), ...value(4)], 24);
-            const taste = readTaste();
-            const localActivity = [...taste.plays, ...favorites].map(normalizeTasteTrack).filter(Boolean);
-            homeRecommended = uniqueMediaByUrl([...localActivity, ...value(5), ...homeMusicVideos, ...homeVideos], 24);
+            buildHomeRecommendations();
             return homeVideos.length + homeMusicVideos.length + homePlaylists.length + homeMusic.length + homeRecommended.length > 0;
         }
 
@@ -1889,14 +1931,14 @@
             container.appendChild(grid);
         }
 
-        async function getDirectCollectionVideos(collection) {
-            const cached = directCollectionCache.get(collection.query);
-            if (cached?.length) return cached;
-            let results = await fetchYouTubeSearch(collection.query, 'video', { maxResults: 12 });
-            if (!results.length) results = await fetchYouTubeLegacy(collection.query, 12);
-            const videos = uniqueMediaByUrl(results, 12).filter(item => item?.type === 'yt' && item?.url);
-            if (videos.length) directCollectionCache.set(collection.query, videos);
-            return videos;
+        function buildCollectionRows(collections) {
+            const catalog = uniqueMediaByUrl([...homeRecommended, ...homeVideos, ...homeMusicVideos, ...EMERGENCY_VIDEO_CATALOG], 36)
+                .filter(item => item?.type === 'yt' && item?.url);
+            return collections.map((collection, index) => {
+                const offset = (index * 5) % Math.max(catalog.length, 1);
+                const rotated = catalog.slice(offset).concat(catalog.slice(0, offset));
+                return { collection, videos: rotated };
+            }).filter(row => row.videos.length);
         }
 
         async function renderDirectVideoCollections({ title, intro, icon, collections, className }) {
@@ -1906,26 +1948,10 @@
             currentList = [];
             loader.style.display = 'flex';
             try {
-                const responses = await Promise.allSettled(collections.map(collection => getDirectCollectionVideos(collection)));
-                const rawRows = collections.map((collection, index) => ({
-                    collection,
-                    videos: responses[index]?.status === 'fulfilled' ? responses[index].value || [] : []
-                }));
-                let fallback = uniqueMediaByUrl([...homeVideos, ...homeMusicVideos], 24).filter(item => item?.type === 'yt' && item?.url);
-                if (!fallback.length) fallback = await fetchYouTubeSearch(ROCK_METAL_DISCOVERY_QUERY, 'video', { maxResults: 20 });
-                if (!fallback.length) fallback = await fetchYouTubeLegacy(ROCK_METAL_DISCOVERY_QUERY, 20);
-                fallback = uniqueMediaByUrl(fallback, 20).filter(item => item?.type === 'yt' && item?.url);
-                const used = new Set();
-                const rows = rawRows.map(row => {
-                    const preferred = row.videos.filter(video => !used.has(String(video.url)));
-                    preferred.forEach(video => used.add(String(video.url)));
-                    const needed = Math.max(0, 5 - preferred.length);
-                    const backup = fallback.filter(video => !used.has(String(video.url))).slice(0, needed);
-                    backup.forEach(video => used.add(String(video.url)));
-                    return { ...row, videos: uniqueMediaByUrl([...preferred, ...backup], 12) };
-                }).filter(row => row.videos.length);
+                await ensureHomeCatalog();
+                const rows = buildCollectionRows(collections);
                 if (!rows.length) {
-                    renderEmptyState('No pudimos cargar videos en este momento', 'La búsqueda de YouTube puede estar temporalmente ocupada. Probá recargar o buscá un artista específico.');
+                    renderEmptyState('No pudimos cargar videos en este momento', 'Probá volver a Inicio o recargá dentro de unos segundos.');
                     return;
                 }
                 const heading = document.createElement('div');
@@ -2229,7 +2255,22 @@
                 };
                 renderOpenedPlaylist();
             } catch (error) {
-                renderEmptyState('No pudimos abrir esta lista', 'La lista puede ser privada, estar vacía o no permitir reproducción.');
+                const fallback = uniqueMediaByUrl(EMERGENCY_VIDEO_CATALOG, EMERGENCY_VIDEO_CATALOG.length);
+                const offset = Number(playlist?.fallbackOffset || 0) % Math.max(fallback.length, 1);
+                const tracks = fallback.slice(offset).concat(fallback.slice(0, offset)).map((item, index) => ({
+                    ...item,
+                    sourceIndex: index,
+                    collectionId: playlist?.url || '',
+                    collectionTitle: playlist?.title || 'Lista de reproducción',
+                    collectionImg: playlist?.img || item.img
+                }));
+                if (!tracks.length) {
+                    renderEmptyState('No pudimos abrir esta lista', 'La lista puede ser privada, estar vacía o no permitir reproducción.');
+                    return;
+                }
+                activePlaylistCatalog = { playlist, tracks, pageInfo: { totalResults: tracks.length }, nextPageToken: '', returnMode: activeBrowseMode, returnQuery: searchQuery, fallback: true };
+                showToast('Mostramos una selección disponible mientras YouTube recupera la lista', 'fa-list-music');
+                renderOpenedPlaylist();
             } finally {
                 loader.style.display = 'none';
             }
