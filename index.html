@@ -646,9 +646,22 @@
         .video-stage-kicker { color: #5eead4; font-size: .65rem; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; }
         .video-stage-title { font-family: 'Sora', sans-serif; font-size: clamp(1.05rem, 2vw, 1.45rem); line-height: 1.18; letter-spacing: -.04em; }
         .video-stage-artist { margin-top: 8px; color: #aaaac0; font-size: .84rem; }
+        .video-stage-meta { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 14px; }
+        .video-stage-meta span { display: inline-flex; align-items: center; gap: 5px; padding: 5px 7px; border: 1px solid rgba(190,188,255,.14); border-radius: 999px; color: #c7c6d8; background: rgba(255,255,255,.035); font-size: .64rem; font-weight: 800; }
+        .video-stage-meta i { color: #5eead4; font-size: .62rem; }
+        .video-stage-description { display: -webkit-box; margin: 14px 0 0; overflow: hidden; color: #a9aac0; font-size: .75rem; line-height: 1.5; -webkit-box-orient: vertical; -webkit-line-clamp: 5; }
+        .video-stage-description.is-empty { color: #777991; font-style: italic; }
         .video-stage-note { color: #8788a2; font-size: .72rem; line-height: 1.5; }
-        .video-stage-close { align-self: flex-start; border: 1px solid rgba(255,255,255,.15); background: rgba(255,255,255,.06); color: #ecebff; border-radius: 9px; padding: 8px 10px; font-size: .75rem; cursor: pointer; }
-        .video-stage-close:hover { border-color: #5eead4; color: #5eead4; }
+        .video-stage-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+        .video-stage-close, .video-stage-channel { align-self: flex-start; border: 1px solid rgba(255,255,255,.15); background: rgba(255,255,255,.06); color: #ecebff; border-radius: 9px; padding: 8px 10px; font-size: .75rem; cursor: pointer; }
+        .video-stage-channel { border-color: rgba(94,234,212,.26); color: #dffff8; background: rgba(94,234,212,.07); }
+        .video-stage-close:hover, .video-stage-channel:hover { border-color: #5eead4; color: #5eead4; }
+        .video-stage-channel[hidden] { display: none; }
+        #videoStageToggleBtn.video-minimized { position: relative; display: inline-flex; align-items: center; justify-content: center; width: 34px; height: 34px; border: 1px solid rgba(94,234,212,.62); border-radius: 50%; color: #071016; background: #5eead4; box-shadow: 0 0 0 0 rgba(94,234,212,.42); animation: mini-video-attention 2.4s ease-out infinite; }
+        #videoStageToggleBtn.video-minimized::after { content: 'Video activo'; position: absolute; right: 0; bottom: calc(100% + 7px); min-width: max-content; padding: 5px 7px; border: 1px solid rgba(94,234,212,.25); border-radius: 6px; color: #dffff8; background: rgba(9,10,20,.96); font: 800 .58rem 'Manrope', sans-serif; letter-spacing: .03em; opacity: .96; pointer-events: none; }
+        #videoStageToggleBtn .video-mini-indicator { position: absolute; top: 1px; right: 0; display: none; width: 9px; height: 9px; border: 2px solid #15162a; border-radius: 50%; background: #ff6d85; }
+        #videoStageToggleBtn.video-minimized .video-mini-indicator { display: block; }
+        @keyframes mini-video-attention { 0%, 55%, 100% { box-shadow: 0 0 0 0 rgba(94,234,212,.34); } 72% { box-shadow: 0 0 0 8px rgba(94,234,212,0); } }
         .video-stage.is-error .video-frame::after { content: 'Este video no permite reproducción embebida. Elegí otro resultado.'; position: absolute; inset: 0; display: grid; place-items: center; padding: 32px; text-align: center; color: #f0d1d9; background: rgba(19,11,19,.88); font-size: .9rem; z-index: 4; }
         .video-suggestions { display: none; border-top: 1px solid rgba(190,188,255,.14); padding: 18px 20px 20px; }
         .video-suggestions.visible { display: block; }
@@ -817,8 +830,8 @@
                 <div class="video-stage-layout">
                     <div class="video-frame"><div id="yt-player-container"></div></div>
                     <div class="video-stage-info">
-                        <div><p class="video-stage-kicker">Reproduciendo desde YouTube</p><h2 class="video-stage-title" id="videoStageTitle">Elegí un video</h2><p class="video-stage-artist" id="videoStageArtist"></p></div>
-                        <div><p class="video-stage-note">Algunos videos pueden estar restringidos por su creador, región o YouTube.</p><button type="button" class="video-stage-close" onclick="hideVideoStage(false)"><i class="fas fa-chevron-up"></i> Ocultar video</button></div>
+                        <div><p class="video-stage-kicker">Reproduciendo desde YouTube</p><h2 class="video-stage-title" id="videoStageTitle">Elegí un video</h2><p class="video-stage-artist" id="videoStageArtist"></p><div class="video-stage-meta" id="videoStageMeta"></div><p class="video-stage-description" id="videoStageDescription"></p></div>
+                        <div><p class="video-stage-note">Datos extraídos de la ficha pública del video. Algunos videos pueden estar restringidos por su creador, región o YouTube.</p><div class="video-stage-actions"><button type="button" class="video-stage-channel" id="videoStageChannelBtn" onclick="openVideoStageChannel()" hidden><i class="fas fa-satellite-dish"></i> Ver canal</button><button type="button" class="video-stage-close" onclick="hideVideoStage(false)"><i class="fas fa-chevron-up"></i> Ocultar video</button></div></div>
                     </div>
                 </div>
                 <div class="video-suggestions" id="videoSuggestions" aria-label="Más videos sugeridos">
@@ -887,7 +900,7 @@
             <button type="button" class="btn-control share-btn whatsapp" id="shareWhatsappBtn" onclick="shareCurrentToWhatsApp()" title="Compartir por WhatsApp" aria-label="Compartir por WhatsApp" disabled><i class="fab fa-whatsapp"></i></button>
             <button type="button" class="btn-control share-btn copy-link" id="copyCurrentLinkBtn" onclick="copyCurrentLink()" title="Copiar enlace" aria-label="Copiar enlace" disabled><i class="fas fa-link"></i></button>
             <button type="button" class="btn-control share-btn download" id="downloadCurrentBtn" onclick="downloadCurrentTrack()" title="Descargar audio con licencia permitida" aria-label="Descargar audio con licencia permitida" hidden><i class="fas fa-download"></i></button>
-            <button type="button" class="btn-control" id="videoStageToggleBtn" onclick="toggleVideoStageVisibility()" title="Mostrar video" aria-label="Mostrar video" hidden><i class="fas fa-clapperboard"></i></button>
+            <button type="button" class="btn-control" id="videoStageToggleBtn" onclick="toggleVideoStageVisibility()" title="Mostrar video" aria-label="Mostrar video" hidden><i class="fas fa-clapperboard"></i><span class="video-mini-indicator" aria-hidden="true"></span></button>
             <i class="fas fa-compress-arrows-alt btn-control" id="pipBtn" onclick="toggleFloatingMode()" title="Modo Flotante" style="cursor:pointer; opacity: 0.7;"></i>
         </div>
     </div>
@@ -948,7 +961,14 @@
         let isSeeking = false;
         let lastVolume = 0.8;
         const VIDEO_AUTOPLAY_STORAGE_KEY = 'youtoo_video_autoplay_v1';
+        const VIDEO_RESUME_STORAGE_KEY = 'nowarfy_video_resume_v1';
+        const VIDEO_RESUME_MAX_AGE_MS = 14 * 24 * 60 * 60 * 1000;
         let videoAutoplay = localStorage.getItem(VIDEO_AUTOPLAY_STORAGE_KEY) !== 'false';
+        let videoStageObserver = null;
+        let videoStageMinimized = false;
+        let pendingVideoResumeSession = null;
+        let restoreVideoMinimizedAfterReady = false;
+        let lastVideoResumeSaveAt = 0;
         let playbackStoppedByUser = false;
         let automaticAdvanceTimer = null;
         let automaticAdvanceTargetQid = null;
@@ -991,6 +1011,7 @@
         setupKeyboardShortcuts();
         restoreQueueFromStorage();
         setupQueueTrashDropzone();
+        setupVideoStageObserver();
         setupBackgroundPersistence();
         setupPlaybackContinuity();
         setupInstallableApp();
@@ -2178,7 +2199,7 @@
                 ytApiReady = true;
                 const pending = pendingYTRequest;
                 pendingYTRequest = null;
-                if (pending) initYTPlayer(pending.resourceId, pending.isPlaylist);
+                if (pending) initYTPlayer(pending.resourceId, pending.isPlaylist, pending.resumeSession || null);
             };
         }
 
@@ -2434,8 +2455,14 @@
             playbackStoppedByUser = false;
             currentIndex = idx;
             const song = queue[idx];
+            const resumeSession = song.type === 'yt' && options.resumeSession && String(options.resumeSession.resourceId) === String(song.url)
+                ? options.resumeSession
+                : null;
             currentPlayingQid = song._qid;
             currentSourceIdx = options.sourceIdx ?? null;
+            pendingVideoResumeSession = resumeSession;
+            restoreVideoMinimizedAfterReady = !!(resumeSession && options.restoreMinimized);
+            if (!resumeSession) clearVideoResumeSession();
             updateNowPlaying(song);
             rememberPlay(song);
             stopAll();
@@ -2447,9 +2474,9 @@
             if (song.type === 'yt') {
                 showVideoStage(song);
                 if (ytApiReady && window.YT && window.YT.Player) {
-                    initYTPlayer(song.url, song.isPlaylist);
+                    initYTPlayer(song.url, song.isPlaylist, resumeSession);
                 } else {
-                    pendingYTRequest = { resourceId: song.url, isPlaylist: song.isPlaylist };
+                    pendingYTRequest = { resourceId: song.url, isPlaylist: song.isPlaylist, resumeSession };
                     loadYouTubeAPI();
                 }
             } else {
@@ -2541,7 +2568,42 @@
             if (hint) hint.classList.toggle('show', show);
         }
 
-        // --- PERSISTENCIA DE LA COLA (localStorage) ---
+        // --- PERSISTENCIA DE LA COLA Y DEL VIDEO ACTIVO (localStorage) ---
+        function clearVideoResumeSession() {
+            try { localStorage.removeItem(VIDEO_RESUME_STORAGE_KEY); } catch (e) { /* almacenamiento no disponible */ }
+            pendingVideoResumeSession = null;
+            lastVideoResumeSaveAt = 0;
+        }
+
+        function persistVideoResumeSession(force = false) {
+            const song = currentQueueSong();
+            if (!song || song.type !== 'yt' || !ytPlayer?.getCurrentTime) return;
+            const now = Date.now();
+            if (!force && now - lastVideoResumeSaveAt < 3000) return;
+            try {
+                const position = Number(ytPlayer.getCurrentTime()) || 0;
+                localStorage.setItem(VIDEO_RESUME_STORAGE_KEY, JSON.stringify({
+                    qid: currentPlayingQid,
+                    resourceId: song.url,
+                    isPlaylist: !!song.isPlaylist,
+                    position: Math.max(0, position),
+                    wasPlaying: !!isPlaying,
+                    minimized: !!videoStageMinimized,
+                    savedAt: now
+                }));
+                lastVideoResumeSaveAt = now;
+            } catch (e) { /* almacenamiento no disponible */ }
+        }
+
+        function readVideoResumeSession() {
+            try {
+                const saved = JSON.parse(localStorage.getItem(VIDEO_RESUME_STORAGE_KEY));
+                if (!saved || !saved.resourceId || !Number.isFinite(Number(saved.position))) return null;
+                if (!Number.isFinite(Number(saved.savedAt)) || Date.now() - Number(saved.savedAt) > VIDEO_RESUME_MAX_AGE_MS) return null;
+                return saved;
+            } catch (e) { return null; }
+        }
+
         function persistQueue() {
             try {
                 localStorage.setItem('nowarfy_queue', JSON.stringify(queue));
@@ -2553,20 +2615,24 @@
         function restoreQueueFromStorage() {
             try {
                 const savedQueue = JSON.parse(localStorage.getItem('nowarfy_queue'));
-                if (Array.isArray(savedQueue) && savedQueue.length) {
-                    queue = savedQueue;
-                    queueSeenKeys = new Set(queue.map(songKey));
-                    queueIdCounter = queue.reduce((max, s) => Math.max(max, s._qid || 0), 0);
-                    queueRound = parseInt(localStorage.getItem('nowarfy_queue_round'), 10) || 0;
-                    const savedQid = localStorage.getItem('nowarfy_queue_qid');
-                    const qid = savedQid ? parseInt(savedQid, 10) : null;
-                    const idx = queue.findIndex(s => s._qid === qid);
-                    if (idx !== -1) {
-                        currentIndex = idx;
-                        currentPlayingQid = qid;
-                        const song = queue[idx];
-                        updateNowPlaying(song);
-                    }
+                if (!Array.isArray(savedQueue) || !savedQueue.length) return;
+                queue = savedQueue;
+                queueSeenKeys = new Set(queue.map(songKey));
+                queueIdCounter = queue.reduce((max, s) => Math.max(max, s._qid || 0), 0);
+                queueRound = parseInt(localStorage.getItem('nowarfy_queue_round'), 10) || 0;
+                const savedQid = localStorage.getItem('nowarfy_queue_qid');
+                const qid = savedQid ? parseInt(savedQid, 10) : null;
+                const idx = queue.findIndex(s => s._qid === qid);
+                if (idx === -1) return;
+                currentIndex = idx;
+                currentPlayingQid = qid;
+                const song = queue[idx];
+                updateNowPlaying(song);
+
+                const resume = readVideoResumeSession();
+                if (song.type === 'yt' && resume && String(resume.resourceId) === String(song.url) && (!resume.qid || Number(resume.qid) === Number(qid))) {
+                    pendingVideoResumeSession = resume;
+                    window.setTimeout(() => playQueueAt(idx, { resumeSession: resume, restoreMinimized: !!resume.minimized }), 0);
                 }
             } catch (e) { /* nada que restaurar */ }
         }
@@ -2588,6 +2654,7 @@
 
         function clearQueue() {
             if (queue.length === 0) return;
+            clearVideoResumeSession();
             stopAll();
             queue = [];
             queueSeenKeys = new Set();
@@ -2849,35 +2916,86 @@
             }, 180);
         }
 
+        function renderVideoStageDetails(song) {
+            const meta = document.getElementById('videoStageMeta');
+            const description = document.getElementById('videoStageDescription');
+            const channelButton = document.getElementById('videoStageChannelBtn');
+            if (!meta || !description || !channelButton) return;
+            const duration = formatContentDuration(song?.duration);
+            const channel = song?.channelTitle || song?.artist || 'Canal público de YouTube';
+            const kind = song?.isPlaylist ? 'Lista de reproducción' : 'Video de YouTube';
+            const entries = [
+                { icon: 'fa-clock', label: duration === '—' ? 'Duración en el reproductor' : duration },
+                { icon: song?.isPlaylist ? 'fa-list' : 'fa-clapperboard', label: kind },
+                { icon: 'fa-satellite-dish', label: channel }
+            ];
+            meta.innerHTML = entries.map(entry => `<span><i class="fas ${entry.icon}"></i>${escapeHtml(entry.label)}</span>`).join('');
+            const cleanDescription = descriptionExcerpt(song?.description || '', 430);
+            description.textContent = cleanDescription || 'No hay una descripción pública disponible para este video.';
+            description.classList.toggle('is-empty', !cleanDescription);
+            channelButton.hidden = !song?.channelId;
+        }
+
+        function openVideoStageChannel() {
+            const song = currentQueueSong();
+            if (!song?.channelId) { showToast('No hay un canal disponible para abrir', 'fa-satellite-dish'); return; }
+            browseChannel(song.channelId, song.channelTitle || song.artist || 'Canal de YouTube');
+        }
+
         function updateVideoStageToggle(isVisible) {
             const button = document.getElementById('videoStageToggleBtn');
             if (!button) return;
             const song = currentQueueSong();
             const isVideo = song?.type === 'yt';
-            button.hidden = !isVideo || isVisible;
-            if (isVideo && !isVisible) {
-                button.title = 'Volver a mostrar video';
-                button.setAttribute('aria-label', 'Volver a mostrar video');
+            const minimized = isVideo && !isVisible;
+            button.hidden = !minimized;
+            button.classList.toggle('video-minimized', minimized);
+            if (minimized) {
+                button.title = 'El video sigue activo · volver a mostrar';
+                button.setAttribute('aria-label', 'El video sigue activo; volver a mostrar video');
             }
         }
 
-        function showVideoStage(song) {
+        function setVideoStageMinimized(minimized, options = {}) {
+            const stage = document.getElementById('videoStage');
+            const song = currentQueueSong();
+            if (!stage || !song || song.type !== 'yt') return;
+            videoStageMinimized = !!minimized;
+            stage.classList.toggle('visible', !videoStageMinimized);
+            if (videoStageMinimized) stage.classList.remove('is-error');
+            updateVideoStageToggle(!videoStageMinimized);
+            persistVideoResumeSession(true);
+            if (!videoStageMinimized && options.focus) {
+                window.requestAnimationFrame(() => stage.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+            }
+        }
+
+        function showVideoStage(song, options = {}) {
             const stage = document.getElementById('videoStage');
             stage.classList.remove('is-error');
             stage.classList.add('visible');
+            videoStageMinimized = false;
             document.getElementById('videoStageTitle').textContent = song.title || 'Video de YouTube';
-            document.getElementById('videoStageArtist').textContent = song.artist || '';
+            document.getElementById('videoStageArtist').textContent = song.channelTitle || song.artist || '';
+            renderVideoStageDetails(song);
             renderVideoSuggestions(song);
             updateVideoStageToggle(true);
+            if (options.focus) window.requestAnimationFrame(() => stage.scrollIntoView({ behavior: 'smooth', block: 'start' }));
         }
 
         function hideVideoStage(pauseVideo = false) {
-            const stage = document.getElementById('videoStage');
-            stage.classList.remove('visible', 'is-error');
-            updateVideoStageToggle(false);
+            const song = currentQueueSong();
+            if (!song || song.type !== 'yt') {
+                videoStageMinimized = false;
+                document.getElementById('videoStage').classList.remove('visible', 'is-error');
+                updateVideoStageToggle(true);
+                return;
+            }
+            setVideoStageMinimized(true);
             if (pauseVideo && ytPlayer && isPlaying) {
                 ytPlayer.pauseVideo();
                 isPlaying = false;
+                persistVideoResumeSession(true);
                 updateIcon();
                 updatePlaybackState();
             }
@@ -2888,10 +3006,31 @@
             if (!song || song.type !== 'yt') { showToast('No hay un video activo para mostrar', 'fa-clapperboard'); return; }
             const stage = document.getElementById('videoStage');
             if (stage.classList.contains('visible')) hideVideoStage(false);
-            else showVideoStage(song);
+            else showVideoStage(song, { focus: true });
         }
 
-        function initYTPlayer(resourceId, isPlaylist = false) {
+        function setupVideoStageObserver() {
+            const stage = document.getElementById('videoStage');
+            const scrollRoot = document.querySelector('.content-area');
+            if (!stage || !window.IntersectionObserver) return;
+            videoStageObserver?.disconnect();
+            videoStageObserver = new IntersectionObserver(entries => {
+                const entry = entries[0];
+                const song = currentQueueSong();
+                if (!entry || !song || song.type !== 'yt' || !isPlaying || videoStageMinimized) return;
+                if (stage.classList.contains('visible') && entry.intersectionRatio < 0.28) {
+                    window.setTimeout(() => {
+                        if (stage.classList.contains('visible') && !videoStageMinimized && currentQueueSong()?.type === 'yt' && isPlaying) {
+                            setVideoStageMinimized(true);
+                        }
+                    }, 180);
+                }
+            }, { root: scrollRoot || null, threshold: [0, 0.28, 0.7] });
+            videoStageObserver.observe(stage);
+        }
+
+        function initYTPlayer(resourceId, isPlaylist = false, resumeSession = null) {
+            pendingVideoResumeSession = resumeSession || pendingVideoResumeSession;
             document.getElementById('yt-player-container').innerHTML = '<div id="yt-player"></div>';
             const playerConfig = {
                 height: '100%',
@@ -2910,9 +3049,25 @@
             ytPlayer = new YT.Player('yt-player', playerConfig);
         }
 
-        function onYTReady() {
+        function onYTReady(event) {
+            if (event?.target && event.target !== ytPlayer) return;
             const v = parseFloat(document.getElementById('volumeSlider').value);
             if (ytPlayer.setVolume) ytPlayer.setVolume(v * 100);
+            const song = currentQueueSong();
+            if (song?.type === 'yt' && ytPlayer.getDuration) {
+                renderVideoStageDetails({ ...song, duration: song.duration || ytPlayer.getDuration() });
+            }
+            const resume = pendingVideoResumeSession;
+            pendingVideoResumeSession = null;
+            if (resume && song?.type === 'yt' && String(resume.resourceId) === String(song.url)) {
+                const position = Math.max(0, Number(resume.position) || 0);
+                if (position > 1 && ytPlayer.seekTo) ytPlayer.seekTo(position, true);
+                if (resume.wasPlaying === false && ytPlayer.pauseVideo) ytPlayer.pauseVideo();
+                if (restoreVideoMinimizedAfterReady) {
+                    restoreVideoMinimizedAfterReady = false;
+                    window.setTimeout(() => setVideoStageMinimized(true), 0);
+                }
+            }
         }
         function onYTStateChange(event) {
             if (event?.target && event.target !== ytPlayer) return;
@@ -2923,10 +3078,12 @@
                 if (!progressInterval) startProgress(ytPlayer);
             } else if (event.data === YT.PlayerState.PAUSED) {
                 isPlaying = false;
+                persistVideoResumeSession(true);
             } else if (event.data === YT.PlayerState.BUFFERING) {
                 setTrackLoading(true, currentIndex);
             } else if (event.data === YT.PlayerState.ENDED) {
                 isPlaying = false;
+                clearVideoResumeSession();
                 queueAutomaticAdvance('youtube-ended');
             }
             updateIcon();
@@ -2934,6 +3091,7 @@
         }
         function onYTError(event) {
             if (event?.target && event.target !== ytPlayer) return;
+            clearVideoResumeSession();
             setTrackLoading(false);
             isPlaying = false;
             document.getElementById('videoStage').classList.add('is-error');
@@ -3009,8 +3167,11 @@
             progressInterval = setInterval(() => {
                 if (isSeeking) return;
                 let curr, dur;
-                if (source === ytPlayer) { curr = source.getCurrentTime(); dur = source.getDuration(); }
-                else { curr = source.currentTime; dur = source.duration; }
+                if (source === ytPlayer) {
+                    curr = source.getCurrentTime();
+                    dur = source.getDuration();
+                    persistVideoResumeSession();
+                } else { curr = source.currentTime; dur = source.duration; }
                 if (dur) {
                     const pct = (curr / dur) * 100;
                     updateMediaPosition(dur, curr);
@@ -3213,7 +3374,7 @@
         }
 
         function setupBackgroundPersistence() {
-            const save = () => { persistQueue(); updatePlaybackState(); };
+            const save = () => { persistQueue(); persistVideoResumeSession(true); updatePlaybackState(); };
             document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') save(); });
             window.addEventListener('pagehide', save);
         }
