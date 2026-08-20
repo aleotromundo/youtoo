@@ -52,6 +52,12 @@
             overflow: hidden;
         }
 
+        .ambient-artwork-background { position: fixed; z-index: 0; inset: -9%; opacity: 0; pointer-events: none; background-position: center; background-size: cover; filter: blur(52px) saturate(1.45) contrast(1.08); transform: scale(1.1); transition: opacity 1.1s var(--ease), background-image .8s var(--ease); }
+        .ambient-artwork-background::after { content: ''; position: absolute; inset: 0; background: radial-gradient(circle at 58% 20%, rgba(16,17,37,.12), rgba(5,6,15,.66) 72%), linear-gradient(120deg, rgba(10,10,22,.38), rgba(8,8,18,.75)); }
+        .ambient-artwork-background.is-visible { opacity: .55; }
+        .main-container { z-index: 1; }
+        @media (prefers-reduced-motion: no-preference) { .ambient-artwork-background.is-visible { animation: ambientArtworkDrift 18s ease-in-out infinite alternate; } @keyframes ambientArtworkDrift { from { transform: scale(1.1) translate3d(-1.2%, -0.8%, 0); } to { transform: scale(1.16) translate3d(1.2%, 1%, 0); } } }
+
         button, input { font-family: inherit; }
         :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
@@ -629,7 +635,7 @@
         body.mode-youtoo .nav-links li { border-radius: 11px; padding: 11px 13px; }
         body.mode-youtoo .nav-links li.active { background: linear-gradient(90deg, rgba(167,139,250,.2), rgba(94,234,212,.05)); }
         body.mode-youtoo .nav-links li.active::before { background: var(--accent-2); box-shadow: 0 0 10px rgba(94,234,212,.45); }
-        body.mode-youtoo .content-area { padding: 25px 32px; background: radial-gradient(900px 480px at 58% -18%, rgba(139,92,246,.21), transparent 61%), radial-gradient(730px 430px at 100% 26%, rgba(45,212,191,.08), transparent 67%), radial-gradient(580px 360px at 12% 80%, rgba(69,45,125,.12), transparent 73%), repeating-linear-gradient(125deg, rgba(255,255,255,.018) 0 1px, transparent 1px 13px), var(--bg-dark); }
+        body.mode-youtoo .content-area { padding: 25px 32px; background: radial-gradient(900px 480px at 58% -18%, rgba(139,92,246,.21), transparent 61%), radial-gradient(730px 430px at 100% 26%, rgba(45,212,191,.08), transparent 67%), radial-gradient(580px 360px at 12% 80%, rgba(69,45,125,.12), transparent 73%), repeating-linear-gradient(125deg, rgba(255,255,255,.018) 0 1px, transparent 1px 13px), linear-gradient(rgba(15,16,32,.76), rgba(15,16,32,.88)); }
         body.mode-youtoo .search-container { display: flex; align-items: center; padding: 7px 0 21px; background: rgba(15,16,32,.82); }
         body.mode-youtoo .search-wrap { max-width: 720px; width: 100%; }
         body.mode-youtoo .search-input { background: #1a1b30; border: 1px solid rgba(190,188,255,.18); color: white; border-radius: 13px; padding: 15px 46px; }
@@ -814,6 +820,8 @@
             body.mode-youtoo .nowarfy-nav-group .nav-links li span { display: none; }
             body.mode-youtoo .sidebar { width: 100%; }
             body.mode-youtoo .sidebar::after, body.mode-youtoo .brand-youtoo { display: none; }
+            .ambient-artwork-background { inset: -15%; filter: blur(38px) saturate(1.25); }
+            .ambient-artwork-background.is-visible { opacity: .38; }
             .youtoo-hero { padding-top: 6px; }
             .taste-rail { margin-bottom: 10px; }
             .taste-data-panel { padding: 18px; }
@@ -832,6 +840,7 @@
 </head>
 <body class="mode-youtoo">
 
+    <div class="ambient-artwork-background" id="ambientArtworkBackground" aria-hidden="true"></div>
     <div class="main-container">
         <!-- SIDEBAR -->
         <aside class="sidebar" aria-label="Navegación principal de Nowarfy">
@@ -1061,6 +1070,9 @@
         let homePlaylists = [];
         let homeMusic = [];
         let homeRecommended = [];
+        let ambientArtworkIndex = 0;
+        let ambientArtworkRotationTimer = null;
+        let ambientArtworkLockedToCurrent = false;
         let activeChannelCatalog = null;
         let activePlaylistCatalog = null;
 
@@ -1930,6 +1942,7 @@
             if (!homePlaylists.length) homePlaylists = uniqueMediaByUrl(EMERGENCY_PLAYLISTS, 20);
             homeChannels = deriveChannels(uniqueMediaByUrl([...homeVideos, ...homeMusicVideos], 24));
             buildHomeRecommendations();
+            refreshAmbientArtworkFromCatalog();
             return homeVideos.length + homeMusicVideos.length + homePlaylists.length + homeMusic.length + homeRecommended.length > 0;
         }
 
@@ -2593,6 +2606,50 @@
             container.appendChild(section);
         }
 
+        function setAmbientArtwork(item, lockToCurrent = false) {
+            if (!hasValidArtwork(item)) return false;
+            const background = document.getElementById('ambientArtworkBackground');
+            if (!background) return false;
+            const imageUrl = String(item.img || item.thumbnail || '').trim();
+            const probe = new Image();
+            probe.onload = () => {
+                const safeUrl = imageUrl.replace(/"/g, '%22').replace(/\\/g, '%5C');
+                background.style.backgroundImage = `url("${safeUrl}")`;
+                background.classList.add('is-visible');
+            };
+            probe.onerror = () => {};
+            probe.src = imageUrl;
+            if (lockToCurrent) ambientArtworkLockedToCurrent = true;
+            return true;
+        }
+
+        function ambientArtworkCandidates() {
+            return uniqueMediaByUrl([
+                ...homeRecommended,
+                ...homeMusicVideos,
+                ...homeVideos,
+                ...homeMusic,
+                ...homePlaylists
+            ], 80).filter(hasValidArtwork);
+        }
+
+        function rotateAmbientArtwork() {
+            if (ambientArtworkLockedToCurrent || document.visibilityState !== 'visible') return;
+            const candidates = ambientArtworkCandidates();
+            if (!candidates.length) return;
+            ambientArtworkIndex = (ambientArtworkIndex + 1) % candidates.length;
+            setAmbientArtwork(candidates[ambientArtworkIndex]);
+        }
+
+        function refreshAmbientArtworkFromCatalog() {
+            if (ambientArtworkLockedToCurrent) return;
+            const candidates = ambientArtworkCandidates();
+            if (!candidates.length) return;
+            ambientArtworkIndex = Math.abs(featuredHash(candidates.map(item => item.url).join('|'))) % candidates.length;
+            setAmbientArtwork(candidates[ambientArtworkIndex]);
+            if (!ambientArtworkRotationTimer) ambientArtworkRotationTimer = setInterval(rotateAmbientArtwork, 14000);
+        }
+
         function loadYouTubeAPI() {
             if (window.YT && window.YT.Player) { ytApiReady = true; return; }
             if (document.querySelector('script[data-youtoo-iframe-api]')) return;
@@ -2681,6 +2738,7 @@
         }
 
         function updateNowPlaying(song) {
+            setAmbientArtwork(song, true);
             const title = document.getElementById('currTitle');
             const artist = document.getElementById('currArtist');
             const cover = document.getElementById('playerCover');
