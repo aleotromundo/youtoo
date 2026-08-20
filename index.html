@@ -639,14 +639,8 @@
 
             <section class="youtoo-hero" aria-label="Descubrir en YouToo">
                 <p class="youtoo-hero-kicker">Exploración audiovisual</p>
-                <h1>Encontrá algo que quieras ver y escuchar.</h1>
-                <p>Elegí una ruta de descubrimiento o buscá lo que tengas en mente. Los efectos de sonido quedan fuera de esta experiencia.</p>
-            </section>
-
-            <section class="discovery-panel" id="discoveryPanel" aria-label="Explorar contenido">
-                <button type="button" class="discovery-action" onclick="exploreMode('videos')"><i class="fas fa-clapperboard"></i><strong>Videos aleatorios</strong><span>Clips y actuaciones reproducibles de YouTube.</span></button>
-                <button type="button" class="discovery-action" onclick="exploreMode('music')"><i class="fas fa-headphones"></i><strong>Solo música</strong><span>Audio libre para escuchar sin video.</span></button>
-                <button type="button" class="discovery-action" onclick="exploreMode('mix')"><i class="fas fa-wand-magic-sparkles"></i><strong>Mezcla sorpresa</strong><span>Una búsqueda audiovisual distinta cada vez.</span></button>
+                <h1>Videos y música, listos para elegir.</h1>
+                <p>La portada carga una selección directa de videos y música. Buscá un artista cuando quieras ir más allá; los efectos de sonido quedan fuera.</p>
             </section>
 
             <section class="video-stage" id="videoStage" aria-live="polite" aria-label="Reproductor de video">
@@ -659,12 +653,6 @@
                 </div>
             </section>
 
-            <div class="mood-selector">
-                <button class="mood-btn mood-energy" onclick="setMood('energy')"><i class="fas fa-bolt"></i> Energía</button>
-                <button class="mood-btn mood-relax" onclick="setMood('relax')"><i class="fas fa-spa"></i> Relax</button>
-                <button class="mood-btn mood-party" onclick="setMood('party')"><i class="fas fa-champagne-glasses"></i> Fiesta</button>
-                <button class="mood-btn mood-sad" onclick="setMood('sad')"><i class="fas fa-cloud-rain"></i> Melancolía</button>
-            </div>
 
             <div id="loader" class="loader-wrap">
                 <div class="loader-spinner"></div>
@@ -784,28 +772,10 @@
         let lastVolume = 0.8;
         let channelFilter = null; // { id, title } cuando el usuario entra a ver el contenido de un canal
         let activeBrowseMode = 'home';
-        const DISCOVERY_QUERIES = ['live music session', 'indie rock video', 'electronic performance', 'jazz live', 'latin music video', 'acoustic session', 'metal live'];
-
-        // Secciones para la pantalla de Inicio: cada una es una fila propia con canciones,
-        // así la pantalla arranca llena de opciones en vez de depender de una sola búsqueda.
-        // IMPORTANTE: esto tiene que estar definido ANTES de la llamada inicial a resetView() más abajo.
-        const HOME_SECTIONS = [
-            { query: 'rock classics', label: 'Rock clásico' },
-            { query: 'pop hits', label: 'Pop de hoy' },
-            { query: 'indie rock', label: 'Indie para descubrir' },
-            { query: 'hip hop hits', label: 'Hip Hop' },
-            { query: 'electronic music mix', label: 'Electrónica' },
-            { query: 'jazz classics', label: 'Jazz clásico' },
-            { query: 'latin hits', label: 'Latinos' },
-            { query: 'reggae essentials', label: 'Reggae' },
-            { query: 'metal classics', label: 'Metal' },
-            { query: '80s hits', label: 'Lo mejor de los 80' },
-            { query: '90s hits', label: 'Lo mejor de los 90' },
-            { query: 'acoustic covers', label: 'Acústico' },
-            { query: 'funk soul classics', label: 'Funk & Soul' },
-            { query: 'k-pop hits', label: 'K-Pop' },
-            { query: 'lofi beats', label: 'Lo-fi para concentrarte' }
-        ];
+        let homeFeedLoaded = false;
+        let homeFeedLoading = false;
+        let homeVideos = [];
+        let homeMusic = [];
 
         const audioEl = document.getElementById('audio-element');
         const playerBar = document.getElementById('playerBar');
@@ -1036,36 +1006,6 @@
             if (q) performSmartSearch(q); else resetView();
         }
 
-        async function exploreMode(mode) {
-            activeBrowseMode = mode;
-            channelFilter = null;
-            currentMood = null;
-            document.querySelectorAll('.mood-btn').forEach(b => b.classList.remove('active'));
-            document.querySelectorAll('.nav-links li').forEach(l => l.classList.remove('active'));
-            document.querySelector('.nav-links li:first-child').classList.add('active');
-
-            const loader = document.getElementById('loader');
-            const container = document.getElementById('dynamicSections');
-            const query = DISCOVERY_QUERIES[Math.floor(Math.random() * DISCOVERY_QUERIES.length)];
-            loader.style.display = 'flex';
-            container.innerHTML = '';
-            searchInput.value = '';
-            searchClearBtn.classList.remove('show');
-
-            try {
-                if (mode === 'music') {
-                    await searchOpenverse('music ' + query, { discovery: true });
-                } else {
-                    await performSmartSearch(query);
-                    if (mode === 'mix') showToast('Mezcla sorpresa lista', 'fa-wand-magic-sparkles');
-                }
-            } catch (error) {
-                renderEmptyState('No pudimos cargar esta selección', 'Probá con otra opción o buscá un artista.');
-            } finally {
-                loader.style.display = 'none';
-            }
-        }
-
         async function getOpenverseToken() {
             if (!OPENVERSE_CLIENT_ID || !OPENVERSE_CLIENT_SECRET) return null;
             const now = Date.now();
@@ -1083,38 +1023,36 @@
             } catch (e) { return null; }
         }
 
-        async function searchOpenverse(query, opts = {}) {
+        async function fetchOpenverseTracks(query, limit = 20) {
             const token = await getOpenverseToken();
             const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
-            // category=music le pide a Openverse que priorice música por sobre efectos de sonido, podcasts, etc.
-            const url = `https://api.openverse.org/v1/audio/?q=${encodeURIComponent(query)}&category=music&page_size=20`;
+            const url = `https://api.openverse.org/v1/audio/?q=${encodeURIComponent(query)}&category=music&page_size=${Math.min(Math.max(limit, 1), 20)}`;
             const response = await fetch(url, { headers });
             const data = await response.json();
-            if (data.results && data.results.length > 0) {
-                const mappedResults = data.results
-                    // Filtramos los .wav: pesan mucho y casi nunca traen carátula
-                    .filter(track => (track.filetype || '').toLowerCase() !== 'wav' && !/\.wav($|\?)/i.test(track.url || ''))
-                    // Por si la API mezcla categorías: sacamos lo marcado explícitamente como efecto de sonido
-                    .filter(track => (track.category || '').toLowerCase() !== 'sound_effect')
-                    // Descartamos clips brevísimos (stingers/efectos sin categoría) sin tocar intros reales de canciones
-                    .filter(track => !track.duration || track.duration >= 15000)
-                    // Excluimos efectos, ambientes y foley de la experiencia musical.
-                    .filter(track => {
-                        const tags = Array.isArray(track.tags) ? track.tags.join(' ') : String(track.tags || '');
-                        const searchable = `${track.title || ''} ${track.creator || ''} ${track.category || ''} ${tags}`.toLowerCase();
-                        return !/\b(sound effect|sound-effect|sfx|foley|ambient|ambience|ambiente|noise|ruido|whoosh|impact|explosion)\b/.test(searchable);
-                    })
-                    .map(track => ({
-                        title: track.title, artist: track.creator,
-                        img: track.thumbnail || '',
-                        url: track.url, type: 'mp3', genre: (track.genres && track.genres[0]) || 'unknown'
-                    }))
-                    // Priorizamos los que tienen carátula, para que no queden mezclados con los que no tienen ícono
-                    .sort((a, b) => (b.img ? 1 : 0) - (a.img ? 1 : 0));
-                if (mappedResults.length === 0) throw new Error("No results");
-                currentList = mappedResults;
-                renderGrid(mappedResults, opts.discovery ? 'Solo música para descubrir' : `Resultados Libres: "${query}"`, "<i class='fas fa-headphones'></i>");
-            } else { throw new Error("No results"); }
+            if (!response.ok || !data.results?.length) return [];
+            return data.results
+                .filter(track => (track.filetype || '').toLowerCase() !== 'wav' && !/\.wav($|\?)/i.test(track.url || ''))
+                .filter(track => (track.category || '').toLowerCase() !== 'sound_effect')
+                .filter(track => !track.duration || track.duration >= 15000)
+                .filter(track => {
+                    const tags = Array.isArray(track.tags) ? track.tags.join(' ') : String(track.tags || '');
+                    const searchable = `${track.title || ''} ${track.creator || ''} ${track.category || ''} ${tags}`.toLowerCase();
+                    return !/\b(sound effect|sound-effect|sfx|foley|ambient|ambience|ambiente|noise|ruido|whoosh|impact|explosion)\b/.test(searchable);
+                })
+                .map(track => ({
+                    title: track.title, artist: track.creator,
+                    img: track.thumbnail || '', url: track.url, type: 'mp3',
+                    duration: track.duration ? Math.round(track.duration / 1000) : null,
+                    genre: (track.genres && track.genres[0]) || 'unknown'
+                }))
+                .sort((a, b) => (b.img ? 1 : 0) - (a.img ? 1 : 0));
+        }
+
+        async function searchOpenverse(query) {
+            const mappedResults = await fetchOpenverseTracks(query, 20);
+            if (!mappedResults.length) throw new Error('No results');
+            currentList = mappedResults;
+            renderGrid(mappedResults, `Música: "${query}"`, "<i class='fas fa-headphones'></i>");
         }
 
         function setMood(mood) {
@@ -1125,7 +1063,7 @@
             performSmartSearch(mood);
         }
 
-        // Inicio no dispara búsquedas automáticas: cada recarga antes consumía seis consultas de YouTube.
+        // La portada hace solamente una búsqueda de videos y una de música por sesión; el proxy cachea la primera.
         async function resetView() {
             searchQuery = ""; currentMood = null; channelFilter = null; activeBrowseMode = 'home';
             searchInput.value = ""; searchClearBtn.classList.remove('show');
@@ -1133,9 +1071,37 @@
             document.querySelectorAll('.nav-links li').forEach(l => l.classList.remove('active'));
             document.querySelector('.nav-links li:first-child').classList.add('active');
 
+            if (homeFeedLoaded) return renderHomeFeed();
+            if (homeFeedLoading) return;
+            homeFeedLoading = true;
+            const loader = document.getElementById('loader');
+            const container = document.getElementById('dynamicSections');
+            loader.style.display = 'flex';
+            container.innerHTML = '';
+            try {
+                const [videos, music] = await Promise.all([
+                    fetchYouTubeSearch('official music video', 'video', { maxResults: 12 }),
+                    fetchOpenverseTracks('music', 12)
+                ]);
+                homeVideos = videos;
+                homeMusic = music;
+                homeFeedLoaded = true;
+                renderHomeFeed();
+            } catch (error) {
+                renderEmptyState('No pudimos cargar la portada', 'Probá buscar un artista o recargá más tarde.');
+            } finally {
+                homeFeedLoading = false;
+                loader.style.display = 'none';
+            }
+        }
+
+        function renderHomeFeed() {
+            const container = document.getElementById('dynamicSections');
+            container.innerHTML = '';
             currentList = [];
-            document.getElementById('loader').style.display = 'none';
-            renderEmptyState('Elegí cómo querés explorar', 'Probá Videos aleatorios, Solo música o una mezcla sorpresa. Los efectos de sonido no aparecen en estas rutas.');
+            if (homeVideos.length) renderGrid(homeVideos, 'Videos para mirar', "<i class='fas fa-clapperboard'></i>");
+            if (homeMusic.length) renderGrid(homeMusic, 'Música para escuchar', "<i class='fas fa-headphones'></i>");
+            if (!homeVideos.length && !homeMusic.length) renderEmptyState('No hay opciones disponibles ahora', 'Probá buscar un artista o volvé a intentar más tarde.');
         }
 
         function showSection(section) {
