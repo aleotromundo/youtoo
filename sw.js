@@ -1,4 +1,4 @@
-const CACHE_NAME = 'nowarfy-shell-v13';
+const CACHE_NAME = 'nowarfy-shell-v14';
 const APP_SHELL = [
   '/',
   '/index.html',
@@ -7,7 +7,8 @@ const APP_SHELL = [
   '/assets/favicon-32.png',
   '/assets/nowarfy-icon-192.png',
   '/assets/nowarfy-icon-512.png',
-  '/assets/nowarfy-apple-touch-icon.png'
+  '/assets/nowarfy-apple-touch-icon.png',
+  '/assets/nowarfy-qr.png'
 ];
 
 self.addEventListener('install', event => {

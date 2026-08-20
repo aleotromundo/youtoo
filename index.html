@@ -782,6 +782,23 @@
         .nowarfy-install-btn { width: 100%; margin-top: 12px; padding: 10px 12px; border: 1px solid rgba(94,234,212,.35); border-radius: 9px; background: rgba(94,234,212,.10); color: #d7fff8; font: 800 .72rem 'Manrope', sans-serif; cursor: pointer; transition: transform .18s var(--ease), background .18s var(--ease); }
         .nowarfy-install-btn:hover { background: rgba(94,234,212,.18); transform: translateY(-1px); }
         .nowarfy-install-btn[hidden] { display: none; }
+        .nowarfy-qr-launch { display: flex; flex: 0 0 auto; align-items: center; gap: 9px; width: calc(100% - 18px); margin: 0 9px; padding: 7px 9px; border: 1px solid rgba(190,188,255,.19); border-radius: 11px; color: #e9e7ff; background: rgba(255,255,255,.035); cursor: pointer; text-align: left; transition: transform .18s var(--ease), border-color .18s var(--ease), background .18s var(--ease); }
+        .nowarfy-qr-launch:hover { border-color: rgba(94,234,212,.48); background: rgba(94,234,212,.09); transform: translateY(-1px); }
+        .nowarfy-qr-launch img { width: 34px; height: 34px; flex: 0 0 34px; border-radius: 5px; background: #fffdf7; image-rendering: pixelated; }
+        .nowarfy-qr-copy { min-width: 0; flex: 1; }
+        .nowarfy-qr-copy strong, .nowarfy-qr-copy small { display: block; }
+        .nowarfy-qr-copy strong { color: #dcfff8; font-size: .69rem; }
+        .nowarfy-qr-copy small { margin-top: 1px; color: #9596b0; font-size: .6rem; }
+        .nowarfy-qr-launch > i { color: #5eead4; font-size: .88rem; }
+        .nowarfy-qr-modal[hidden] { display: none; }
+        .nowarfy-qr-modal { position: fixed; z-index: 10000; inset: 0; display: grid; place-items: center; padding: 22px; background: rgba(2,3,10,.78); backdrop-filter: blur(10px); }
+        .nowarfy-qr-dialog { position: relative; width: min(92vw, 392px); padding: 28px; border: 1px solid rgba(190,188,255,.28); border-radius: 20px; background: linear-gradient(145deg, #20213b, #0f101e); box-shadow: 0 28px 75px rgba(0,0,0,.55); text-align: center; }
+        .nowarfy-qr-dialog h2 { margin: 0; color: #fbfaff; font: 800 1.28rem 'Sora', sans-serif; letter-spacing: -.04em; }
+        .nowarfy-qr-dialog p { margin: 7px auto 18px; color: #adaec4; font-size: .78rem; line-height: 1.45; }
+        .nowarfy-qr-dialog img { display: block; width: min(68vw, 272px); height: min(68vw, 272px); margin: 0 auto; padding: 11px; border-radius: 13px; background: #fffdf7; image-rendering: pixelated; }
+        .nowarfy-qr-close { position: absolute; top: 10px; right: 10px; width: 34px; height: 34px; border: 0; border-radius: 50%; color: #dddcef; background: rgba(255,255,255,.08); cursor: pointer; }
+        .nowarfy-qr-link { display: inline-flex; align-items: center; gap: 7px; margin-top: 20px; padding: 9px 13px; border: 1px solid rgba(94,234,212,.37); border-radius: 999px; color: #dcfff8; background: rgba(94,234,212,.09); font: 800 .72rem 'Manrope', sans-serif; text-decoration: none; }
+        .qr-modal-open { overflow: hidden; }
 
         @media (max-width: 768px) {
             body.mode-youtoo .sidebar { width: 100%; max-height: 76px; padding: 11px 12px; gap: 10px; overflow-x: auto; overflow-y: hidden; scroll-padding-bottom: 0; }
@@ -789,6 +806,9 @@
             .nowarfy-nav-groups { display: flex; flex: 0 0 auto; flex-direction: row; gap: 3px; align-items: center; }
             .nowarfy-nav-group { display: contents; }
             .nowarfy-nav-label, .nowarfy-side-status { display: none; }
+            .nowarfy-qr-launch { width: 40px; min-width: 40px; height: 40px; margin: 0 0 0 4px; padding: 3px; justify-content: center; border-radius: 9px; }
+            .nowarfy-qr-launch img { width: 31px; height: 31px; flex-basis: 31px; }
+            .nowarfy-qr-copy, .nowarfy-qr-launch > i { display: none; }
             body.mode-youtoo .nowarfy-nav-group .nav-links { display: flex; gap: 3px; }
             body.mode-youtoo .nowarfy-nav-group .nav-links li { min-height: auto; margin: 0; padding: 8px; }
             body.mode-youtoo .nowarfy-nav-group .nav-links li span { display: none; }
@@ -845,6 +865,11 @@
                 </section>
             </div>
             <div class="nowarfy-side-status"><strong><i class="fas fa-circle"></i> Datos en este dispositivo</strong>La cuenta y sincronización se activarán solo si las elegís.<button type="button" id="pwaInstallBtn" class="nowarfy-install-btn" hidden><i class="fas fa-download"></i> Instalar Nowarfy</button></div>
+            <button type="button" id="nowarfyQrButton" class="nowarfy-qr-launch" onclick="openNowarfyQr()" aria-haspopup="dialog" aria-controls="nowarfyQrModal" aria-label="Mostrar código QR para abrir Nowarfy">
+                <img src="assets/nowarfy-qr.png" alt="">
+                <span class="nowarfy-qr-copy"><strong>Compartí Nowarfy</strong><small>Mostrar código QR</small></span>
+                <i class="fas fa-qrcode" aria-hidden="true"></i>
+            </button>
         </aside>
 
         <!-- CONTENIDO -->
@@ -956,6 +981,16 @@
         <div class="queue-list" id="queueList"></div>
         <div class="queue-loading-hint" id="queueLoadingHint"><div class="loader-spinner" style="width:16px;height:16px;border-width:2px;"></div> Sumando más canciones...</div>
         <div class="queue-drop-trash" id="queueTrash"><i class="fas fa-trash"></i> Soltá aquí para quitarla de la cola</div>
+    </div>
+
+    <div class="nowarfy-qr-modal" id="nowarfyQrModal" role="dialog" aria-modal="true" aria-labelledby="nowarfyQrTitle" hidden onclick="if (event.target === this) closeNowarfyQr()">
+        <div class="nowarfy-qr-dialog">
+            <button type="button" class="nowarfy-qr-close" onclick="closeNowarfyQr()" aria-label="Cerrar código QR"><i class="fas fa-xmark"></i></button>
+            <h2 id="nowarfyQrTitle">Abrí Nowarfy en tu celular</h2>
+            <p>Escaneá este código para ir directo a la página principal.</p>
+            <img src="assets/nowarfy-qr.png" alt="Código QR para abrir la página principal de Nowarfy">
+            <a class="nowarfy-qr-link" href="https://you2-chi.vercel.app/" target="_blank" rel="noopener"><i class="fas fa-arrow-up-right-from-square"></i> Abrir Nowarfy</a>
+        </div>
     </div>
 
     <audio id="audio-element" preload="metadata"></audio>
@@ -3897,6 +3932,26 @@
                 });
             }, { once: true });
         }
+
+        let nowarfyQrPreviousFocus = null;
+        function openNowarfyQr() {
+            const modal = document.getElementById('nowarfyQrModal');
+            if (!modal) return;
+            nowarfyQrPreviousFocus = document.activeElement;
+            modal.hidden = false;
+            document.body.classList.add('qr-modal-open');
+            modal.querySelector('.nowarfy-qr-close')?.focus();
+        }
+        function closeNowarfyQr() {
+            const modal = document.getElementById('nowarfyQrModal');
+            if (!modal || modal.hidden) return;
+            modal.hidden = true;
+            document.body.classList.remove('qr-modal-open');
+            nowarfyQrPreviousFocus?.focus?.();
+        }
+        window.addEventListener('keydown', (event) => {
+            if (event.key === 'Escape') closeNowarfyQr();
+        });
 
         // --- MODO FLOTANTE (ARRASTRE + RETORNO) ---
         let isFloating = false;
