@@ -1552,14 +1552,18 @@
             const response = await fetch(`/api/search?type=openverse&query=${encodeURIComponent(query)}&maxResults=${Math.min(Math.max(limit, 1), 20)}`);
             const data = await response.json();
             if (!response.ok || !data.results?.length) return [];
+            const allowedAudioTypes = new Set(['mp3', 'ogg', 'opus', 'm4a', 'aac']);
+            const unwantedAudioTerms = /\b(sound effect|sound-effect|sfx|foley|ambient|ambience|ambiente|noise|ruido|whoosh|impact|explosion|sample|sampling|loop|drum loop|drum circle|water|sonar|test tone|tone generator|field recording|field-recording|white noise|pink noise)\b/i;
             return data.results
-                .filter(track => (track.filetype || '').toLowerCase() !== 'wav' && !/\.wav($|\?)/i.test(track.url || ''))
+                .filter(track => allowedAudioTypes.has(String(track.filetype || '').toLowerCase()))
+                .filter(track => String(track.url || '').trim() && String(track.thumbnail || '').trim())
+                .filter(track => String(track.title || '').trim() && String(track.creator || '').trim())
                 .filter(track => (track.category || '').toLowerCase() !== 'sound_effect')
-                .filter(track => !track.duration || track.duration >= 15000)
+                .filter(track => Number(track.duration) >= 60000)
                 .filter(track => {
                     const tags = Array.isArray(track.tags) ? track.tags.join(' ') : String(track.tags || '');
-                    const searchable = `${track.title || ''} ${track.creator || ''} ${track.category || ''} ${tags}`.toLowerCase();
-                    return !/\b(sound effect|sound-effect|sfx|foley|ambient|ambience|ambiente|noise|ruido|whoosh|impact|explosion)\b/.test(searchable);
+                    const searchable = `${track.title || ''} ${track.creator || ''} ${track.category || ''} ${tags}`;
+                    return !unwantedAudioTerms.test(searchable);
                 })
                 .map(track => ({
                     title: track.title, artist: track.creator,
@@ -1602,7 +1606,7 @@
         async function loadHomeCatalogSources() {
             const seed = getTasteSeed();
             const musicQuery = seed ? `${seed} music` : 'music';
-            const musicReserveQuery = seed ? 'independent music' : 'instrumental music';
+            const musicReserveQuery = seed ? 'music album' : 'instrumental music album';
             const results = await Promise.allSettled([
                 fetchYouTubeSearch(seed ? `${seed} music video` : 'official music video', 'video', { maxResults: 14 }),
                 fetchYouTubeSearch(seed ? `${seed} playlist` : 'music playlist', 'playlist', { maxResults: 10 }),
@@ -1979,14 +1983,19 @@
                 div.style.animationDelay = `${Math.min(idx * 0.03, 0.5)}s`;
                 const artistClickable = !!song.channelId;
                 const isVideo = song.resourceKind === 'youtube#video';
+                const isDirectAudio = song.type === 'mp3';
+                const imageErrorAction = isDirectAudio
+                    ? "this.closest('.card').remove();"
+                    : "this.closest('.card-img-wrap').classList.add('img-error'); this.style.display='none';";
                 div.classList.toggle('video-card', isVideo);
+                div.classList.toggle('audio-card', isDirectAudio);
                 div.innerHTML = `
                     <div class="card-img-wrap">
                         ${isVideo ? `<span class="video-source-badge"><i class="fas fa-play"></i> Video</span><span class="card-duration">${formatContentDuration(song.duration)}</span>` : ''}
                         <div class="skeleton"></div>
                         <img src="${song.img || ''}" class="card-img" loading="lazy"
                              onload="this.classList.add('loaded')"
-                             onerror="this.closest('.card-img-wrap').classList.add('img-error'); this.style.display='none';">
+                             onerror="${imageErrorAction}">
                         <div class="card-spinner">
                             <div class="orbit-spinner" style="--s:26px;--d:5px;"><i></i><i></i><i></i></div>
                             <span>Cargando</span>
