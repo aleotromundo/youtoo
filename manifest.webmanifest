@@ -1,0 +1,19 @@
+{
+  "name": "YouToo · Descubrimiento audiovisual",
+  "short_name": "YouToo",
+  "description": "Biblioteca audiovisual con videos, música y canales públicos.",
+  "id": "/",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#0a0a12",
+  "theme_color": "#8B5CF6",
+  "icons": [
+    {
+      "src": "/assets/youtoo-mark-compact.png",
+      "sizes": "1920x1920",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

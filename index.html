@@ -4,6 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>YouToo · Descubrí lo que suena</title>
+    <meta name="theme-color" content="#8B5CF6">
+    <link rel="manifest" href="/manifest.webmanifest">
+    <link rel="apple-touch-icon" href="/assets/youtoo-mark-compact.png">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -605,10 +608,54 @@
         .playlist-source-badge i { color: #c4b5fd; margin-right: 4px; }
         .playlist-open { display: inline-flex; align-items: center; gap: 7px; margin: 9px 2px 5px; color: #5eead4; font-size: .72rem; font-weight: 800; }
         .playlist-card:hover .playlist-open { color: #d9d4ff; }
+        .taste-rail { position: sticky; top: 0; z-index: 12; margin: -2px -2px 16px; padding: 10px 2px 12px; background: linear-gradient(180deg, rgba(10,10,18,.98) 74%, rgba(10,10,18,0)); }
+        .taste-chips { display: flex; align-items: center; gap: 8px; overflow-x: auto; padding: 0 2px 6px; scrollbar-width: none; }
+        .taste-chips::-webkit-scrollbar { display: none; }
+        .taste-chip { flex: 0 0 auto; border: 1px solid rgba(190,188,255,.15); border-radius: 999px; padding: 8px 13px; color: #c9c7da; background: rgba(31,32,57,.8); font: 750 .74rem 'Manrope', sans-serif; cursor: pointer; white-space: nowrap; transition: .18s var(--ease); }
+        .taste-chip:hover { transform: translateY(-1px); border-color: rgba(94,234,212,.55); color: #f2f1ff; }
+        .taste-chip.active { color: #09111a; border-color: #5eead4; background: #5eead4; box-shadow: 0 5px 16px rgba(94,234,212,.18); }
+        .taste-chip .fa-sparkles { margin-right: 5px; }
+        .taste-data-panel { max-width: 800px; padding: 24px; border: 1px solid rgba(190,188,255,.18); border-radius: 18px; background: linear-gradient(145deg, rgba(31,32,57,.9), rgba(17,18,34,.94)); }
+        .taste-data-panel h2 { margin: 0 0 7px; color: #f5f3ff; font: 800 1.34rem 'Sora', sans-serif; letter-spacing: -.04em; }
+        .taste-data-panel > p { max-width: 640px; margin: 0 0 18px; color: #a9a9c2; font-size: .86rem; line-height: 1.55; }
+        .taste-data-status { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin: 18px 0; padding: 14px; border: 1px solid rgba(94,234,212,.16); border-radius: 12px; background: rgba(94,234,212,.05); }
+        .taste-data-status strong, .taste-data-status span { display: block; }
+        .taste-data-status strong { color: #e9e7ff; font-size: .86rem; }
+        .taste-data-status span { margin-top: 3px; color: #a9a9c2; font-size: .74rem; }
+        .taste-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin: 14px 0 20px; }
+        .taste-stat { padding: 13px; border: 1px solid rgba(190,188,255,.12); border-radius: 12px; background: rgba(8,8,18,.31); }
+        .taste-stat b { display: block; color: #5eead4; font: 800 1.12rem 'Sora', sans-serif; }
+        .taste-stat span { color: #aaaac2; font-size: .7rem; }
+        .taste-actions { display: flex; flex-wrap: wrap; gap: 9px; }
+        .taste-action { border: 1px solid rgba(190,188,255,.2); border-radius: 9px; padding: 9px 12px; color: #e9e7ff; background: rgba(255,255,255,.04); font: 800 .74rem 'Manrope', sans-serif; cursor: pointer; }
+        .taste-action.primary { border-color: rgba(94,234,212,.4); color: #09111a; background: #5eead4; }
+        .taste-action.danger { border-color: rgba(255,123,144,.35); color: #ffc2cd; }
+        .channel-profile { position: relative; overflow: hidden; display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 20px; align-items: center; margin: 2px 0 24px; padding: 22px; border: 1px solid rgba(190,188,255,.2); border-radius: 18px; background: linear-gradient(125deg, rgba(68,49,118,.5), rgba(19,20,38,.94) 58%, rgba(12,44,53,.5)); }
+        .channel-profile::after { content: ''; position: absolute; right: -70px; top: -90px; width: 240px; height: 240px; border-radius: 50%; background: radial-gradient(circle, rgba(94,234,212,.2), transparent 68%); pointer-events: none; }
+        .channel-profile-avatar { position: relative; z-index: 1; width: 106px; height: 106px; overflow: hidden; border: 3px solid rgba(94,234,212,.5); border-radius: 50%; background: #16172a; object-fit: cover; }
+        .channel-profile-content { position: relative; z-index: 1; min-width: 0; }
+        .channel-profile-kicker { margin: 0 0 5px; color: #5eead4; font-size: .66rem; font-weight: 850; letter-spacing: .13em; text-transform: uppercase; }
+        .channel-profile h2 { margin: 0; color: #f7f5ff; font: 800 clamp(1.35rem, 3vw, 2rem) 'Sora', sans-serif; letter-spacing: -.05em; overflow-wrap: anywhere; }
+        .channel-profile-handle { margin: 4px 0 0; color: #aeadc4; font-size: .78rem; }
+        .channel-profile-description { max-width: 700px; margin: 11px 0 0; color: #bebdd0; font-size: .8rem; line-height: 1.48; white-space: pre-line; }
+        .channel-profile-stats { display: flex; flex-wrap: wrap; gap: 8px 14px; margin-top: 13px; color: #cfcde0; font-size: .74rem; }
+        .channel-profile-stats span b { color: #f0edff; }
+        .channel-profile-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 15px; }
+        .channel-profile-action { display: inline-flex; align-items: center; gap: 7px; border: 1px solid rgba(94,234,212,.3); border-radius: 9px; padding: 8px 11px; color: #dffef8; background: rgba(94,234,212,.08); font: 800 .72rem 'Manrope', sans-serif; text-decoration: none; cursor: pointer; }
+        .catalog-more-wrap { display: flex; justify-content: center; margin: 17px 0 30px; }
+        .catalog-more { border: 1px solid rgba(94,234,212,.42); border-radius: 999px; padding: 10px 16px; color: #dffff8; background: rgba(94,234,212,.08); font: 800 .75rem 'Manrope', sans-serif; cursor: pointer; transition: .18s var(--ease); }
+        .catalog-more:hover { transform: translateY(-2px); color: #09111a; background: #5eead4; }
+        .catalog-more:disabled { cursor: progress; opacity: .65; transform: none; }
         @media (max-width: 768px) {
             body.mode-youtoo .sidebar { width: 100%; }
             body.mode-youtoo .sidebar::after, body.mode-youtoo .brand-youtoo { display: none; }
             .youtoo-hero { padding-top: 6px; }
+            .taste-rail { margin-bottom: 10px; }
+            .taste-data-panel { padding: 18px; }
+            .taste-stats { grid-template-columns: 1fr; }
+            .taste-data-status { align-items: flex-start; flex-direction: column; }
+            .channel-profile { grid-template-columns: 1fr; gap: 13px; padding: 17px; }
+            .channel-profile-avatar { width: 82px; height: 82px; }
             .discovery-panel { grid-template-columns: 1fr; gap: 9px; }
             .discovery-action { min-height: 95px; padding: 14px 16px; }
             .discovery-action i { margin-bottom: 10px; }
@@ -625,8 +672,9 @@
         <div class="sidebar">
             <div class="logo"><span class="brand-nowarfi"><i class="fab fa-spotify"></i> NowarFi</span><span class="brand-youtoo"><img src="assets/youtoo-mark-compact.png" alt=""> YouToo</span></div>
             <ul class="nav-links">
-                <li onclick="resetView()" class="active"><i class="fas fa-house"></i> <span>Inicio</span></li>
-                <li onclick="showSection('favorites')"><i class="fas fa-heart"></i> <span>Favoritos</span></li>
+                <li data-nav="home" onclick="resetView()" class="active"><i class="fas fa-house"></i> <span>Inicio</span></li>
+                <li data-nav="favorites" onclick="showSection('favorites')"><i class="fas fa-heart"></i> <span>Favoritos</span></li>
+                <li data-nav="taste" onclick="showSection('taste')"><i class="fas fa-shield-halved"></i> <span>Tus datos</span></li>
             </ul>
         </div>
 
@@ -639,6 +687,9 @@
                     <button class="search-clear" id="searchClear" onclick="clearSearch()" aria-label="Limpiar búsqueda"><i class="fas fa-xmark"></i></button>
                 </div>
             </div>
+            <nav class="taste-rail" aria-label="Categorías para descubrir">
+                <div class="taste-chips" id="tasteChips"></div>
+            </nav>
 
             <section class="youtoo-hero" aria-label="Descubrir en YouToo">
                 <p class="youtoo-hero-kicker">Exploración audiovisual</p>
@@ -734,7 +785,8 @@
         <div class="queue-drop-trash" id="queueTrash"><i class="fas fa-trash"></i> Soltá aquí para quitarla de la cola</div>
     </div>
 
-    <audio id="audio-element"></audio>
+    <audio id="audio-element" preload="metadata"></audio>
+    <audio id="audio-element-next" preload="metadata" aria-hidden="true"></audio>
     <div class="toast-container" id="toastContainer"></div>
 
     <script>
@@ -766,8 +818,6 @@
         let ytApiReady = false;
         let pendingYTRequest = null;
         let progressInterval = null;
-        let openverseToken = null;
-        let tokenExpiry = 0;
         // Evita insistir contra YouTube durante la misma sesión cuando informa que la cuota se agotó.
         let youtubeQuotaBlockedUntil = 0;
         let youtubeQuotaNoticeShown = false;
@@ -782,8 +832,15 @@
         let homeChannels = [];
         let homePlaylists = [];
         let homeMusic = [];
+        let activeChannelCatalog = null;
+        let activePlaylistCatalog = null;
 
         const audioEl = document.getElementById('audio-element');
+        const nextAudioEl = document.getElementById('audio-element-next');
+        let activeAudioEl = audioEl;
+        let crossfadeInProgress = false;
+        let crossfadeTimer = null;
+        const CROSSFADE_SECONDS = 3;
         const playerBar = document.getElementById('playerBar');
         const pipBtn = document.getElementById('pipBtn');
         const progressTrack = document.getElementById('progressTrack');
@@ -795,13 +852,15 @@
         const searchClearBtn = document.getElementById('searchClear');
 
         initVolume();
-        resetView();
+        // Se difiere el inicio para que el perfil local y sus funciones ya estén inicializados.
+        setTimeout(resetView, 0);
         loadYouTubeAPI();
         setupProgressDrag();
         setupKeyboardShortcuts();
         restoreQueueFromStorage();
         setupQueueTrashDropzone();
         setupBackgroundPersistence();
+        setupInstallableApp();
         renderQueue();
 
         // --- LIMPIEZA DE CONSOLA ---
@@ -818,37 +877,177 @@
         }
 
         const TASTE_STORAGE_KEY = 'youtoo_taste_v1';
+        const EMPTY_TASTE = Object.freeze({ version: 2, personalization: true, searches: [], plays: [], channels: [], playlists: [] });
+
         function readTaste() {
             try {
                 const saved = JSON.parse(localStorage.getItem(TASTE_STORAGE_KEY));
-                return { searches: Array.isArray(saved?.searches) ? saved.searches : [], plays: Array.isArray(saved?.plays) ? saved.plays : [] };
-            } catch { return { searches: [], plays: [] }; }
+                return {
+                    version: 2,
+                    personalization: saved?.personalization !== false,
+                    searches: Array.isArray(saved?.searches) ? saved.searches.filter(item => typeof item === 'string').slice(0, 12) : [],
+                    plays: Array.isArray(saved?.plays) ? saved.plays.filter(item => item && typeof item.title === 'string').slice(0, 30) : [],
+                    channels: Array.isArray(saved?.channels) ? saved.channels.filter(item => item && typeof item.id === 'string').slice(0, 20) : [],
+                    playlists: Array.isArray(saved?.playlists) ? saved.playlists.filter(item => item && typeof item.id === 'string').slice(0, 16) : []
+                };
+            } catch { return { ...EMPTY_TASTE, searches: [], plays: [], channels: [], playlists: [] }; }
         }
-        function writeTaste(taste) { localStorage.setItem(TASTE_STORAGE_KEY, JSON.stringify(taste)); }
+
+        function writeTaste(taste) {
+            localStorage.setItem(TASTE_STORAGE_KEY, JSON.stringify({ ...taste, version: 2, updatedAt: Date.now() }));
+        }
+
+        function rememberUnique(list, entry, getKey, max) {
+            const key = getKey(entry);
+            return [entry, ...list.filter(item => getKey(item) !== key)].slice(0, max);
+        }
+
         function rememberSearch(query) {
             const normalized = String(query || '').trim();
             if (!normalized) return;
             const taste = readTaste();
-            taste.searches = [normalized, ...taste.searches.filter(item => item.toLowerCase() !== normalized.toLowerCase())].slice(0, 8);
+            if (!taste.personalization) return;
+            taste.searches = [normalized, ...taste.searches.filter(item => item.toLowerCase() !== normalized.toLowerCase())].slice(0, 12);
             writeTaste(taste);
+            renderTasteChips(searchQuery || normalized);
         }
+
         function rememberPlay(song) {
             if (!song?.title) return;
             const taste = readTaste();
-            const entry = { title: song.title, artist: song.artist || '', channelId: song.channelId || '', at: Date.now() };
-            taste.plays = [entry, ...taste.plays.filter(item => `${item.title}|${item.artist}` !== `${entry.title}|${entry.artist}`)].slice(0, 16);
+            if (!taste.personalization) return;
+            const entry = { title: song.title, artist: song.artist || '', channelId: song.channelId || '', channelTitle: song.channelTitle || song.artist || '', at: Date.now() };
+            taste.plays = rememberUnique(taste.plays, entry, item => `${item.title}|${item.artist}`, 30);
+            writeTaste(taste);
+            renderTasteChips(searchQuery);
+        }
+
+        function rememberChannel(channelId, title) {
+            if (!channelId) return;
+            const taste = readTaste();
+            if (!taste.personalization) return;
+            const entry = { id: String(channelId), title: String(title || 'Canal de YouTube'), at: Date.now() };
+            taste.channels = rememberUnique(taste.channels, entry, item => item.id, 20);
+            writeTaste(taste);
+            renderTasteChips(searchQuery);
+        }
+
+        function rememberPlaylist(playlist) {
+            if (!playlist?.url) return;
+            const taste = readTaste();
+            if (!taste.personalization) return;
+            const entry = { id: String(playlist.url), title: String(playlist.title || 'Lista de reproducción'), at: Date.now() };
+            taste.playlists = rememberUnique(taste.playlists, entry, item => item.id, 16);
             writeTaste(taste);
         }
+
         function getTasteSeed() {
             const taste = readTaste();
-            return taste.searches[0] || taste.plays[0]?.artist || taste.plays[0]?.title || '';
+            if (!taste.personalization) return '';
+            return taste.searches[0] || taste.plays[0]?.artist || taste.channels[0]?.title || taste.plays[0]?.title || '';
         }
+
+        function getTasteTopics() {
+            const taste = readTaste();
+            const topics = [{ label: 'Todo', query: '', kind: 'home' }];
+            const seen = new Set(['todo']);
+            const add = (label, query, personalized = true) => {
+                const cleanLabel = String(label || '').trim();
+                const cleanQuery = String(query || '').trim();
+                const key = cleanQuery.toLocaleLowerCase();
+                if (!cleanLabel || !cleanQuery || seen.has(key)) return;
+                seen.add(key);
+                topics.push({ label: cleanLabel.slice(0, 34), query: cleanQuery.slice(0, 80), personalized });
+            };
+            if (taste.personalization) {
+                taste.searches.forEach(value => add(value, value));
+                taste.plays.forEach(item => add(item.artist || item.title, item.artist || item.title));
+                taste.channels.forEach(item => add(item.title, item.title));
+            }
+            [
+                ['Música', 'música'],
+                ['Álbumes', 'álbum completo'],
+                ['Videos en vivo', 'música en vivo'],
+                ['Punk argentino', 'punk argentino'],
+                ['Rock latino', 'rock latino']
+            ].forEach(([label, query]) => add(label, query, false));
+            return topics.slice(0, 10);
+        }
+
+        function renderTasteChips(activeQuery = '') {
+            const container = document.getElementById('tasteChips');
+            if (!container) return;
+            const normalizedActive = String(activeQuery || '').trim().toLocaleLowerCase();
+            container.innerHTML = '';
+            getTasteTopics().forEach(topic => {
+                const button = document.createElement('button');
+                button.type = 'button';
+                button.className = `taste-chip${(topic.kind === 'home' && !normalizedActive) || topic.query.toLocaleLowerCase() === normalizedActive ? ' active' : ''}`;
+                button.innerHTML = `${topic.personalized ? '<i class="fas fa-sparkles"></i>' : ''}${escapeHtml(topic.label)}`;
+                button.onclick = () => selectTasteTopic(topic);
+                container.appendChild(button);
+            });
+        }
+
+        function selectTasteTopic(topic) {
+            if (topic.kind === 'home') { resetView(); return; }
+            channelFilter = null;
+            searchInput.value = topic.query;
+            searchClearBtn.classList.add('show');
+            performSmartSearch(topic.query);
+        }
+
         function renderPersonalizedNote() {
             const note = document.getElementById('personalizedNote');
+            const taste = readTaste();
             const seed = getTasteSeed();
-            if (!seed) { note.hidden = true; return; }
+            if (!taste.personalization || !seed) { note.hidden = true; return; }
             note.hidden = false;
-            note.innerHTML = `<i class="fas fa-sparkles"></i> Selección inspirada en <strong>${escapeHtml(seed)}</strong>, según tu actividad guardada en este dispositivo.`;
+            note.innerHTML = `<i class="fas fa-sparkles"></i> Selección inspirada en <strong>${escapeHtml(seed)}</strong>, según tu actividad guardada solo en este dispositivo.`;
+        }
+
+        function setPersonalization(enabled) {
+            const taste = readTaste();
+            taste.personalization = !!enabled;
+            writeTaste(taste);
+            homeFeedLoaded = false;
+            renderTasteChips();
+            renderPersonalizedNote();
+            if (activeBrowseMode === 'home') resetView(); else renderTasteData();
+            showToast(enabled ? 'Personalización local activada' : 'Personalización local pausada', 'fa-shield-halved');
+        }
+
+        function clearTasteData() {
+            localStorage.removeItem(TASTE_STORAGE_KEY);
+            homeFeedLoaded = false;
+            renderTasteChips();
+            renderPersonalizedNote();
+            renderTasteData();
+            showToast('Se borraron tus datos locales de descubrimiento', 'fa-trash');
+        }
+
+        function renderTasteData() {
+            const taste = readTaste();
+            const container = document.getElementById('dynamicSections');
+            currentList = [];
+            document.getElementById('loader').style.display = 'none';
+            container.innerHTML = `
+                <section class="taste-data-panel" aria-label="Datos de descubrimiento">
+                    <h2>Tus datos de descubrimiento</h2>
+                    <p>Esta primera versión guarda actividad de búsqueda, reproducción, canales y listas abiertas únicamente en el almacenamiento de este navegador. No se envía a un servidor y podés pausar la personalización o borrar la información cuando quieras.</p>
+                    <div class="taste-data-status">
+                        <div><strong>${taste.personalization ? 'Personalización local activada' : 'Personalización local pausada'}</strong><span>${taste.personalization ? 'La portada y las categorías pueden usar tus señales guardadas.' : 'Se conserva el historial, pero no se usa ni se agregan nuevas señales.'}</span></div>
+                        <button class="taste-action primary" type="button" id="tasteToggle">${taste.personalization ? 'Pausar' : 'Activar'}</button>
+                    </div>
+                    <div class="taste-stats">
+                        <div class="taste-stat"><b>${taste.searches.length}</b><span>Búsquedas guardadas</span></div>
+                        <div class="taste-stat"><b>${taste.plays.length}</b><span>Reproducciones recordadas</span></div>
+                        <div class="taste-stat"><b>${taste.channels.length + taste.playlists.length}</b><span>Canales y listas abiertas</span></div>
+                    </div>
+                    <div class="taste-actions"><button class="taste-action danger" type="button" id="tasteClear"><i class="fas fa-trash"></i> Borrar datos locales</button></div>
+                </section>`;
+            document.getElementById('tasteToggle').onclick = () => setPersonalization(!taste.personalization);
+            document.getElementById('tasteClear').onclick = clearTasteData;
         }
         function deriveChannels(videos) {
             const seen = new Set();
@@ -939,6 +1138,160 @@
                 });
         }
 
+        function formatCompactNumber(value) {
+            const number = Number(value);
+            if (!Number.isFinite(number)) return '—';
+            return new Intl.NumberFormat('es-UY', { notation: 'compact', maximumFractionDigits: 1 }).format(number);
+        }
+
+        function mapPlaylistApiItems(items, fallback = {}) {
+            return (items || []).map((item, index) => {
+                const thumb = item.snippet?.thumbnails?.medium || item.snippet?.thumbnails?.high || item.snippet?.thumbnails?.default;
+                return {
+                    title: item.snippet?.title || 'Lista sin título',
+                    artist: item.snippet?.channelTitle || fallback.channelTitle || 'Lista de YouTube',
+                    img: thumb?.url || fallback.img || '',
+                    url: item.id,
+                    type: 'yt',
+                    resourceKind: 'youtube#playlist',
+                    isPlaylist: true,
+                    itemCount: item.contentDetails?.itemCount,
+                    sourceIndex: index,
+                    channelId: item.snippet?.channelId || fallback.channelId || '',
+                    channelTitle: item.snippet?.channelTitle || fallback.channelTitle || ''
+                };
+            }).filter(item => item.url);
+        }
+
+        function mapPlaylistVideoItems(items, fallback = {}, offset = 0) {
+            return (items || []).map((item, index) => {
+                const thumb = item.snippet?.thumbnails?.medium || item.snippet?.thumbnails?.high || item.snippet?.thumbnails?.default;
+                return {
+                    title: item.snippet?.title || 'Video sin título',
+                    artist: item.snippet?.channelTitle || fallback.channelTitle || 'YouTube',
+                    img: thumb?.url || fallback.img || '',
+                    url: item.contentDetails?.videoId,
+                    type: 'yt',
+                    resourceKind: 'youtube#video',
+                    isPlaylist: false,
+                    sourceIndex: offset + index,
+                    duration: parseYouTubeDuration(item.contentDetails?.duration),
+                    channelId: item.snippet?.channelId || fallback.channelId || '',
+                    channelTitle: item.snippet?.channelTitle || fallback.channelTitle || ''
+                };
+            }).filter(item => item.url);
+        }
+
+        function addCatalogMore(container, label, handler) {
+            const wrap = document.createElement('div');
+            wrap.className = 'catalog-more-wrap';
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.className = 'catalog-more';
+            button.innerHTML = `<i class="fas fa-plus"></i> ${escapeHtml(label)}`;
+            button.onclick = async () => {
+                button.disabled = true;
+                button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Cargando...';
+                try { await handler(); }
+                finally { if (button.isConnected) { button.disabled = false; button.innerHTML = `<i class="fas fa-plus"></i> ${escapeHtml(label)}`; } }
+            };
+            wrap.appendChild(button);
+            container.appendChild(wrap);
+        }
+
+        function renderChannelCatalog() {
+            const state = activeChannelCatalog;
+            if (!state?.channel) return;
+            const container = document.getElementById('dynamicSections');
+            const channel = state.channel;
+            const thumb = channel.snippet?.thumbnails?.medium || channel.snippet?.thumbnails?.high || channel.snippet?.thumbnails?.default;
+            const channelTitle = channel.snippet?.title || state.title || 'Canal de YouTube';
+            const customUrl = channel.snippet?.customUrl || '';
+            const description = String(channel.snippet?.description || '').trim();
+            const uploadsTotal = state.uploads?.pageInfo?.totalResults ?? channel.statistics?.videoCount;
+            container.innerHTML = `
+                <section class="channel-profile" aria-label="Perfil del canal ${escapeHtml(channelTitle)}">
+                    <img class="channel-profile-avatar" src="${thumb?.url || ''}" alt="" onerror="this.style.visibility='hidden'">
+                    <div class="channel-profile-content">
+                        <p class="channel-profile-kicker"><i class="fab fa-youtube"></i> Canal público de YouTube</p>
+                        <h2>${escapeHtml(channelTitle)}</h2>
+                        ${customUrl ? `<p class="channel-profile-handle">${escapeHtml(customUrl)}</p>` : ''}
+                        ${description ? `<p class="channel-profile-description">${escapeHtml(description.slice(0, 420))}${description.length > 420 ? '…' : ''}</p>` : ''}
+                        <div class="channel-profile-stats"><span><b>${formatCompactNumber(channel.statistics?.subscriberCount)}</b> suscriptores</span><span><b>${formatCompactNumber(channel.statistics?.viewCount)}</b> visualizaciones</span><span><b>${formatCompactNumber(uploadsTotal)}</b> videos públicos</span></div>
+                        <div class="channel-profile-actions"><button type="button" class="channel-profile-action" id="channelProfileBack"><i class="fas fa-arrow-left"></i> Inicio</button><a class="channel-profile-action" href="https://www.youtube.com/channel/${encodeURIComponent(channel.id)}" target="_blank" rel="noopener noreferrer"><i class="fas fa-arrow-up-right-from-square"></i> Ver en YouTube</a></div>
+                    </div>
+                </section>`;
+            document.getElementById('channelProfileBack').onclick = resetView;
+
+            const playlists = state.playlists?.items || [];
+            const uploads = state.uploads?.items || [];
+            currentList = uploads;
+            if (playlists.length) renderPlaylistGrid(playlists, `Listas y álbumes · ${state.playlists?.pageInfo?.totalResults ?? playlists.length}`);
+            if (state.playlists?.nextPageToken) addCatalogMore(container, 'Cargar más listas', () => loadMoreChannelPlaylists(state.playlists.nextPageToken));
+            if (uploads.length) {
+                renderGrid(uploads, `Videos del canal · ${uploadsTotal || uploads.length}`, "<i class='fas fa-clapperboard'></i>");
+            } else {
+                const empty = document.createElement('div');
+                empty.className = 'empty-state';
+                empty.innerHTML = '<i class="fas fa-video-slash"></i><strong>Este canal no tiene videos públicos reproducibles disponibles</strong><span>Puede tener restricciones de privacidad, región o reproducción embebida.</span>';
+                container.appendChild(empty);
+            }
+            if (state.uploads?.nextPageToken) addCatalogMore(container, 'Cargar más videos', () => loadMoreChannelUploads(state.uploads.nextPageToken));
+        }
+
+        async function loadChannelProfile(channelReference, channelTitle = '') {
+            const loader = document.getElementById('loader');
+            const container = document.getElementById('dynamicSections');
+            activeBrowseMode = 'channel';
+            channelFilter = null;
+            loader.style.display = 'flex';
+            container.innerHTML = '';
+            try {
+                const response = await fetch(`/api/search?type=youtube&action=channelOverview&channelRef=${encodeURIComponent(channelReference)}&maxResults=24`);
+                const data = await response.json();
+                if (!response.ok || !data?.channel) throw new Error(data?.error?.message || 'channel_unavailable');
+                const fallback = { channelId: data.channel.id, channelTitle: data.channel.snippet?.title || channelTitle, img: data.channel.snippet?.thumbnails?.medium?.url || '' };
+                activeChannelCatalog = {
+                    channel: data.channel,
+                    title: channelTitle,
+                    uploadsPlaylistId: data.channel.contentDetails?.relatedPlaylists?.uploads || '',
+                    playlists: { ...data.playlists, items: mapPlaylistApiItems(data.playlists?.items, fallback) },
+                    uploads: { ...data.uploads, items: mapPlaylistVideoItems(data.uploads?.items, fallback) }
+                };
+                searchInput.value = data.channel.snippet?.title || channelTitle;
+                searchClearBtn.classList.add('show');
+                rememberChannel(data.channel.id, data.channel.snippet?.title || channelTitle);
+                renderChannelCatalog();
+            } catch (error) {
+                renderEmptyState('No pudimos abrir este canal', 'El enlace puede no corresponder a un canal público, o YouTube puede estar temporalmente no disponible.');
+            } finally {
+                loader.style.display = 'none';
+            }
+        }
+
+        async function loadMoreChannelPlaylists(pageToken) {
+            const state = activeChannelCatalog;
+            if (!state?.channel?.id || !pageToken) return;
+            const response = await fetch(`/api/search?type=youtube&action=channelPlaylists&channelId=${encodeURIComponent(state.channel.id)}&pageToken=${encodeURIComponent(pageToken)}&maxResults=24`);
+            const data = await response.json();
+            if (!response.ok) throw new Error('more_playlists_unavailable');
+            const fallback = { channelId: state.channel.id, channelTitle: state.channel.snippet?.title || '', img: state.channel.snippet?.thumbnails?.medium?.url || '' };
+            state.playlists = { ...data, items: [...(state.playlists.items || []), ...mapPlaylistApiItems(data.items, fallback)] };
+            renderChannelCatalog();
+        }
+
+        async function loadMoreChannelUploads(pageToken) {
+            const state = activeChannelCatalog;
+            if (!state?.uploadsPlaylistId || !pageToken) return;
+            const response = await fetch(`/api/search?type=youtube&action=channelUploads&uploadsPlaylistId=${encodeURIComponent(state.uploadsPlaylistId)}&pageToken=${encodeURIComponent(pageToken)}&maxResults=24`);
+            const data = await response.json();
+            if (!response.ok) throw new Error('more_uploads_unavailable');
+            const fallback = { channelId: state.channel.id, channelTitle: state.channel.snippet?.title || '', img: state.channel.snippet?.thumbnails?.medium?.url || '' };
+            const nextItems = mapPlaylistVideoItems(data.items, fallback, state.uploads.items.length);
+            state.uploads = { ...data, items: [...(state.uploads.items || []), ...nextItems] };
+            renderChannelCatalog();
+        }
+
         // Obtiene resultados de YouTube una sola vez por petición. El proxy aplica caché compartida
         // y comunica los errores de cuota con un estado HTTP real, para no repetir solicitudes inútiles.
         function markYouTubeQuotaUnavailable() {
@@ -1005,6 +1358,7 @@
 
         async function performSmartSearch(query) {
             searchQuery = query;
+            renderTasteChips(query);
             if (!channelFilter) rememberSearch(query);
             activeBrowseMode = 'search';
             currentMood = null;
@@ -1041,12 +1395,10 @@
             }
         }
 
-        // Entrar a ver el contenido (álbumes/canciones) de un canal específico
+        // Abre una ficha nativa con las listas públicas y los videos subidos del canal.
         function browseChannel(channelId, channelTitle) {
-            channelFilter = { id: channelId, title: channelTitle };
-            searchInput.value = channelTitle;
-            searchClearBtn.classList.toggle('show', !!channelTitle);
-            performSmartSearch(channelTitle || 'canciones');
+            if (!channelId) return;
+            loadChannelProfile(channelId, channelTitle);
         }
 
         function clearChannelFilter() {
@@ -1055,28 +1407,8 @@
             if (q) performSmartSearch(q); else resetView();
         }
 
-        async function getOpenverseToken() {
-            if (!OPENVERSE_CLIENT_ID || !OPENVERSE_CLIENT_SECRET) return null;
-            const now = Date.now();
-            if (openverseToken && now < tokenExpiry) return openverseToken;
-            try {
-                const response = await fetch('https://api.openverse.org/v1/auth_tokens/token/', {
-                    method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                    body: new URLSearchParams({ client_id: OPENVERSE_CLIENT_ID, client_secret: OPENVERSE_CLIENT_SECRET, grant_type: 'client_credentials' })
-                });
-                if (!response.ok) return null;
-                const data = await response.json();
-                openverseToken = data.access_token;
-                tokenExpiry = now + (data.expires_in * 1000);
-                return openverseToken;
-            } catch (e) { return null; }
-        }
-
         async function fetchOpenverseTracks(query, limit = 20) {
-            const token = await getOpenverseToken();
-            const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
-            const url = `https://api.openverse.org/v1/audio/?q=${encodeURIComponent(query)}&category=music&page_size=${Math.min(Math.max(limit, 1), 20)}`;
-            const response = await fetch(url, { headers });
+            const response = await fetch(`/api/search?type=openverse&query=${encodeURIComponent(query)}&maxResults=${Math.min(Math.max(limit, 1), 20)}`);
             const data = await response.json();
             if (!response.ok || !data.results?.length) return [];
             return data.results
@@ -1115,6 +1447,7 @@
         // La portada hace una búsqueda de videos, una de listas y una de música por sesión; el proxy cachea las consultas de YouTube.
         async function resetView() {
             searchQuery = ""; currentMood = null; channelFilter = null; activeBrowseMode = 'home';
+            renderTasteChips();
             searchInput.value = ""; searchClearBtn.classList.remove('show');
             document.querySelectorAll('.mood-btn').forEach(b => b.classList.remove('active'));
             document.querySelectorAll('.nav-links li').forEach(l => l.classList.remove('active'));
@@ -1162,9 +1495,10 @@
         }
 
         function showSection(section) {
+            activeBrowseMode = section;
             document.querySelectorAll('.nav-links li').forEach(l => l.classList.remove('active'));
+            document.querySelector(`[data-nav="${section}"]`)?.classList.add('active');
             if (section === 'favorites') {
-                document.querySelectorAll('.nav-links li')[1].classList.add('active');
                 document.getElementById('dynamicSections').innerHTML = '';
                 document.getElementById('loader').style.display = 'none';
                 currentList = favorites;
@@ -1174,6 +1508,7 @@
                     renderGrid(favorites, "Tus Favoritos", "<i class='fas fa-heart'></i>");
                 }
             }
+            if (section === 'taste') renderTasteData();
         }
 
         function renderEmptyState(title, subtitle) {
@@ -1310,42 +1645,75 @@
             container.appendChild(section);
         }
 
+        function returnFromPlaylist() {
+            const state = activePlaylistCatalog;
+            activePlaylistCatalog = null;
+            if (state?.returnMode === 'channel' && activeChannelCatalog?.channel) {
+                activeBrowseMode = 'channel';
+                renderChannelCatalog();
+                return;
+            }
+            if (state?.returnMode === 'home') { resetView(); return; }
+            performSmartSearch(state?.returnQuery || searchQuery || state?.playlist?.title || 'música');
+        }
+
+        function renderOpenedPlaylist() {
+            const state = activePlaylistCatalog;
+            if (!state) return;
+            const container = document.getElementById('dynamicSections');
+            container.innerHTML = '';
+            currentList = state.tracks;
+            const back = document.createElement('div');
+            const backButton = document.createElement('button');
+            backButton.type = 'button';
+            backButton.className = 'video-stage-close';
+            backButton.innerHTML = '<i class="fas fa-arrow-left"></i> Volver';
+            backButton.onclick = returnFromPlaylist;
+            back.appendChild(backButton);
+            container.appendChild(back);
+            renderSongList(state.tracks, `${state.playlist.title} · ${state.pageInfo?.totalResults || state.tracks.length} videos`, "<i class='fas fa-list-music'></i>");
+            if (state.nextPageToken) addCatalogMore(container, 'Cargar más de esta lista', () => loadMoreOpenPlaylist(state.nextPageToken));
+        }
+
         async function openPlaylist(playlist) {
+            rememberPlaylist(playlist);
             const loader = document.getElementById('loader');
             const container = document.getElementById('dynamicSections');
             loader.style.display = 'flex';
             container.innerHTML = '';
             try {
-                const response = await fetch(`/api/search?type=youtube&action=playlistItems&playlistId=${encodeURIComponent(playlist.url)}&maxResults=25`);
+                const response = await fetch(`/api/search?type=youtube&action=playlistItems&playlistId=${encodeURIComponent(playlist.url)}&maxResults=24`);
                 const data = await response.json();
                 if (!response.ok || !data.items?.length) throw new Error('playlist_unavailable');
-                const tracks = data.items.map((item, index) => {
-                    const thumb = item.snippet?.thumbnails?.medium || item.snippet?.thumbnails?.default || item.snippet?.thumbnails?.high;
-                    return {
-                        title: item.snippet?.title || 'Video sin título',
-                        artist: item.snippet?.channelTitle || playlist.artist,
-                        img: thumb?.url || playlist.img || '',
-                        url: item.contentDetails?.videoId,
-                        type: 'yt',
-                        resourceKind: 'youtube#video',
-                        isPlaylist: false,
-                        sourceIndex: index,
-                        duration: parseYouTubeDuration(item.contentDetails?.duration),
-                        channelId: item.snippet?.channelId,
-                        channelTitle: item.snippet?.channelTitle
-                    };
-                }).filter(track => track.url);
+                const tracks = mapPlaylistVideoItems(data.items, { channelId: playlist.channelId || '', channelTitle: playlist.artist || '', img: playlist.img || '' });
                 if (!tracks.length) throw new Error('playlist_empty');
-                currentList = tracks;
-                const back = document.createElement('div');
-                back.innerHTML = `<button type="button" class="video-stage-close" onclick="performSmartSearch(searchQuery || '${escapeHtml(playlist.title).replace(/'/g, "\\'")}')"><i class="fas fa-arrow-left"></i> Volver a resultados</button>`;
-                container.appendChild(back);
-                renderSongList(tracks, `${playlist.title} · ${data.pageInfo?.totalResults || tracks.length} videos`, "<i class='fas fa-list-music'></i>");
+                activePlaylistCatalog = {
+                    playlist,
+                    tracks,
+                    pageInfo: data.pageInfo || {},
+                    nextPageToken: data.nextPageToken || '',
+                    returnMode: activeBrowseMode,
+                    returnQuery: searchQuery
+                };
+                renderOpenedPlaylist();
             } catch (error) {
                 renderEmptyState('No pudimos abrir esta lista', 'La lista puede ser privada, estar vacía o no permitir reproducción.');
             } finally {
                 loader.style.display = 'none';
             }
+        }
+
+        async function loadMoreOpenPlaylist(pageToken) {
+            const state = activePlaylistCatalog;
+            if (!state?.playlist?.url || !pageToken) return;
+            const response = await fetch(`/api/search?type=youtube&action=playlistItems&playlistId=${encodeURIComponent(state.playlist.url)}&pageToken=${encodeURIComponent(pageToken)}&maxResults=24`);
+            const data = await response.json();
+            if (!response.ok) throw new Error('more_playlist_items_unavailable');
+            const nextTracks = mapPlaylistVideoItems(data.items, { channelId: state.playlist.channelId || '', channelTitle: state.playlist.artist || '', img: state.playlist.img || '' }, state.tracks.length);
+            state.tracks = [...state.tracks, ...nextTracks];
+            state.pageInfo = data.pageInfo || state.pageInfo;
+            state.nextPageToken = data.nextPageToken || '';
+            renderOpenedPlaylist();
         }
 
         function renderGrid(list, title, icon) {
@@ -1440,6 +1808,116 @@
             if (currentPlayingQid == null) playQueueAt(queue.length - 1);
         }
 
+        function updateNowPlaying(song) {
+            document.getElementById('currTitle').innerText = song.title;
+            document.getElementById('currArtist').innerText = song.artist;
+            const img = document.getElementById('currentImg');
+            if (song.img) { img.src = song.img; img.style.display = 'block'; }
+            else { img.style.display = 'none'; }
+            updateFavButton(song);
+        }
+
+        function nextQueueIndex() {
+            if (!queue.length) return -1;
+            const idx = queue.findIndex(item => item._qid === currentPlayingQid);
+            return idx >= 0 ? (idx + 1) % queue.length : 0;
+        }
+
+        function getStandbyAudioEl() { return activeAudioEl === audioEl ? nextAudioEl : audioEl; }
+
+        function prepareNextDirectAudio() {
+            const nextIndex = nextQueueIndex();
+            const next = queue[nextIndex];
+            if (nextIndex === currentIndex || !next || next.type !== 'mp3' || !next.url) return;
+            const standby = getStandbyAudioEl();
+            if (standby.dataset.queueId === String(next._qid)) return;
+            standby.pause();
+            standby.src = next.url;
+            standby.dataset.queueId = String(next._qid);
+            standby.load();
+        }
+
+        function bindDirectAudioEvents(audio) {
+            audio.ontimeupdate = () => {
+                if (audio !== activeAudioEl) return;
+                updateProgress(audio.currentTime, audio.duration);
+                const current = queue[currentIndex];
+                const next = queue[nextQueueIndex()];
+                const remaining = Number(audio.duration) - Number(audio.currentTime);
+                if (!crossfadeInProgress && current?.type === 'mp3' && next?.type === 'mp3' && Number.isFinite(remaining) && remaining > 0 && remaining <= CROSSFADE_SECONDS) beginDirectAudioCrossfade();
+            };
+            audio.onended = () => { if (audio === activeAudioEl && !crossfadeInProgress) nextSong(); };
+            audio.onwaiting = () => { if (audio === activeAudioEl) setTrackLoading(true, currentSourceIdx); };
+            audio.onplaying = () => {
+                if (audio !== activeAudioEl) return;
+                isPlaying = true;
+                updateIcon();
+                setTrackLoading(false);
+                if (!progressInterval) startProgress(audio);
+                prepareNextDirectAudio();
+            };
+            audio.onerror = () => { if (audio === activeAudioEl) { setTrackLoading(false); showToast('No se pudo reproducir esta pista', 'fa-triangle-exclamation'); } };
+        }
+
+        function cancelDirectCrossfade() {
+            if (!crossfadeInProgress) return;
+            clearInterval(crossfadeTimer);
+            const standby = getStandbyAudioEl();
+            standby.pause();
+            standby.currentTime = 0;
+            standby.dataset.queueId = '';
+            activeAudioEl.volume = parseFloat(document.getElementById('volumeSlider').value) || 0;
+            crossfadeInProgress = false;
+        }
+
+        function finishDirectCrossfade(nextIndex, outgoing, incoming) {
+            clearInterval(crossfadeTimer);
+            outgoing.pause();
+            outgoing.currentTime = 0;
+            outgoing.dataset.queueId = '';
+            activeAudioEl = incoming;
+            crossfadeInProgress = false;
+            currentIndex = nextIndex;
+            const song = queue[nextIndex];
+            currentPlayingQid = song._qid;
+            currentSourceIdx = null;
+            updateNowPlaying(song);
+            rememberPlay(song);
+            updateMediaSession(song);
+            persistQueue();
+            renderQueue();
+            startProgress(incoming);
+            prepareNextDirectAudio();
+        }
+
+        function beginDirectAudioCrossfade() {
+            if (crossfadeInProgress) return;
+            const nextIndex = nextQueueIndex();
+            const next = queue[nextIndex];
+            if (nextIndex === currentIndex || !next || next.type !== 'mp3' || !next.url) return;
+            const outgoing = activeAudioEl;
+            const incoming = getStandbyAudioEl();
+            crossfadeInProgress = true;
+            incoming.pause();
+            incoming.src = next.url;
+            incoming.currentTime = 0;
+            incoming.dataset.queueId = String(next._qid);
+            incoming.volume = 0;
+            bindDirectAudioEvents(incoming);
+            incoming.play().then(() => {
+                const startedAt = performance.now();
+                const tick = () => {
+                    const progress = Math.min(1, (performance.now() - startedAt) / (CROSSFADE_SECONDS * 1000));
+                    const baseVolume = parseFloat(document.getElementById('volumeSlider').value) || 0;
+                    outgoing.volume = baseVolume * (1 - progress);
+                    incoming.volume = baseVolume * progress;
+                    if (progress >= 1) finishDirectCrossfade(nextIndex, outgoing, incoming);
+                };
+                tick();
+                crossfadeTimer = setInterval(tick, 50);
+            }).catch(() => { crossfadeInProgress = false; nextSong(); });
+        }
+
         // Reproduce el ítem "idx" de la cola (fuente de verdad para next/prev/togglePlay).
         function playQueueAt(idx, options = {}) {
             if (idx < 0 || idx >= queue.length) return;
@@ -1447,12 +1925,7 @@
             const song = queue[idx];
             currentPlayingQid = song._qid;
             currentSourceIdx = options.sourceIdx ?? null;
-            document.getElementById('currTitle').innerText = song.title;
-            document.getElementById('currArtist').innerText = song.artist;
-            const img = document.getElementById('currentImg');
-            if (song.img) { img.src = song.img; img.style.display = 'block'; }
-            else { img.style.display = 'none'; }
-            updateFavButton(song);
+            updateNowPlaying(song);
             rememberPlay(song);
             stopAll();
             updateMediaSession(song);
@@ -1470,14 +1943,15 @@
                 }
             } else {
                 hideVideoStage(false);
+                activeAudioEl = audioEl;
+                nextAudioEl.pause();
+                nextAudioEl.currentTime = 0;
+                nextAudioEl.dataset.queueId = '';
                 audioEl.src = song.url;
+                audioEl.dataset.queueId = String(song._qid);
                 applyVolume(parseFloat(document.getElementById('volumeSlider').value));
+                bindDirectAudioEvents(audioEl);
                 audioEl.play().catch(e => { console.error(e); setTrackLoading(false); showToast('No se pudo reproducir esta pista', 'fa-triangle-exclamation'); });
-                audioEl.ontimeupdate = () => updateProgress(audioEl.currentTime, audioEl.duration);
-                audioEl.onended = () => nextSong();
-                audioEl.onwaiting = () => setTrackLoading(true, currentSourceIdx);
-                audioEl.onplaying = () => { isPlaying = true; updateIcon(); setTrackLoading(false); if (!progressInterval) startProgress(audioEl); };
-                audioEl.onerror = () => { setTrackLoading(false); showToast('No se pudo reproducir esta pista', 'fa-triangle-exclamation'); };
             }
 
             growQueueIfNeeded();
@@ -1789,7 +2263,8 @@
             if (song.type === 'yt') {
                 if (ytPlayer) { if (isPlaying) ytPlayer.pauseVideo(); else ytPlayer.playVideo(); isPlaying = !isPlaying; }
             } else {
-                if (isPlaying) audioEl.pause(); else audioEl.play(); isPlaying = !isPlaying;
+                if (crossfadeInProgress) cancelDirectCrossfade();
+                if (isPlaying) activeAudioEl.pause(); else activeAudioEl.play(); isPlaying = !isPlaying;
             }
             updateIcon();
             updatePlaybackState();
@@ -1810,7 +2285,20 @@
             if (prev < 0) prev = queue.length - 1;
             playQueueAt(prev);
         }
-        function stopAll() { if (ytPlayer) { ytPlayer.stopVideo(); ytPlayer.destroy(); ytPlayer = null; } pendingYTRequest = null; audioEl.pause(); if (progressInterval) clearInterval(progressInterval); isPlaying = false; updateIcon(); progFill.style.width = '0%'; progThumb.style.left = '0%'; }
+        function stopAll() {
+            if (ytPlayer) { ytPlayer.stopVideo(); ytPlayer.destroy(); ytPlayer = null; }
+            pendingYTRequest = null;
+            clearInterval(crossfadeTimer);
+            crossfadeInProgress = false;
+            [audioEl, nextAudioEl].forEach(audio => { audio.pause(); audio.currentTime = 0; audio.dataset.queueId = ''; });
+            activeAudioEl = audioEl;
+            if (progressInterval) clearInterval(progressInterval);
+            progressInterval = null;
+            isPlaying = false;
+            updateIcon();
+            progFill.style.width = '0%';
+            progThumb.style.left = '0%';
+        }
 
         function startProgress(source) {
             if (progressInterval) clearInterval(progressInterval);
@@ -1845,7 +2333,7 @@
             if (currentIndex === -1 || !queue[currentIndex]) return 0;
             const song = queue[currentIndex];
             if (song.type === 'yt' && ytPlayer && ytPlayer.getDuration) return ytPlayer.getDuration();
-            if (song.type === 'mp3') return audioEl.duration || 0;
+            if (song.type === 'mp3') return activeAudioEl.duration || 0;
             return 0;
         }
 
@@ -1853,7 +2341,7 @@
             if (currentIndex === -1 || !queue[currentIndex]) return;
             const song = queue[currentIndex];
             if (song.type === 'yt' && ytPlayer) { const d = ytPlayer.getDuration(); if (d) ytPlayer.seekTo(d * pct, true); }
-            else if (song.type === 'mp3' && audioEl.duration) { audioEl.currentTime = audioEl.duration * pct; }
+            else if (song.type === 'mp3' && activeAudioEl.duration) { activeAudioEl.currentTime = activeAudioEl.duration * pct; }
         }
 
         function seekBy(deltaSeconds) {
@@ -1863,7 +2351,7 @@
                 const t = Math.max(0, ytPlayer.getCurrentTime() + deltaSeconds);
                 ytPlayer.seekTo(t, true);
             } else if (song.type === 'mp3') {
-                audioEl.currentTime = Math.max(0, Math.min(audioEl.duration || 0, audioEl.currentTime + deltaSeconds));
+                activeAudioEl.currentTime = Math.max(0, Math.min(activeAudioEl.duration || 0, activeAudioEl.currentTime + deltaSeconds));
             }
         }
 
@@ -1942,6 +2430,7 @@
         }
         function applyVolume(v) {
             audioEl.volume = v;
+            nextAudioEl.volume = v;
             if (ytPlayer && ytPlayer.setVolume) ytPlayer.setVolume(v * 100);
             const slider = document.getElementById('volumeSlider');
             slider.value = v;
@@ -1991,7 +2480,7 @@
                 navigator.mediaSession.setActionHandler('seekbackward', (d) => seekBy(-(d.seekOffset || 10)));
                 navigator.mediaSession.setActionHandler('seekforward', (d) => seekBy(d.seekOffset || 10));
                 navigator.mediaSession.setActionHandler('seekto', (d) => {
-                    const duration = getCurrentDuration();
+                    const duration = getDuration();
                     if (duration && Number.isFinite(d.seekTime)) commitSeek(d.seekTime / duration);
                 });
             } catch (e) { /* API opcional */ }
@@ -2008,6 +2497,15 @@
             const save = () => { persistQueue(); updatePlaybackState(); };
             document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') save(); });
             window.addEventListener('pagehide', save);
+        }
+
+        function setupInstallableApp() {
+            if (!('serviceWorker' in navigator)) return;
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/sw.js').catch(() => {
+                    // La aplicación sigue operativa si el navegador no admite Service Worker.
+                });
+            }, { once: true });
         }
 
         // --- MODO FLOTANTE (ARRASTRE + RETORNO) ---
