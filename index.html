@@ -1192,6 +1192,7 @@
         let activeBrowseMode = 'home';
         let homeFeedLoaded = false;
         let homeFeedLoading = false;
+        let initialRadioQueueReady = false;
         const FEATURED_ROTATION_STORAGE_KEY = 'nowarfy_featured_rotation_v1';
         const FEATURED_EDITION_SIZE = 5;
         const FEATURED_THEMES = ['violet', 'aqua', 'ember', 'electric'];
@@ -2087,7 +2088,14 @@
             document.querySelectorAll('.nav-links li').forEach(l => l.classList.remove('active'));
             document.querySelector('.nav-links li:first-child').classList.add('active');
 
-            if (homeFeedLoaded) return renderHomeFeed();
+            if (homeFeedLoaded) {
+                renderHomeFeed();
+                if (!initialRadioQueueReady) {
+                    await ensureInitialRadioQueue();
+                    initialRadioQueueReady = true;
+                }
+                return;
+            }
             if (homeFeedLoading) return;
             homeFeedLoading = true;
             const loader = document.getElementById('loader');
@@ -2097,8 +2105,13 @@
             try {
                 const hasContent = await loadHomeCatalogSources();
                 homeFeedLoaded = hasContent;
-                if (hasContent) renderHomeFeed();
-                else renderEmptyState('No pudimos cargar propuestas ahora', 'Probá recargar dentro de unos segundos o buscá un artista.');
+                if (hasContent) {
+                    renderHomeFeed();
+                    if (!initialRadioQueueReady) {
+                        await ensureInitialRadioQueue();
+                        initialRadioQueueReady = true;
+                    }
+                } else renderEmptyState('No pudimos cargar propuestas ahora', 'Probá recargar dentro de unos segundos o buscá un artista.');
             } finally {
                 homeFeedLoading = false;
                 loader.style.display = 'none';
@@ -2810,6 +2823,8 @@
             persistQueue();
             renderQueue();
             playQueueAt(0, { sourceIdx });
+            // Cada elección reinicia la radio con una tanda completa detrás.
+            growQueueIfNeeded(true);
         }
 
         // Agregar una canción a la cola actual sin interrumpir lo que está sonando.
@@ -2930,6 +2945,46 @@
             anchor.click();
             anchor.remove();
             showToast(`Descarga iniciada · ${song.license}`, 'fa-download');
+        }
+
+        async function ensureInitialRadioQueue() {
+            if (queue.length >= QUEUE_BATCH) {
+                if (currentPlayingQid == null) {
+                    currentIndex = 0;
+                    currentPlayingQid = queue[0]._qid;
+                    updateNowPlaying(queue[0]);
+                }
+                await growQueueIfNeeded(true);
+                return;
+            }
+            const catalogCandidates = uniqueMediaByUrl([
+                ...homeMusicVideos,
+                ...homeMusic,
+                ...homeVideos,
+                ...homeRecommended,
+                ...EMERGENCY_VIDEO_CATALOG
+            ], 120).filter(song => song?.url);
+            if (!catalogCandidates.length) return;
+            const initialSongs = [];
+            const initialKeys = new Set();
+            for (const song of catalogCandidates) {
+                const key = songKey(song);
+                if (initialKeys.has(key)) continue;
+                initialKeys.add(key);
+                initialSongs.push(withQid(song));
+                if (initialSongs.length >= QUEUE_BATCH) break;
+            }
+            queue = initialSongs;
+            queueSeenKeys = new Set(queue.map(songKey));
+            queueRound = 0;
+            currentIndex = 0;
+            currentPlayingQid = queue[0]._qid;
+            currentSourceIdx = queue[0].sourceIndex ?? null;
+            updateNowPlaying(queue[0]);
+            persistQueue();
+            renderQueue();
+            // Si el catálogo tuviera menos de 20 elementos, la radio los completa por red.
+            if (queue.length < QUEUE_BATCH) await growQueueIfNeeded(true);
         }
 
         function nextQueueIndex() {
@@ -3192,11 +3247,11 @@
             return added;
         }
 
-        async function growQueueIfNeeded() {
+        async function growQueueIfNeeded(force = false) {
             if (queueFetching || queue.length === 0) return;
             const idx = queue.findIndex(s => s._qid === currentPlayingQid);
             const remaining = queue.length - (idx + 1);
-            if (remaining > QUEUE_LOW_WATER) return;
+            if (!force && remaining > QUEUE_LOW_WATER) return;
             const seed = queue[idx] || queue[queue.length - 1];
             if (!seed) return;
             queueFetching = true;
