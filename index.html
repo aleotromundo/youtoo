@@ -646,7 +646,30 @@
         .catalog-more { border: 1px solid rgba(94,234,212,.42); border-radius: 999px; padding: 10px 16px; color: #dffff8; background: rgba(94,234,212,.08); font: 800 .75rem 'Manrope', sans-serif; cursor: pointer; transition: .18s var(--ease); }
         .catalog-more:hover { transform: translateY(-2px); color: #09111a; background: #5eead4; }
         .catalog-more:disabled { cursor: progress; opacity: .65; transform: none; }
+        /* Navegación completa de Nowarfy: solo estado local y acciones ya disponibles en el cliente. */
+        body.mode-youtoo .sidebar { padding: 18px 14px; gap: 16px; overflow-y: auto; }
+        body.mode-youtoo .logo { display: flex; align-items: center; min-height: 38px; }
+        .brand-youtoo small { color: #8f90aa; font: 800 .62rem 'Manrope', sans-serif; letter-spacing: .08em; }
+        .nowarfy-nav-groups { display: flex; flex: 1; min-height: 0; flex-direction: column; gap: 18px; }
+        .nowarfy-nav-group { margin: 0; }
+        .nowarfy-nav-label { display: block; padding: 0 11px 7px; color: #73748f; font: 800 .62rem 'Manrope', sans-serif; letter-spacing: .13em; text-transform: uppercase; }
+        body.mode-youtoo .nowarfy-nav-group .nav-links { margin: 0; padding: 0; }
+        body.mode-youtoo .nowarfy-nav-group .nav-links li { min-height: 39px; margin-bottom: 2px; }
+        .nowarfy-nav-separator { height: 1px; margin: 1px 10px 10px; background: rgba(190,188,255,.12); }
+        .nowarfy-side-status { margin: auto 9px 2px; padding: 11px 10px; border: 1px solid rgba(94,234,212,.16); border-radius: 11px; background: rgba(94,234,212,.045); color: #adaec4; font-size: .68rem; line-height: 1.4; }
+        .nowarfy-side-status strong { display: flex; align-items: center; gap: 7px; margin-bottom: 3px; color: #dcfff8; font-size: .7rem; }
+        .nowarfy-side-status i { color: #5eead4; font-size: .56rem; }
+        body.mode-youtoo .sidebar::after { display: none; }
+
         @media (max-width: 768px) {
+            body.mode-youtoo .sidebar { width: 100%; max-height: 76px; padding: 11px 12px; gap: 10px; overflow-x: auto; overflow-y: hidden; }
+            body.mode-youtoo .sidebar { flex-direction: row; align-items: center; }
+            .nowarfy-nav-groups { display: flex; flex: 0 0 auto; flex-direction: row; gap: 3px; align-items: center; }
+            .nowarfy-nav-group { display: contents; }
+            .nowarfy-nav-label, .nowarfy-side-status { display: none; }
+            body.mode-youtoo .nowarfy-nav-group .nav-links { display: flex; gap: 3px; }
+            body.mode-youtoo .nowarfy-nav-group .nav-links li { min-height: auto; margin: 0; padding: 8px; }
+            body.mode-youtoo .nowarfy-nav-group .nav-links li span { display: none; }
             body.mode-youtoo .sidebar { width: 100%; }
             body.mode-youtoo .sidebar::after, body.mode-youtoo .brand-youtoo { display: none; }
             .youtoo-hero { padding-top: 6px; }
@@ -669,14 +692,38 @@
 
     <div class="main-container">
         <!-- SIDEBAR -->
-        <div class="sidebar">
-            <div class="logo"><span class="brand-nowarfi"><i class="fab fa-spotify"></i> NowarFi</span><span class="brand-youtoo"><img src="assets/youtoo-mark-compact.png" alt=""> YouToo</span></div>
-            <ul class="nav-links">
-                <li data-nav="home" onclick="resetView()" class="active"><i class="fas fa-house"></i> <span>Inicio</span></li>
-                <li data-nav="favorites" onclick="showSection('favorites')"><i class="fas fa-heart"></i> <span>Favoritos</span></li>
-                <li data-nav="taste" onclick="showSection('taste')"><i class="fas fa-shield-halved"></i> <span>Tus datos</span></li>
-            </ul>
-        </div>
+        <aside class="sidebar" aria-label="Navegación principal de Nowarfy">
+            <div class="logo"><span class="brand-nowarfi"><i class="fab fa-spotify"></i> NowarFi</span><span class="brand-youtoo"><img src="assets/youtoo-mark-compact.png" alt=""> Nowarfy <small>· YouToo</small></span></div>
+            <div class="nowarfy-nav-groups">
+                <section class="nowarfy-nav-group" aria-label="Descubrir">
+                    <span class="nowarfy-nav-label">Descubrir</span>
+                    <ul class="nav-links">
+                        <li data-nav="home" onclick="resetView()" class="active"><i class="fas fa-house"></i> <span>Inicio</span></li>
+                        <li data-nav="explore" onclick="showSection('explore')"><i class="fas fa-compass"></i> <span>Explorar</span></li>
+                        <li data-nav="channels" onclick="showSection('channels')"><i class="fas fa-satellite-dish"></i> <span>Canales</span></li>
+                        <li data-nav="playlists" onclick="showSection('playlists')"><i class="fas fa-list-ul"></i> <span>Listas</span></li>
+                        <li data-nav="videos" onclick="showSection('videos')"><i class="fas fa-clapperboard"></i> <span>Videos</span></li>
+                        <li data-nav="music" onclick="showSection('music')"><i class="fas fa-headphones"></i> <span>Música</span></li>
+                    </ul>
+                </section>
+                <section class="nowarfy-nav-group" aria-label="Tu biblioteca">
+                    <span class="nowarfy-nav-label">Tu biblioteca</span>
+                    <ul class="nav-links">
+                        <li data-nav="favorites" onclick="showSection('favorites')"><i class="fas fa-heart"></i> <span>Favoritos</span></li>
+                        <li data-nav="history" onclick="showSection('history')"><i class="fas fa-clock-rotate-left"></i> <span>Historial</span></li>
+                    </ul>
+                </section>
+                <section class="nowarfy-nav-group" aria-label="Tu experiencia">
+                    <span class="nowarfy-nav-label">Tu experiencia</span>
+                    <ul class="nav-links">
+                        <li data-nav="queue" onclick="openQueueFromSidebar()"><i class="fas fa-list-music"></i> <span>Tu cola</span></li>
+                        <li data-nav="player" onclick="showFloatingPlayer()"><i class="fas fa-up-right-and-down-left-from-center"></i> <span>Reproductor</span></li>
+                        <li data-nav="taste" onclick="showSection('taste')"><i class="fas fa-shield-halved"></i> <span>Tus datos</span></li>
+                    </ul>
+                </section>
+            </div>
+            <div class="nowarfy-side-status"><strong><i class="fas fa-circle"></i> Datos en este dispositivo</strong>La cuenta y sincronización se activarán solo si las elegís.</div>
+        </aside>
 
         <!-- CONTENIDO -->
         <div class="content-area">
@@ -910,7 +957,19 @@
             if (!song?.title) return;
             const taste = readTaste();
             if (!taste.personalization) return;
-            const entry = { title: song.title, artist: song.artist || '', channelId: song.channelId || '', channelTitle: song.channelTitle || song.artist || '', at: Date.now() };
+            const entry = {
+                title: song.title,
+                artist: song.artist || '',
+                channelId: song.channelId || '',
+                channelTitle: song.channelTitle || song.artist || '',
+                url: song.url || '',
+                type: song.type || '',
+                img: song.img || '',
+                duration: song.duration || null,
+                resourceKind: song.resourceKind || '',
+                isPlaylist: !!song.isPlaylist,
+                at: Date.now()
+            };
             taste.plays = rememberUnique(taste.plays, entry, item => `${item.title}|${item.artist}`, 30);
             writeTaste(taste);
             renderTasteChips(searchQuery);
@@ -1483,21 +1542,116 @@
             if (!homeChannels.length && !homePlaylists.length && !homeVideos.length && !homeMusic.length) renderEmptyState('No hay opciones disponibles ahora', 'Probá buscar un artista o volvé a intentar más tarde.');
         }
 
-        function showSection(section) {
-            activeBrowseMode = section;
-            document.querySelectorAll('.nav-links li').forEach(l => l.classList.remove('active'));
+        function activateNavigation(section) {
+            document.querySelectorAll('.nav-links li').forEach(item => item.classList.remove('active'));
             document.querySelector(`[data-nav="${section}"]`)?.classList.add('active');
+        }
+
+        async function ensureHomeCatalog() {
+            if (homeFeedLoaded) return true;
+            if (homeFeedLoading) return false;
+            homeFeedLoading = true;
+            const loader = document.getElementById('loader');
+            const container = document.getElementById('dynamicSections');
+            loader.style.display = 'flex';
+            container.innerHTML = '';
+            try {
+                const seed = getTasteSeed();
+                const [videos, playlists, music] = await Promise.all([
+                    fetchYouTubeSearch(seed ? `${seed} music video` : 'official music video', 'video', { maxResults: 12 }),
+                    fetchYouTubeSearch(seed ? `${seed} playlist` : 'music playlist', 'playlist', { maxResults: 10 }),
+                    fetchOpenverseTracks(seed || 'music', 12)
+                ]);
+                homeVideos = videos;
+                homeChannels = deriveChannels(videos);
+                homePlaylists = playlists;
+                homeMusic = music;
+                homeFeedLoaded = true;
+                return true;
+            } catch (error) {
+                renderEmptyState('No pudimos cargar el catálogo', 'Probá buscar un artista o recargá más tarde.');
+                return false;
+            } finally {
+                homeFeedLoading = false;
+                loader.style.display = 'none';
+            }
+        }
+
+        function renderPlaybackHistory() {
+            const taste = readTaste();
+            const playable = taste.plays.filter(item => item?.url && item?.type);
+            const container = document.getElementById('dynamicSections');
+            container.innerHTML = '';
+            document.getElementById('loader').style.display = 'none';
+            if (!taste.plays.length) {
+                renderEmptyState('Todavía no hay reproducciones guardadas', 'Lo que escuches o mires desde ahora aparecerá acá, solo en este dispositivo.');
+                return;
+            }
+            if (playable.length) {
+                currentList = playable;
+                renderGrid(playable, 'Historial de reproducción', "<i class='fas fa-clock-rotate-left'></i>");
+            } else {
+                renderEmptyState('Tu historial ya está guardado', 'Las nuevas reproducciones conservarán también su enlace para poder volver a abrirlas desde acá.');
+            }
+        }
+
+        function openQueueFromSidebar() {
+            activeBrowseMode = 'queue';
+            activateNavigation('queue');
+            const panel = document.getElementById('queuePanel');
+            if (!panel.classList.contains('open')) toggleQueuePanel();
+            else renderQueue();
+        }
+
+        function showFloatingPlayer() {
+            activeBrowseMode = 'player';
+            activateNavigation('player');
+            if (!isFloating) toggleFloatingMode();
+            document.getElementById('playerBar').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+
+        async function showSection(section) {
+            activeBrowseMode = section;
+            activateNavigation(section);
             if (section === 'favorites') {
                 document.getElementById('dynamicSections').innerHTML = '';
                 document.getElementById('loader').style.display = 'none';
                 currentList = favorites;
-                if (favorites.length === 0) {
-                    renderEmptyState('Todavía no tenés favoritos', 'Tocá el corazón de una canción para guardarla acá.');
-                } else {
-                    renderGrid(favorites, "Tus Favoritos", "<i class='fas fa-heart'></i>");
-                }
+                if (favorites.length === 0) renderEmptyState('Todavía no tenés favoritos', 'Tocá el corazón de una canción para guardarla acá.');
+                else renderGrid(favorites, 'Tus Favoritos', "<i class='fas fa-heart'></i>");
+                return;
             }
-            if (section === 'taste') renderTasteData();
+            if (section === 'history') { renderPlaybackHistory(); return; }
+            if (section === 'taste') { renderTasteData(); return; }
+
+            const ready = await ensureHomeCatalog();
+            if (!ready) return;
+            const container = document.getElementById('dynamicSections');
+            container.innerHTML = '';
+            if (section === 'explore') { renderHomeFeed(); return; }
+            if (section === 'channels') {
+                currentList = [];
+                if (homeChannels.length) renderChannelRow(homeChannels, 'Canales para descubrir');
+                else renderEmptyState('No hay canales disponibles ahora', 'Buscá un artista para navegar su canal completo.');
+                return;
+            }
+            if (section === 'playlists') {
+                currentList = [];
+                if (homePlaylists.length) renderPlaylistGrid(homePlaylists, 'Listas de reproducción y álbumes');
+                else renderEmptyState('No hay listas disponibles ahora', 'Probá buscar el nombre de un artista o álbum.');
+                return;
+            }
+            if (section === 'videos') {
+                currentList = homeVideos;
+                if (homeVideos.length) renderGrid(homeVideos, 'Videos para mirar', "<i class='fas fa-clapperboard'></i>");
+                else renderEmptyState('No hay videos disponibles ahora', 'Probá buscar un artista o tema.');
+                return;
+            }
+            if (section === 'music') {
+                currentList = homeMusic;
+                if (homeMusic.length) renderGrid(homeMusic, 'Música para escuchar', "<i class='fas fa-headphones'></i>");
+                else renderEmptyState('No hay música disponible ahora', 'Probá buscar un artista o tema.');
+            }
         }
 
         function renderEmptyState(title, subtitle) {
