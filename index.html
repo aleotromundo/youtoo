@@ -152,6 +152,10 @@
         .library-rail-title { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; font-size: 1.35rem; font-weight: 850; letter-spacing: -.015em; }
         .library-rail-title i { color: var(--accent); font-size: .95rem; }
         .library-rail-hint { margin-left: auto; color: var(--text-gray); font-size: .72rem; font-weight: 700; }
+        .library-rail-controls { display: flex; align-items: center; gap: 6px; margin-left: 3px; }
+        .library-rail-nav { display: inline-grid; width: 29px; height: 29px; place-items: center; border: 1px solid rgba(190,188,255,.2); border-radius: 50%; color: #e9e7ff; background: rgba(255,255,255,.045); cursor: pointer; }
+        .library-rail-nav:hover { border-color: rgba(94,234,212,.62); color: #081016; background: #5eead4; }
+        .library-rail-nav i { color: inherit; font-size: .7rem; }
         .library-rail { display: flex; gap: 18px; overflow-x: auto; padding: 3px 2px 16px; scroll-snap-type: x proximity; scrollbar-width: thin; scrollbar-color: var(--accent) rgba(255,255,255,.08); }
         .library-rail::-webkit-scrollbar { height: 7px; }
         .library-rail::-webkit-scrollbar-thumb { border-radius: 20px; background: rgba(167,139,250,.65); }
@@ -1586,8 +1590,9 @@
             { title: 'Clásicos y rarezas', icon: 'fa-compact-disc', query: 'rock metal classic rare live', description: 'Archivo, tomas en vivo y joyas conocidas.' },
             { title: 'Nuevas voces', icon: 'fa-sparkles', query: 'new rock metal bands official', description: 'Bandas y lanzamientos para descubrir.' },
             { title: 'Covers y tributos', icon: 'fa-microphone-lines', query: 'rock metal cover tribute live', description: 'Interpretaciones y homenajes destacados.' },
-            { title: 'Sellos y medios', icon: 'fa-satellite-dish', query: 'rock metal record label official channel', description: 'Canales de sellos, festivales y medios.' }
+            { title: 'Sellos y medios', icon: 'fa-satellite-dish', query: 'rock metal record label music channel', description: 'Canales de sellos, festivales y medios.' }
         ];
+        const exploreCollectionCache = new Map();
 
         async function recoverWithRockMetal() {
             const recovery = await fetchYouTubeSearch(ROCK_METAL_DISCOVERY_QUERY, 'video,playlist,channel', { maxResults: 20 });
@@ -1850,8 +1855,45 @@
             renderDiscoveryCards('Canales por géneros', 'Elegí una escena para abrir sus canales, listas y videos. Cada categoría navega por YouTube dentro de Nowarfy.', GENRE_CHANNEL_LISTS);
         }
 
-        function renderExploreCollections() {
-            renderDiscoveryCards('Explorar', 'Entrá por una forma distinta de descubrir: shows, videoclips, archivo, bandas nuevas, covers o medios especializados.', EXPLORE_COLLECTIONS);
+        async function getExploreCollectionVideos(collection) {
+            const cached = exploreCollectionCache.get(collection.query);
+            if (cached?.length) return cached;
+            const results = await fetchYouTubeSearch(collection.query, 'video', { maxResults: 12 });
+            const videos = uniqueMediaByUrl(results, 12).filter(item => item?.type === 'yt' && item?.url);
+            if (videos.length) exploreCollectionCache.set(collection.query, videos);
+            return videos;
+        }
+
+        async function renderExploreCollections() {
+            const container = document.getElementById('dynamicSections');
+            const loader = document.getElementById('loader');
+            container.innerHTML = '';
+            currentList = [];
+            loader.style.display = 'flex';
+            try {
+                const results = await Promise.allSettled(EXPLORE_COLLECTIONS.map(collection => getExploreCollectionVideos(collection)));
+                const rows = EXPLORE_COLLECTIONS.map((collection, index) => ({
+                    collection,
+                    videos: results[index]?.status === 'fulfilled' ? results[index].value || [] : []
+                })).filter(row => row.videos.length);
+                if (!rows.length) {
+                    renderEmptyState('No pudimos cargar las colecciones de Explorar', 'Probá de nuevo dentro de unos minutos o buscá un artista específico.');
+                    return;
+                }
+                const heading = document.createElement('div');
+                heading.innerHTML = `<div class="section-title"><i class="fas fa-compass"></i> Explorar</div><p class="discovery-intro">Filas de videos para recorrer por escena: empezá con cinco propuestas y seguí navegando a los costados.</p>`;
+                container.appendChild(heading);
+                currentList = uniqueMediaByUrl(rows.flatMap(row => row.videos), 72);
+                rows.forEach(({ collection, videos }) => {
+                    renderLibraryRail(videos, collection.title, `<i class="fas ${collection.icon}"></i>`, false, {
+                        hint: `${collection.description} · 5 visibles`,
+                        showControls: true,
+                        className: 'explore-video-rail'
+                    });
+                });
+            } finally {
+                loader.style.display = 'none';
+            }
         }
 
         function renderPlaybackHistory() {
@@ -1901,7 +1943,7 @@
             if (section === 'history') { renderPlaybackHistory(); return; }
             if (section === 'taste') { renderTasteData(); return; }
 
-            if (section === 'explore') { renderExploreCollections(); return; }
+            if (section === 'explore') { await renderExploreCollections(); return; }
             if (section === 'channels') { renderGenreChannels(); return; }
             const ready = await ensureHomeCatalog();
             if (!ready) return;
@@ -2194,7 +2236,8 @@
             section.className = `library-rail-section ${options.className || ''}`.trim();
             const eyebrow = options.eyebrow ? `<span class="featured-edition">${escapeHtml(options.eyebrow)}</span>` : '';
             const hint = options.hint || '5 visibles · deslizá para explorar';
-            section.innerHTML = `<div class="library-rail-title">${icon} <span>${escapeHtml(title)}</span>${eyebrow}<span class="library-rail-hint">${escapeHtml(hint)}</span></div>`;
+            const controls = options.showControls ? `<span class="library-rail-controls"><button type="button" class="library-rail-nav" data-direction="-1" aria-label="Ver videos anteriores"><i class="fas fa-chevron-left"></i></button><button type="button" class="library-rail-nav" data-direction="1" aria-label="Ver más videos"><i class="fas fa-chevron-right"></i></button></span>` : '';
+            section.innerHTML = `<div class="library-rail-title">${icon} <span>${escapeHtml(title)}</span>${eyebrow}<span class="library-rail-hint">${escapeHtml(hint)}</span>${controls}</div>`;
             const rail = document.createElement('div');
             rail.className = 'library-rail';
             const batchSize = 5;
@@ -2216,6 +2259,14 @@
                 const closeToEnd = rail.scrollLeft + rail.clientWidth >= rail.scrollWidth - 56;
                 if (closeToEnd) appendBatch();
             }, { passive: true });
+            if (options.showControls) {
+                section.querySelectorAll('.library-rail-nav').forEach(button => {
+                    button.addEventListener('click', () => {
+                        const direction = Number(button.dataset.direction) || 1;
+                        rail.scrollBy({ left: direction * Math.max(rail.clientWidth * 0.82, 260), behavior: 'smooth' });
+                    });
+                });
+            }
             section.appendChild(rail);
             container.appendChild(section);
         }
