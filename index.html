@@ -1737,6 +1737,7 @@
 
         // La portada carga YouTube y Openverse en paralelo; una fuente no bloquea ni vacía a la otra.
         async function resetView() {
+            minimizeActiveVideoForNavigation();
             searchQuery = ""; currentMood = null; channelFilter = null; activeBrowseMode = 'home';
             renderTasteChips();
             searchInput.value = ""; searchClearBtn.classList.remove('show');
@@ -1825,6 +1826,7 @@
         }
 
         function openDiscoveryCollection(collection) {
+            minimizeActiveVideoForNavigation();
             searchInput.value = collection.query;
             searchClearBtn.classList.add('show');
             channelFilter = null;
@@ -1945,6 +1947,7 @@
         }
 
         function openQueueFromSidebar() {
+            minimizeActiveVideoForNavigation();
             activeBrowseMode = 'queue';
             activateNavigation('queue');
             const panel = document.getElementById('queuePanel');
@@ -1953,13 +1956,21 @@
         }
 
         function showFloatingPlayer() {
+            minimizeActiveVideoForNavigation();
             activeBrowseMode = 'player';
             activateNavigation('player');
             if (!isFloating) toggleFloatingMode();
             document.getElementById('playerBar').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
         }
 
+        function minimizeActiveVideoForNavigation() {
+            const song = currentQueueSong();
+            const stage = document.getElementById('videoStage');
+            if (song?.type === 'yt' && stage?.classList.contains('visible')) setVideoStageMinimized(true);
+        }
+
         async function showSection(section) {
+            minimizeActiveVideoForNavigation();
             activeBrowseMode = section;
             activateNavigation(section);
             if (section === 'favorites') {
