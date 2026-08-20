@@ -3,10 +3,15 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>YouToo · Descubrí lo que suena</title>
+    <title>Nowarfy · YouToo</title>
     <meta name="theme-color" content="#8B5CF6">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <link rel="manifest" href="/manifest.webmanifest">
-    <link rel="apple-touch-icon" href="/assets/youtoo-mark-compact.png">
+    <link rel="icon" href="/favicon.ico" sizes="any">
+    <link rel="icon" type="image/png" sizes="32x32" href="/assets/favicon-32.png">
+    <link rel="icon" type="image/png" sizes="192x192" href="/assets/nowarfy-icon-192.png">
+    <link rel="apple-touch-icon" sizes="180x180" href="/assets/nowarfy-apple-touch-icon.png">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -151,6 +156,14 @@
         .library-rail .library-card { flex: 0 0 calc((100% - 72px) / 5); min-width: 170px; scroll-snap-align: start; }
         @media (max-width: 1180px) { .library-rail .library-card { flex-basis: calc((100% - 36px) / 3); } }
         @media (max-width: 700px) { .library-rail .library-card { flex-basis: 74vw; } .library-rail-hint { display: none; } }
+        .discovery-intro { max-width: 720px; margin: 10px 0 24px; color: var(--text-gray); font-size: .9rem; line-height: 1.55; }
+        .discovery-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(205px, 1fr)); gap: 14px; }
+        .discovery-card { position: relative; min-height: 142px; padding: 20px; overflow: hidden; border: 1px solid var(--border-soft); border-radius: 12px; background: linear-gradient(135deg, rgba(139,92,246,.2), rgba(9,9,20,.84)); color: white; text-align: left; cursor: pointer; transition: transform .2s var(--ease), border-color .2s var(--ease), background .2s var(--ease); }
+        .discovery-card::after { content: ''; position: absolute; width: 116px; height: 116px; right: -34px; bottom: -44px; border-radius: 50%; background: radial-gradient(circle, rgba(94,234,212,.32), transparent 68%); pointer-events: none; }
+        .discovery-card:hover { transform: translateY(-4px); border-color: rgba(139,92,246,.8); background: linear-gradient(135deg, rgba(139,92,246,.36), rgba(9,9,20,.94)); }
+        .discovery-card-icon { display: inline-flex; width: 36px; height: 36px; align-items: center; justify-content: center; border-radius: 10px; background: rgba(94,234,212,.12); color: var(--accent-2); font-size: 1rem; }
+        .discovery-card h3 { position: relative; z-index: 1; margin: 14px 0 6px; font-size: 1rem; }
+        .discovery-card p { position: relative; z-index: 1; margin: 0; color: var(--text-gray); font-size: .74rem; line-height: 1.45; }
 
         .results-view-switcher { display: flex; align-items: center; justify-content: space-between; gap: 14px; margin-top: 30px; margin-bottom: 15px; }
         .results-view-label { color: var(--text-gray); font-size: 0.82rem; font-weight: 700; }
@@ -575,7 +588,7 @@
         body.mode-youtoo .logo { font-size: 1.5rem; padding: 0 10px; }
         body.mode-youtoo .brand-nowarfi { display: none; }
         .brand-youtoo { display: none; align-items: center; gap: 9px; }
-        .brand-youtoo img { width: 34px; height: 34px; object-fit: contain; }
+        .brand-youtoo img { width: 38px; height: 38px; object-fit: contain; filter: drop-shadow(0 0 10px rgba(94,234,212,.22)); }
         body.mode-youtoo .brand-youtoo { display: flex; }
         body.mode-youtoo .nav-links li { border-radius: 11px; padding: 11px 13px; }
         body.mode-youtoo .nav-links li.active { background: linear-gradient(90deg, rgba(167,139,250,.2), rgba(94,234,212,.05)); }
@@ -715,6 +728,9 @@
         .nowarfy-side-status strong { display: flex; align-items: center; gap: 7px; margin-bottom: 3px; color: #dcfff8; font-size: .7rem; }
         .nowarfy-side-status i { color: #5eead4; font-size: .56rem; }
         body.mode-youtoo .sidebar::after { display: none; }
+        .nowarfy-install-btn { width: 100%; margin-top: 12px; padding: 10px 12px; border: 1px solid rgba(94,234,212,.35); border-radius: 9px; background: rgba(94,234,212,.10); color: #d7fff8; font: 800 .72rem 'Manrope', sans-serif; cursor: pointer; transition: transform .18s var(--ease), background .18s var(--ease); }
+        .nowarfy-install-btn:hover { background: rgba(94,234,212,.18); transform: translateY(-1px); }
+        .nowarfy-install-btn[hidden] { display: none; }
 
         @media (max-width: 768px) {
             body.mode-youtoo .sidebar { width: 100%; max-height: 76px; padding: 11px 12px; gap: 10px; overflow-x: auto; overflow-y: hidden; }
@@ -748,7 +764,7 @@
     <div class="main-container">
         <!-- SIDEBAR -->
         <aside class="sidebar" aria-label="Navegación principal de Nowarfy">
-            <div class="logo"><span class="brand-nowarfi"><i class="fab fa-spotify"></i> NowarFi</span><span class="brand-youtoo"><img src="assets/youtoo-mark-compact.png" alt=""> Nowarfy <small>· YouToo</small></span></div>
+            <div class="logo"><span class="brand-nowarfi"><i class="fas fa-eye"></i> Nowarfy</span><span class="brand-youtoo"><img src="assets/nowarfy-icon-512.png" alt="Ojo de Nowarfy"> Nowarfy <small>· YouToo</small></span></div>
             <div class="nowarfy-nav-groups">
                 <section class="nowarfy-nav-group" aria-label="Descubrir">
                     <span class="nowarfy-nav-label">Descubrir</span>
@@ -778,7 +794,7 @@
                     </ul>
                 </section>
             </div>
-            <div class="nowarfy-side-status"><strong><i class="fas fa-circle"></i> Datos en este dispositivo</strong>La cuenta y sincronización se activarán solo si las elegís.</div>
+            <div class="nowarfy-side-status"><strong><i class="fas fa-circle"></i> Datos en este dispositivo</strong>La cuenta y sincronización se activarán solo si las elegís.<button type="button" id="pwaInstallBtn" class="nowarfy-install-btn" hidden><i class="fas fa-download"></i> Instalar Nowarfy</button></div>
         </aside>
 
         <!-- CONTENIDO -->
@@ -1511,6 +1527,23 @@
         }
 
         const ROCK_METAL_DISCOVERY_QUERY = 'rock metal official music';
+        const GENRE_CHANNEL_LISTS = [
+            { title: 'Rock', icon: 'fa-guitar', query: 'rock official music channels', description: 'Rock clásico, alternativo y contemporáneo.' },
+            { title: 'Metal', icon: 'fa-hand-fist', query: 'metal official music channels', description: 'Metal clásico, extremo y moderno.' },
+            { title: 'Hardcore', icon: 'fa-bolt', query: 'hardcore punk official music channels', description: 'Hardcore, punk pesado y escenas afines.' },
+            { title: 'Punk', icon: 'fa-skull', query: 'punk rock official music channels', description: 'Punk, post-punk y espíritu independiente.' },
+            { title: 'Grunge', icon: 'fa-cloud', query: 'grunge alternative rock official channels', description: 'Grunge, alternativo y los noventa.' },
+            { title: 'Stoner y Doom', icon: 'fa-mountain-sun', query: 'stoner doom metal official channels', description: 'Riffs lentos, fuzz y peso atmosférico.' },
+            { title: 'Rock latino', icon: 'fa-earth-americas', query: 'rock latino official music channels', description: 'Rock en español y escenas latinoamericanas.' }
+        ];
+        const EXPLORE_COLLECTIONS = [
+            { title: 'Conciertos y sesiones', icon: 'fa-tower-broadcast', query: 'rock metal live concert session', description: 'Shows en vivo, sesiones y escenarios.' },
+            { title: 'Videoclips oficiales', icon: 'fa-film', query: 'rock metal official music video', description: 'Estrenos y videoclips de artistas.' },
+            { title: 'Clásicos y rarezas', icon: 'fa-compact-disc', query: 'rock metal classic rare live', description: 'Archivo, tomas en vivo y joyas conocidas.' },
+            { title: 'Nuevas voces', icon: 'fa-sparkles', query: 'new rock metal bands official', description: 'Bandas y lanzamientos para descubrir.' },
+            { title: 'Covers y tributos', icon: 'fa-microphone-lines', query: 'rock metal cover tribute live', description: 'Interpretaciones y homenajes destacados.' },
+            { title: 'Sellos y medios', icon: 'fa-satellite-dish', query: 'rock metal record label official channel', description: 'Canales de sellos, festivales y medios.' }
+        ];
 
         async function recoverWithRockMetal() {
             const recovery = await fetchYouTubeSearch(ROCK_METAL_DISCOVERY_QUERY, 'video,playlist,channel', { maxResults: 20 });
@@ -1715,6 +1748,41 @@
             }
         }
 
+        function openDiscoveryCollection(collection) {
+            searchInput.value = collection.query;
+            searchClearBtn.classList.add('show');
+            channelFilter = null;
+            performSmartSearch(collection.query);
+        }
+
+        function renderDiscoveryCards(title, intro, collections) {
+            const container = document.getElementById('dynamicSections');
+            container.innerHTML = '';
+            currentList = [];
+            const heading = document.createElement('div');
+            heading.innerHTML = `<div class="section-title"><i class="fas fa-compass"></i> ${escapeHtml(title)}</div><p class="discovery-intro">${escapeHtml(intro)}</p>`;
+            const grid = document.createElement('div');
+            grid.className = 'discovery-grid';
+            collections.forEach(collection => {
+                const card = document.createElement('button');
+                card.type = 'button';
+                card.className = 'discovery-card';
+                card.innerHTML = `<span class="discovery-card-icon"><i class="fas ${escapeHtml(collection.icon)}"></i></span><h3>${escapeHtml(collection.title)}</h3><p>${escapeHtml(collection.description)}</p>`;
+                card.onclick = () => openDiscoveryCollection(collection);
+                grid.appendChild(card);
+            });
+            container.appendChild(heading);
+            container.appendChild(grid);
+        }
+
+        function renderGenreChannels() {
+            renderDiscoveryCards('Canales por géneros', 'Elegí una escena para abrir sus canales, listas y videos. Cada categoría navega por YouTube dentro de Nowarfy.', GENRE_CHANNEL_LISTS);
+        }
+
+        function renderExploreCollections() {
+            renderDiscoveryCards('Explorar', 'Entrá por una forma distinta de descubrir: shows, videoclips, archivo, bandas nuevas, covers o medios especializados.', EXPLORE_COLLECTIONS);
+        }
+
         function renderPlaybackHistory() {
             const taste = readTaste();
             const playable = taste.plays.filter(item => item?.url && item?.type);
@@ -1762,17 +1830,12 @@
             if (section === 'history') { renderPlaybackHistory(); return; }
             if (section === 'taste') { renderTasteData(); return; }
 
+            if (section === 'explore') { renderExploreCollections(); return; }
+            if (section === 'channels') { renderGenreChannels(); return; }
             const ready = await ensureHomeCatalog();
             if (!ready) return;
             const container = document.getElementById('dynamicSections');
             container.innerHTML = '';
-            if (section === 'explore') { renderHomeFeed(); return; }
-            if (section === 'channels') {
-                currentList = [];
-                if (homeChannels.length) renderChannelRow(homeChannels, 'Canales para descubrir');
-                else renderEmptyState('No hay canales disponibles ahora', 'Buscá un artista para navegar su canal completo.');
-                return;
-            }
             if (section === 'playlists') {
                 currentList = [];
                 if (homePlaylists.length) renderPlaylistGrid(homePlaylists, 'Listas de reproducción y álbumes');
@@ -3033,7 +3096,41 @@
             window.addEventListener('pagehide', save);
         }
 
+        let deferredInstallPrompt = null;
+
+        function isStandaloneApp() {
+            return window.matchMedia?.('(display-mode: standalone)').matches || navigator.standalone === true;
+        }
+
+        async function requestPwaInstall() {
+            const installButton = document.getElementById('pwaInstallBtn');
+            if (!deferredInstallPrompt) {
+                const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
+                showToast(isIOS ? 'En Safari: Compartir → Agregar a pantalla de inicio' : 'La instalación estará disponible cuando el navegador termine de preparar la aplicación', 'fa-mobile-screen-button');
+                return;
+            }
+            deferredInstallPrompt.prompt();
+            const result = await deferredInstallPrompt.userChoice;
+            deferredInstallPrompt = null;
+            installButton.hidden = true;
+            showToast(result.outcome === 'accepted' ? 'Nowarfy se instaló en este dispositivo' : 'Instalación cancelada', result.outcome === 'accepted' ? 'fa-circle-check' : 'fa-circle-xmark');
+        }
+
         function setupInstallableApp() {
+            const installButton = document.getElementById('pwaInstallBtn');
+            if (installButton) installButton.addEventListener('click', requestPwaInstall);
+            window.addEventListener('beforeinstallprompt', event => {
+                event.preventDefault();
+                deferredInstallPrompt = event;
+                if (installButton && !isStandaloneApp()) installButton.hidden = false;
+            });
+            window.addEventListener('appinstalled', () => {
+                deferredInstallPrompt = null;
+                if (installButton) installButton.hidden = true;
+                showToast('Nowarfy ya está instalada', 'fa-circle-check');
+            });
+            const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
+            if (installButton && isIOS && !isStandaloneApp()) installButton.hidden = false;
             if (!('serviceWorker' in navigator)) return;
             window.addEventListener('load', () => {
                 navigator.serviceWorker.register('/sw.js').catch(() => {
