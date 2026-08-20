@@ -676,6 +676,8 @@
         .video-stage.visible { display: block; }
         .video-stage-layout { display: grid; grid-template-columns: minmax(0, 1.65fr) minmax(230px, .8fr); }
         .video-frame { position: relative; min-height: 270px; aspect-ratio: 16 / 9; background: #07070e; }
+        #freeVideoPlayer { display: block; width: 100%; height: 100%; min-height: 270px; object-fit: contain; background: #05050d; }
+        #freeVideoPlayer[hidden] { display: none; }
         .video-stage-info { padding: 22px; display: flex; flex-direction: column; justify-content: space-between; gap: 16px; }
         .video-stage-kicker { color: #5eead4; font-size: .65rem; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; }
         .video-stage-title { font-family: 'Sora', sans-serif; font-size: clamp(1.05rem, 2vw, 1.45rem); line-height: 1.18; letter-spacing: -.04em; }
@@ -823,7 +825,6 @@
                         <li data-nav="channels" onclick="showSection('channels')"><i class="fas fa-satellite-dish"></i> <span>Canales</span></li>
                         <li data-nav="playlists" onclick="showSection('playlists')"><i class="fas fa-list-ul"></i> <span>Listas</span></li>
                         <li data-nav="videos" onclick="showSection('videos')"><i class="fas fa-clapperboard"></i> <span>Videos</span></li>
-                        <li data-nav="shorts" onclick="showSection('shorts')"><i class="fas fa-mobile-screen-button"></i> <span>Videos cortos</span></li>
                         <li data-nav="music" onclick="showSection('music')"><i class="fas fa-headphones"></i> <span>Música</span></li>
                     </ul>
                 </section>
@@ -862,7 +863,7 @@
 
             <section class="video-stage" id="videoStage" aria-live="polite" aria-label="Reproductor de video">
                 <div class="video-stage-layout">
-                    <div class="video-frame"><div id="yt-player-container"></div></div>
+                    <div class="video-frame"><div id="yt-player-container"></div><video id="freeVideoPlayer" controls playsinline preload="metadata" hidden></video></div>
                     <div class="video-stage-info">
                         <div><p class="video-stage-kicker">Reproduciendo desde YouTube</p><h2 class="video-stage-title" id="videoStageTitle">Elegí un video</h2><p class="video-stage-artist" id="videoStageArtist"></p><div class="video-stage-meta" id="videoStageMeta"></div><p class="video-stage-description" id="videoStageDescription"></p></div>
                         <div><p class="video-stage-note">Datos extraídos de la ficha pública del video. Algunos videos pueden estar restringidos por su creador, región o YouTube.</p><div class="video-stage-actions"><button type="button" class="video-stage-channel" id="videoStageChannelBtn" onclick="openVideoStageChannel()" hidden><i class="fas fa-satellite-dish"></i> Ver canal</button><button type="button" class="video-stage-close" onclick="hideVideoStage(false)"><i class="fas fa-chevron-up"></i> Ocultar video</button></div></div>
@@ -1021,7 +1022,6 @@
         const FEATURED_THEMES = ['violet', 'aqua', 'ember', 'electric'];
         let homeVideos = [];
         let homeMusicVideos = [];
-        let homeShortVideos = [];
         let homeChannels = [];
         let homePlaylists = [];
         let homeMusic = [];
@@ -1031,6 +1031,7 @@
 
         const audioEl = document.getElementById('audio-element');
         const nextAudioEl = document.getElementById('audio-element-next');
+        const freeVideoEl = document.getElementById('freeVideoPlayer');
         let activeAudioEl = audioEl;
         let crossfadeInProgress = false;
         let crossfadeTimer = null;
@@ -1094,6 +1095,11 @@
                 const duration = formatContentDuration(item.duration);
                 return duration === '—' ? 'Video de YouTube' : `Video · ${duration}`;
             }
+            if (item?.type === 'freevideo' || item?.resourceKind === 'commons#video') {
+                const duration = formatContentDuration(item.duration);
+                const source = item.license ? `Video libre · ${item.license}` : 'Video libre';
+                return duration === '—' ? source : `${source} · ${duration}`;
+            }
             return item?.license ? `Audio libre · ${item.license}` : 'Audio';
         }
 
@@ -1104,29 +1110,30 @@
         }
 
         const TASTE_STORAGE_KEY = 'youtoo_taste_v1';
-        const EMPTY_TASTE = Object.freeze({ version: 2, personalization: true, searches: [], plays: [], channels: [], playlists: [] });
+        const EMPTY_TASTE = Object.freeze({ version: 3, personalization: true, searches: [], plays: [], channels: [], playlists: [] });
 
         function readTaste() {
             try {
                 const saved = JSON.parse(localStorage.getItem(TASTE_STORAGE_KEY));
                 return {
-                    version: 2,
+                    version: 3,
                     personalization: saved?.personalization !== false,
-                    searches: Array.isArray(saved?.searches) ? saved.searches.filter(item => typeof item === 'string').slice(0, 12) : [],
-                    plays: Array.isArray(saved?.plays) ? saved.plays.filter(item => item && typeof item.title === 'string').slice(0, 30) : [],
-                    channels: Array.isArray(saved?.channels) ? saved.channels.filter(item => item && typeof item.id === 'string').slice(0, 20) : [],
-                    playlists: Array.isArray(saved?.playlists) ? saved.playlists.filter(item => item && typeof item.id === 'string').slice(0, 16) : []
+                    searches: Array.isArray(saved?.searches) ? saved.searches.filter(item => typeof item === 'string') : [],
+                    plays: Array.isArray(saved?.plays) ? saved.plays.filter(item => item && typeof item.title === 'string') : [],
+                    channels: Array.isArray(saved?.channels) ? saved.channels.filter(item => item && typeof item.id === 'string') : [],
+                    playlists: Array.isArray(saved?.playlists) ? saved.playlists.filter(item => item && typeof item.id === 'string') : []
                 };
             } catch { return { ...EMPTY_TASTE, searches: [], plays: [], channels: [], playlists: [] }; }
         }
 
         function writeTaste(taste) {
-            localStorage.setItem(TASTE_STORAGE_KEY, JSON.stringify({ ...taste, version: 2, updatedAt: Date.now() }));
+            localStorage.setItem(TASTE_STORAGE_KEY, JSON.stringify({ ...taste, version: 3, updatedAt: Date.now() }));
         }
 
-        function rememberUnique(list, entry, getKey, max) {
+        function rememberUnique(list, entry, getKey, max = Infinity) {
             const key = getKey(entry);
-            return [entry, ...list.filter(item => getKey(item) !== key)].slice(0, max);
+            const merged = [entry, ...list.filter(item => getKey(item) !== key)];
+            return Number.isFinite(max) ? merged.slice(0, max) : merged;
         }
 
         function rememberSearch(query) {
@@ -1142,7 +1149,6 @@
         function rememberPlay(song) {
             if (!song?.title) return;
             const taste = readTaste();
-            if (!taste.personalization) return;
             const entry = {
                 title: song.title,
                 artist: song.artist || '',
@@ -1156,17 +1162,21 @@
                 isPlaylist: !!song.isPlaylist,
                 at: Date.now()
             };
-            taste.plays = rememberUnique(taste.plays, entry, item => `${item.title}|${item.artist}`, 30);
+            taste.plays = rememberUnique(taste.plays, entry, item => item.url || `${item.title}|${item.artist}`);
             writeTaste(taste);
             renderTasteChips(searchQuery);
         }
 
-        function rememberChannel(channelId, title) {
+        function rememberChannel(channelId, title, details = {}) {
             if (!channelId) return;
             const taste = readTaste();
-            if (!taste.personalization) return;
-            const entry = { id: String(channelId), title: String(title || 'Canal de YouTube'), at: Date.now() };
-            taste.channels = rememberUnique(taste.channels, entry, item => item.id, 20);
+            const entry = {
+                id: String(channelId), title: String(title || 'Canal de YouTube'),
+                img: details.img || details.thumbnails?.medium?.url || details.thumbnails?.default?.url || '',
+                description: details.description || '',
+                at: Date.now()
+            };
+            taste.channels = rememberUnique(taste.channels, entry, item => item.id);
             writeTaste(taste);
             renderTasteChips(searchQuery);
         }
@@ -1174,9 +1184,12 @@
         function rememberPlaylist(playlist) {
             if (!playlist?.url) return;
             const taste = readTaste();
-            if (!taste.personalization) return;
-            const entry = { id: String(playlist.url), title: String(playlist.title || 'Lista de reproducción'), at: Date.now() };
-            taste.playlists = rememberUnique(taste.playlists, entry, item => item.id, 16);
+            const entry = {
+                id: String(playlist.url), title: String(playlist.title || 'Lista de reproducción'),
+                artist: String(playlist.artist || playlist.channelTitle || 'YouTube'), img: playlist.img || '',
+                description: playlist.description || '', channelId: playlist.channelId || '', at: Date.now()
+            };
+            taste.playlists = rememberUnique(taste.playlists, entry, item => item.id);
             writeTaste(taste);
         }
 
@@ -1500,7 +1513,10 @@
                 };
                 searchInput.value = data.channel.snippet?.title || channelTitle;
                 searchClearBtn.classList.add('show');
-                rememberChannel(data.channel.id, data.channel.snippet?.title || channelTitle);
+                rememberChannel(data.channel.id, data.channel.snippet?.title || channelTitle, {
+                    img: data.channel.snippet?.thumbnails?.medium?.url || data.channel.snippet?.thumbnails?.default?.url || '',
+                    description: data.channel.snippet?.description || ''
+                });
                 renderChannelCatalog();
             } catch (error) {
                 renderEmptyState('No pudimos abrir este canal', 'El enlace puede no corresponder a un canal público, o YouTube puede estar temporalmente no disponible.');
@@ -1634,7 +1650,18 @@
             { title: 'Covers y tributos', icon: 'fa-microphone-lines', query: 'rock metal cover tribute live', description: 'Interpretaciones y homenajes destacados.' },
             { title: 'Sellos y medios', icon: 'fa-satellite-dish', query: 'rock metal record label music channel', description: 'Canales de sellos, festivales y medios.' }
         ];
+        const FREE_MUSIC_COLLECTIONS = [
+            { title: 'Rock libre', icon: 'fa-guitar', query: 'rock music', description: 'Pistas con licencia abierta, carátula y autor identificado.' },
+            { title: 'Metal instrumental libre', icon: 'fa-bolt', query: 'metal instrumental music', description: 'Instrumentales de metal que pasan el filtro de calidad.' },
+            { title: 'Punk y hardcore libre', icon: 'fa-hand-fist', query: 'punk hardcore music', description: 'Escenas libres de punk y hardcore, sin efectos ni bucles.' },
+            { title: 'Sesiones y guitarras libres', icon: 'fa-record-vinyl', query: 'live guitar music', description: 'Grabaciones musicales y sesiones con licencia abierta.' }
+        ];
+        const FREE_VIDEO_COLLECTIONS = [
+            { title: 'Conciertos libres', icon: 'fa-tower-broadcast', query: 'music concert', description: 'Presentaciones audiovisuales con licencia abierta.' },
+            { title: 'Archivo musical libre', icon: 'fa-film', query: 'rock music', description: 'Documentos y clips musicales de dominio público o Creative Commons.' }
+        ];
         const directCollectionCache = new Map();
+        const freeMediaCollectionCache = new Map();
 
         async function recoverWithRockMetal() {
             const recovery = await fetchYouTubeSearch(ROCK_METAL_DISCOVERY_QUERY, 'video,playlist,channel', { maxResults: 20 });
@@ -1731,6 +1758,33 @@
                 .sort((a, b) => (b.img ? 1 : 0) - (a.img ? 1 : 0));
         }
 
+        async function fetchCommonsVideos(query, limit = 12) {
+            const cacheKey = `commons:${String(query || '').toLowerCase().trim()}`;
+            if (freeMediaCollectionCache.has(cacheKey)) return freeMediaCollectionCache.get(cacheKey);
+            const response = await fetch(`/api/search?type=commonsVideo&query=${encodeURIComponent(query)}&maxResults=${Math.min(Math.max(limit, 1), 20)}`);
+            const data = await response.json();
+            if (!response.ok || !Array.isArray(data.results)) return [];
+            const mapped = data.results
+                .filter(item => item?.url && item?.thumbnail && item?.license)
+                .map(item => ({
+                    title: normalizeSourceText(item.title || 'Video libre'), artist: normalizeSourceText(item.creator || 'Wikimedia Commons'),
+                    img: item.thumbnail, url: item.url, type: 'freevideo', resourceKind: 'commons#video',
+                    duration: Number(item.duration) || null, license: normalizeSourceText(item.license), mime: item.mime || '',
+                    sourceUrl: item.sourceUrl || '', description: normalizeSourceText(item.description || ''),
+                    channelTitle: 'Wikimedia Commons'
+                }));
+            freeMediaCollectionCache.set(cacheKey, mapped);
+            return mapped;
+        }
+
+        async function fetchFreeMusicCollection(collection) {
+            const cacheKey = `openverse:${collection.query}`;
+            if (freeMediaCollectionCache.has(cacheKey)) return freeMediaCollectionCache.get(cacheKey);
+            const tracks = await fetchOpenverseTracks(collection.query, 20);
+            freeMediaCollectionCache.set(cacheKey, tracks);
+            return tracks;
+        }
+
         async function searchOpenverse(query) {
             const mappedResults = await fetchOpenverseTracks(query, 20);
             if (!mappedResults.length) throw new Error('No results');
@@ -1812,8 +1866,6 @@
             if (!homeVideos.length) homeVideos = uniqueMediaByUrl(EMERGENCY_VIDEO_CATALOG, 24);
             if (!homeMusicVideos.length) homeMusicVideos = uniqueMediaByUrl([...homeVideos, ...EMERGENCY_VIDEO_CATALOG], 24);
             if (!homePlaylists.length) homePlaylists = uniqueMediaByUrl(EMERGENCY_PLAYLISTS, 20);
-            homeShortVideos = uniqueMediaByUrl([...homeVideos, ...homeMusicVideos], 20)
-                .filter(item => Number.isFinite(item.duration) && item.duration > 0 && item.duration <= 180);
             homeChannels = deriveChannels(uniqueMediaByUrl([...homeVideos, ...homeMusicVideos], 24));
             buildHomeRecommendations();
             return homeVideos.length + homeMusicVideos.length + homePlaylists.length + homeMusic.length + homeRecommended.length > 0;
@@ -1885,7 +1937,6 @@
                 });
             }
             if (homeMusicVideos.length) renderLibraryRail(homeMusicVideos, 'Música para escuchar', "<i class='fab fa-youtube'></i>", false, { hint: 'Videos musicales · 5 visibles', showControls: true });
-            if (homeShortVideos.length) renderLibraryRail(homeShortVideos, 'Videos cortos', "<i class='fas fa-mobile-screen-button'></i>", false, { hint: 'Clips de menos de 3 minutos · 5 visibles', showControls: true });
             if (homePlaylists.length) renderLibraryRail(homePlaylists, 'Listas y álbumes', "<i class='fas fa-layer-group'></i>", true, { hint: 'Abrí una lista para ver su contenido', showControls: true });
             if (homeMusic.length) renderLibraryRail(homeMusic, 'Música libre disponible', "<i class='fas fa-headphones'></i>", false, { hint: 'Audio con carátula y licencia · 5 visibles', showControls: true });
             if (!homeVideos.length && !homeMusicVideos.length && !homePlaylists.length && !homeMusic.length && !homeRecommended.length) renderEmptyState('No hay opciones disponibles ahora', 'Probá recargar dentro de unos segundos o buscá un artista.');
@@ -1982,14 +2033,37 @@
             }
         }
 
+        function renderSavedChannelsRail() {
+            const channels = readTaste().channels;
+            if (!channels.length) return;
+            const container = document.getElementById('dynamicSections');
+            const section = document.createElement('section');
+            section.className = 'library-rail-section saved-entities-rail';
+            section.innerHTML = `<div class="library-rail-title"><i class="fas fa-bookmark"></i><span>Canales abiertos anteriormente</span><span class="library-rail-hint">Guardados en este dispositivo</span></div>`;
+            const rail = document.createElement('div');
+            rail.className = 'library-rail';
+            channels.forEach((channel, index) => {
+                const card = document.createElement('button');
+                card.type = 'button';
+                card.className = 'card playlist-card library-card';
+                card.innerHTML = `<div class="card-img-wrap"><span class="playlist-source-badge"><i class="fas fa-satellite-dish"></i> Canal</span><img src="${escapeHtml(channel.img || '')}" class="card-img loaded" loading="lazy" alt="" onerror="this.closest('.card-img-wrap').classList.add('img-error'); this.style.display='none';"></div><div class="playlist-open"><i class="fas fa-arrow-up-right-from-square"></i> Abrir canal</div><div class="card-title">${escapeHtml(channel.title)}</div>${descriptionExcerpt(channel.description) ? `<p class="card-summary">${escapeHtml(descriptionExcerpt(channel.description))}</p>` : ''}`;
+                card.style.animationDelay = `${Math.min(index * 0.03, 0.5)}s`;
+                card.onclick = () => browseChannel(channel.id, channel.title);
+                rail.appendChild(card);
+            });
+            section.appendChild(rail);
+            container.appendChild(section);
+        }
+
         async function renderGenreChannels() {
-            return renderDirectVideoCollections({
+            await renderDirectVideoCollections({
                 title: 'Canales',
                 intro: 'Videos listos para mirar, organizados por escena. Cada fila reúne contenido reproducible de rock, metal y sus vertientes.',
                 icon: 'fa-satellite-dish',
                 collections: GENRE_CHANNEL_LISTS,
                 className: 'channels-video-rail'
             });
+            renderSavedChannelsRail();
         }
 
         async function renderExploreCollections() {
@@ -2000,6 +2074,30 @@
                 collections: EXPLORE_COLLECTIONS,
                 className: 'explore-video-rail'
             });
+        }
+
+        async function appendFreeMusicCollections() {
+            const settled = await Promise.allSettled(FREE_MUSIC_COLLECTIONS.map(collection => fetchFreeMusicCollection(collection)));
+            const rows = settled.map((result, index) => ({ collection: FREE_MUSIC_COLLECTIONS[index], tracks: result.status === 'fulfilled' ? result.value : [] }))
+                .filter(row => row.tracks.length);
+            rows.forEach(({ collection, tracks }) => {
+                renderLibraryRail(tracks, collection.title, `<i class="fas ${collection.icon}"></i>`, false, {
+                    hint: `${collection.description} · Openverse · 5 visibles`, showControls: true, className: 'free-music-rail'
+                });
+            });
+            return rows.flatMap(row => row.tracks);
+        }
+
+        async function appendFreeVideoCollections() {
+            const settled = await Promise.allSettled(FREE_VIDEO_COLLECTIONS.map(collection => fetchCommonsVideos(collection.query, 12)));
+            const rows = settled.map((result, index) => ({ collection: FREE_VIDEO_COLLECTIONS[index], videos: result.status === 'fulfilled' ? result.value : [] }))
+                .filter(row => row.videos.length);
+            rows.forEach(({ collection, videos }) => {
+                renderLibraryRail(videos, collection.title, `<i class="fas ${collection.icon}"></i>`, false, {
+                    hint: `${collection.description} · Wikimedia Commons · 5 visibles`, showControls: true, className: 'free-video-rail'
+                });
+            });
+            return rows.flatMap(row => row.videos);
         }
 
         function renderPlaybackHistory() {
@@ -2040,7 +2138,7 @@
         function minimizeActiveVideoForNavigation() {
             const song = currentQueueSong();
             const stage = document.getElementById('videoStage');
-            if (song?.type === 'yt' && stage?.classList.contains('visible')) setVideoStageMinimized(true);
+            if (isVisualVideo(song) && stage?.classList.contains('visible')) setVideoStageMinimized(true);
         }
 
         async function showSection(section) {
@@ -2066,27 +2164,30 @@
             container.innerHTML = '';
             if (section === 'playlists') {
                 currentList = [];
-                if (homePlaylists.length) renderPlaylistGrid(homePlaylists, 'Listas de reproducción y álbumes');
-                else renderEmptyState('No hay listas disponibles ahora', 'Probá buscar el nombre de un artista o álbum.');
+                const savedPlaylists = readTaste().playlists.map(item => ({
+                    url: item.id, title: item.title, artist: item.artist || 'YouTube', img: item.img || '',
+                    description: item.description || '', channelId: item.channelId || '', type: 'playlist', isPlaylist: true, itemCount: null
+                }));
+                if (savedPlaylists.length) renderPlaylistGrid(savedPlaylists, 'Listas abiertas anteriormente');
+                if (homePlaylists.length) renderPlaylistGrid(homePlaylists, savedPlaylists.length ? 'Más listas para explorar' : 'Listas de reproducción y álbumes');
+                if (!savedPlaylists.length && !homePlaylists.length) renderEmptyState('No hay listas disponibles ahora', 'Probá buscar el nombre de un artista o álbum.');
                 return;
             }
             if (section === 'videos') {
                 currentList = homeVideos;
                 if (homeVideos.length) renderGrid(homeVideos, 'Videos de YouTube', "<i class='fas fa-clapperboard'></i>");
-                else renderEmptyState('No hay videos disponibles ahora', 'Probá buscar un artista o tema.');
-                return;
-            }
-            if (section === 'shorts') {
-                currentList = homeShortVideos;
-                if (homeShortVideos.length) renderGrid(homeShortVideos, 'Videos cortos de YouTube', "<i class='fas fa-mobile-screen-button'></i>");
-                else renderEmptyState('No hay videos cortos disponibles ahora', 'YouTube no devolvió videos embebibles de duración corta en esta selección.');
+                const freeVideos = await appendFreeVideoCollections();
+                currentList = uniqueMediaByUrl([...homeVideos, ...freeVideos], 120);
+                if (!homeVideos.length && !freeVideos.length) renderEmptyState('No hay videos disponibles ahora', 'Probá buscar un artista o tema.');
                 return;
             }
             if (section === 'music') {
                 currentList = [...homeMusicVideos, ...homeMusic];
                 if (homeMusicVideos.length) renderGrid(homeMusicVideos, 'Música de YouTube', "<i class='fab fa-youtube'></i>");
                 if (homeMusic.length) renderGrid(homeMusic, 'Música libre complementaria', "<i class='fas fa-headphones'></i>");
-                if (!homeMusicVideos.length && !homeMusic.length) renderEmptyState('No hay música disponible ahora', 'Probá buscar un artista o tema.');
+                const expandedFreeMusic = await appendFreeMusicCollections();
+                currentList = uniqueMediaByUrl([...homeMusicVideos, ...homeMusic, ...expandedFreeMusic], 140);
+                if (!homeMusicVideos.length && !homeMusic.length && !expandedFreeMusic.length) renderEmptyState('No hay música disponible ahora', 'Probá buscar un artista o tema.');
             }
         }
 
@@ -2307,7 +2408,8 @@
             div.dataset.idx = song.sourceIndex ?? idx;
             div.style.animationDelay = `${Math.min(idx * 0.03, 0.5)}s`;
             const artistClickable = !!song.channelId;
-            const isVideo = song.resourceKind === 'youtube#video';
+            const isFreeVideo = song.type === 'freevideo' || song.resourceKind === 'commons#video';
+            const isVideo = song.resourceKind === 'youtube#video' || isFreeVideo;
             const isDirectAudio = song.type === 'mp3';
             const imageErrorAction = isDirectAudio
                 ? "this.closest('.card').remove();"
@@ -2316,7 +2418,7 @@
             div.classList.toggle('audio-card', isDirectAudio);
             div.innerHTML = `
                 <div class="card-img-wrap">
-                    ${isVideo ? `<span class="video-source-badge"><i class="fas fa-play"></i> Video</span><span class="card-duration">${formatContentDuration(song.duration)}</span>` : ''}
+                    ${isVideo ? `<span class="video-source-badge"><i class="fas ${isFreeVideo ? 'fa-leaf' : 'fa-play'}"></i> ${isFreeVideo ? 'Libre' : 'Video'}</span><span class="card-duration">${formatContentDuration(song.duration)}</span>` : ''}
                     <div class="skeleton"></div>
                     <img src="${song.img || ''}" class="card-img" loading="lazy"
                          onload="this.classList.add('loaded')"
@@ -2707,6 +2809,9 @@
             renderQueue();
 
             if (song.type === 'yt') {
+                freeVideoEl.pause();
+                freeVideoEl.removeAttribute('src');
+                freeVideoEl.hidden = true;
                 showVideoStage(song);
                 if (ytApiReady && window.YT && window.YT.Player) {
                     initYTPlayer(song.url, song.isPlaylist, resumeSession);
@@ -2714,6 +2819,20 @@
                     pendingYTRequest = { resourceId: song.url, isPlaylist: song.isPlaylist, resumeSession };
                     loadYouTubeAPI();
                 }
+            } else if (song.type === 'freevideo') {
+                document.getElementById('yt-player-container').innerHTML = '';
+                showVideoStage(song);
+                freeVideoEl.hidden = false;
+                activeAudioEl = freeVideoEl;
+                freeVideoEl.src = song.url;
+                freeVideoEl.dataset.queueId = String(song._qid);
+                applyVolume(parseFloat(document.getElementById('volumeSlider').value));
+                bindDirectAudioEvents(freeVideoEl);
+                freeVideoEl.onloadedmetadata = () => {
+                    if (freeVideoEl === activeAudioEl && currentQueueSong()?.type === 'freevideo') renderVideoStageDetails({ ...song, duration: freeVideoEl.duration || song.duration });
+                };
+                freeVideoEl.load();
+                freeVideoEl.play().catch(e => { console.error(e); setTrackLoading(false); showToast('No se pudo reproducir este video libre', 'fa-triangle-exclamation'); });
             } else {
                 hideVideoStage(false);
                 activeAudioEl = audioEl;
@@ -3076,6 +3195,11 @@
             const wrapper = document.getElementById('videoSuggestions');
             const list = document.getElementById('videoSuggestionsList');
             const context = document.getElementById('videoSuggestionsContext');
+            if (song?.type === 'freevideo') {
+                list.innerHTML = '';
+                wrapper.classList.remove('visible');
+                return;
+            }
             const suggestions = getVideoSuggestions(song);
             list.innerHTML = '';
             if (!suggestions.length) {
@@ -3188,22 +3312,27 @@
             }, 180);
         }
 
+        function isVisualVideo(song) {
+            return !!song && (song.type === 'yt' || song.type === 'freevideo');
+        }
+
         function renderVideoStageDetails(song) {
             const meta = document.getElementById('videoStageMeta');
             const description = document.getElementById('videoStageDescription');
             const channelButton = document.getElementById('videoStageChannelBtn');
             if (!meta || !description || !channelButton) return;
             const duration = formatContentDuration(song?.duration);
-            const channel = song?.channelTitle || song?.artist || 'Canal público de YouTube';
-            const kind = song?.isPlaylist ? 'Lista de reproducción' : 'Video de YouTube';
+            const isFreeVideo = song?.type === 'freevideo';
+            const channel = isFreeVideo ? 'Wikimedia Commons' : (song?.channelTitle || song?.artist || 'Canal público de YouTube');
+            const kind = isFreeVideo ? `Video libre${song?.license ? ` · ${song.license}` : ''}` : (song?.isPlaylist ? 'Lista de reproducción' : 'Video de YouTube');
             const entries = [
                 { icon: 'fa-clock', label: duration === '—' ? 'Duración en el reproductor' : duration },
                 { icon: song?.isPlaylist ? 'fa-list' : 'fa-clapperboard', label: kind },
-                { icon: 'fa-satellite-dish', label: channel }
+                { icon: isFreeVideo ? 'fa-leaf' : 'fa-satellite-dish', label: channel }
             ];
             meta.innerHTML = entries.map(entry => `<span><i class="fas ${entry.icon}"></i>${escapeHtml(entry.label)}</span>`).join('');
             const cleanDescription = descriptionExcerpt(song?.description || '', 430);
-            description.textContent = cleanDescription || 'No hay una descripción pública disponible para este video.';
+            description.textContent = cleanDescription || (isFreeVideo ? 'Clip con licencia abierta alojado en Wikimedia Commons.' : 'No hay una descripción pública disponible para este video.');
             description.classList.toggle('is-empty', !cleanDescription);
             channelButton.hidden = !song?.channelId;
         }
@@ -3218,7 +3347,7 @@
             const button = document.getElementById('videoStageToggleBtn');
             if (!button) return;
             const song = currentQueueSong();
-            const isVideo = song?.type === 'yt';
+            const isVideo = isVisualVideo(song);
             const minimized = isVideo && !isVisible;
             button.hidden = !minimized;
             button.classList.toggle('video-minimized', minimized);
@@ -3231,7 +3360,7 @@
         function setVideoStageMinimized(minimized, options = {}) {
             const stage = document.getElementById('videoStage');
             const song = currentQueueSong();
-            if (!stage || !song || song.type !== 'yt') return;
+            if (!stage || !isVisualVideo(song)) return;
             videoStageMinimized = !!minimized;
             stage.classList.toggle('visible', !videoStageMinimized);
             if (videoStageMinimized) stage.classList.remove('is-error');
@@ -3247,8 +3376,12 @@
             stage.classList.remove('is-error');
             stage.classList.add('visible');
             videoStageMinimized = false;
-            document.getElementById('videoStageTitle').textContent = song.title || 'Video de YouTube';
-            document.getElementById('videoStageArtist').textContent = song.channelTitle || song.artist || '';
+            document.getElementById('videoStageTitle').textContent = song.title || (song.type === 'freevideo' ? 'Video libre' : 'Video de YouTube');
+            document.getElementById('videoStageArtist').textContent = song.type === 'freevideo' ? `${song.artist || 'Wikimedia Commons'} · ${song.license || 'licencia abierta'}` : (song.channelTitle || song.artist || '');
+            const kicker = document.querySelector('.video-stage-kicker');
+            const note = document.querySelector('.video-stage-note');
+            if (kicker) kicker.textContent = song.type === 'freevideo' ? 'Reproduciendo video libre' : 'Reproduciendo desde YouTube';
+            if (note) note.textContent = song.type === 'freevideo' ? 'Archivo público de Wikimedia Commons. Revisá la ficha de origen para atribución y licencia.' : 'Datos extraídos de la ficha pública del video. Algunos videos pueden estar restringidos por su creador, región o YouTube.';
             renderVideoStageDetails(song);
             renderVideoSuggestions(song);
             updateVideoStageToggle(true);
@@ -3257,17 +3390,18 @@
 
         function hideVideoStage(pauseVideo = false) {
             const song = currentQueueSong();
-            if (!song || song.type !== 'yt') {
+            if (!isVisualVideo(song)) {
                 videoStageMinimized = false;
                 document.getElementById('videoStage').classList.remove('visible', 'is-error');
                 updateVideoStageToggle(true);
                 return;
             }
             setVideoStageMinimized(true);
-            if (pauseVideo && ytPlayer && isPlaying) {
-                ytPlayer.pauseVideo();
+            if (pauseVideo && isPlaying) {
+                if (song.type === 'yt' && ytPlayer) ytPlayer.pauseVideo();
+                else if (song.type === 'freevideo') freeVideoEl.pause();
                 isPlaying = false;
-                persistVideoResumeSession(true);
+                if (song.type === 'yt') persistVideoResumeSession(true);
                 updateIcon();
                 updatePlaybackState();
             }
@@ -3275,7 +3409,7 @@
 
         function toggleVideoStageVisibility() {
             const song = currentQueueSong();
-            if (!song || song.type !== 'yt') { showToast('No hay un video activo para mostrar', 'fa-clapperboard'); return; }
+            if (!isVisualVideo(song)) { showToast('No hay un video activo para mostrar', 'fa-clapperboard'); return; }
             const stage = document.getElementById('videoStage');
             if (stage.classList.contains('visible')) hideVideoStage(false);
             else showVideoStage(song, { focus: true });
@@ -3289,10 +3423,10 @@
             videoStageObserver = new IntersectionObserver(entries => {
                 const entry = entries[0];
                 const song = currentQueueSong();
-                if (!entry || !song || song.type !== 'yt' || !isPlaying || videoStageMinimized) return;
+                if (!entry || !isVisualVideo(song) || !isPlaying || videoStageMinimized) return;
                 if (stage.classList.contains('visible') && entry.intersectionRatio < 0.28) {
                     window.setTimeout(() => {
-                        if (stage.classList.contains('visible') && !videoStageMinimized && currentQueueSong()?.type === 'yt' && isPlaying) {
+                        if (stage.classList.contains('visible') && !videoStageMinimized && isVisualVideo(currentQueueSong()) && isPlaying) {
                             setVideoStageMinimized(true);
                         }
                     }, 180);
@@ -3376,7 +3510,7 @@
         function togglePlay() {
             if (currentIndex === -1 || !queue[currentIndex]) return;
             // Si venimos de restaurar la cola guardada y todavía no se cargó nada en el reproductor, arrancarla.
-            if (!ytPlayer && !audioEl.src) { playQueueAt(currentIndex); return; }
+            if (!ytPlayer && !audioEl.src && !freeVideoEl.src) { playQueueAt(currentIndex); return; }
             const song = queue[currentIndex];
             if (isPlaying) {
                 playbackStoppedByUser = true;
@@ -3421,6 +3555,11 @@
             clearAutomaticAdvance();
             if (ytPlayer) { ytPlayer.stopVideo(); ytPlayer.destroy(); ytPlayer = null; }
             pendingYTRequest = null;
+            freeVideoEl.pause();
+            freeVideoEl.currentTime = 0;
+            freeVideoEl.removeAttribute('src');
+            freeVideoEl.dataset.queueId = '';
+            freeVideoEl.hidden = true;
             clearInterval(crossfadeTimer);
             crossfadeInProgress = false;
             [audioEl, nextAudioEl].forEach(audio => { audio.pause(); audio.currentTime = 0; audio.dataset.queueId = ''; });
@@ -3470,7 +3609,7 @@
             if (currentIndex === -1 || !queue[currentIndex]) return 0;
             const song = queue[currentIndex];
             if (song.type === 'yt' && ytPlayer && ytPlayer.getDuration) return ytPlayer.getDuration();
-            if (song.type === 'mp3') return activeAudioEl.duration || 0;
+            if (song.type === 'mp3' || song.type === 'freevideo') return activeAudioEl.duration || 0;
             return 0;
         }
 
@@ -3478,7 +3617,7 @@
             if (currentIndex === -1 || !queue[currentIndex]) return;
             const song = queue[currentIndex];
             if (song.type === 'yt' && ytPlayer) { const d = ytPlayer.getDuration(); if (d) ytPlayer.seekTo(d * pct, true); }
-            else if (song.type === 'mp3' && activeAudioEl.duration) { activeAudioEl.currentTime = activeAudioEl.duration * pct; }
+            else if ((song.type === 'mp3' || song.type === 'freevideo') && activeAudioEl.duration) { activeAudioEl.currentTime = activeAudioEl.duration * pct; }
         }
 
         function seekBy(deltaSeconds) {
@@ -3487,7 +3626,7 @@
             if (song.type === 'yt' && ytPlayer) {
                 const t = Math.max(0, ytPlayer.getCurrentTime() + deltaSeconds);
                 ytPlayer.seekTo(t, true);
-            } else if (song.type === 'mp3') {
+            } else if (song.type === 'mp3' || song.type === 'freevideo') {
                 activeAudioEl.currentTime = Math.max(0, Math.min(activeAudioEl.duration || 0, activeAudioEl.currentTime + deltaSeconds));
             }
         }
@@ -3600,6 +3739,7 @@
         function applyVolume(v) {
             audioEl.volume = v;
             nextAudioEl.volume = v;
+            freeVideoEl.volume = v;
             if (ytPlayer && ytPlayer.setVolume) ytPlayer.setVolume(v * 100);
             const slider = document.getElementById('volumeSlider');
             slider.value = v;

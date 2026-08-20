@@ -1,4 +1,4 @@
-const CACHE_NAME = 'nowarfy-shell-v11';
+const CACHE_NAME = 'nowarfy-shell-v13';
 const APP_SHELL = [
   '/',
   '/index.html',

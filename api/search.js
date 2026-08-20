@@ -22,6 +22,39 @@ function boundedMax(value, fallback = 24) {
   return Number.isInteger(parsed) ? Math.min(Math.max(parsed, 1), 50) : fallback;
 }
 
+function stripHtml(value) {
+  return String(value || '').replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim();
+}
+
+function commonsLicenseAllowed(value) {
+  const license = stripHtml(value).toLowerCase();
+  return license.includes('public domain') || /cc\s*by(?:-sa)?(?:\s|\d|$)/i.test(license) || license.includes('cc0');
+}
+
+function mapCommonsVideoPage(page) {
+  const info = page?.imageinfo?.[0];
+  const mime = String(info?.mime || '').toLowerCase();
+  const license = stripHtml(info?.extmetadata?.LicenseShortName?.value || info?.extmetadata?.UsageTerms?.value || '');
+  if (!info?.url || !info?.thumburl || !commonsLicenseAllowed(license)) return null;
+  if (!['video/webm', 'application/ogg'].includes(mime)) return null;
+  const durationRaw = stripHtml(info?.extmetadata?.Duration?.value || '');
+  const duration = Number.parseFloat(durationRaw);
+  return {
+    id: String(page?.pageid || ''),
+    title: String(page?.title || '').replace(/^File:/i, '').replace(/\.(webm|ogv|ogg)$/i, '').trim(),
+    creator: stripHtml(info?.extmetadata?.Artist?.value || info?.extmetadata?.Credit?.value || 'Wikimedia Commons'),
+    description: stripHtml(info?.extmetadata?.ImageDescription?.value || ''),
+    license,
+    mime,
+    url: info.url,
+    thumbnail: info.thumburl,
+    sourceUrl: page?.canonicalurl || `https://commons.wikimedia.org/wiki/${encodeURIComponent(String(page?.title || ''))}`,
+    duration: Number.isFinite(duration) && duration > 0 ? Math.round(duration) : null,
+    width: Number(info.width || 0),
+    height: Number(info.height || 0)
+  };
+}
+
 function parseChannelReference(value) {
   const raw = String(value || '').trim();
   if (!raw) return null;
@@ -205,6 +238,36 @@ export default async function handler(req, res) {
       data.items = await enrichVideoItems(data.items, apiKey);
       compactCache(res);
       return res.status(200).json(data);
+    }
+
+    if (type === 'commonsVideo') {
+      if (!query || typeof query !== 'string') return res.status(400).json({ error: { source: 'commons', message: 'Falta el término de búsqueda' } });
+      const params = new URLSearchParams({
+        action: 'query',
+        format: 'json',
+        origin: '*',
+        generator: 'search',
+        gsrnamespace: '6',
+        gsrsearch: `${query.trim().slice(0, 120)} filetype:video`,
+        gsrlimit: String(Math.min(boundedMax(req.query.maxResults, 12) * 3, 50)),
+        gsrwhat: 'text',
+        prop: 'imageinfo|info',
+        inprop: 'url',
+        iiprop: 'url|mime|size|extmetadata',
+        iiurlwidth: '560',
+        iilimit: '1'
+      });
+      const commonsResponse = await fetch(`https://commons.wikimedia.org/w/api.php?${params.toString()}`, {
+        headers: { 'User-Agent': 'Nowarfy-YouToo/1.0 (public media discovery)' }
+      });
+      const commonsData = await commonsResponse.json();
+      if (!commonsResponse.ok) return res.status(commonsResponse.status || 502).json({ error: { source: 'commons', message: 'No se pudo consultar Wikimedia Commons' } });
+      const results = Object.values(commonsData?.query?.pages || {})
+        .map(mapCommonsVideoPage)
+        .filter(Boolean)
+        .slice(0, boundedMax(req.query.maxResults, 12));
+      compactCache(res);
+      return res.status(200).json({ results });
     }
 
     if (type === 'openverse') {
