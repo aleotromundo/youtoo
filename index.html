@@ -570,6 +570,9 @@
         .youtoo-hero-kicker { color: #5eead4; font-size: .68rem; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; }
         .youtoo-hero h1 { font-family: 'Sora', sans-serif; font-size: clamp(1.6rem, 3.4vw, 2.7rem); letter-spacing: -.06em; line-height: 1.08; max-width: 620px; margin: 8px 0; }
         .youtoo-hero p { color: #9d9eb7; max-width: 550px; font-size: .9rem; line-height: 1.55; }
+        .personalized-note { display: inline-flex; align-items: center; gap: 7px; margin-top: 9px; padding: 7px 10px; border: 1px solid rgba(94,234,212,.18); border-radius: 999px; color: #bdbed2 !important; background: rgba(94,234,212,.06); font-size: .72rem; }
+        .personalized-note i { color: #5eead4; }
+        .personalized-note strong { color: #e9e7ff; }
         .discovery-panel { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin: 4px 0 22px; }
         .discovery-action { position: relative; min-height: 126px; overflow: hidden; padding: 17px; border: 1px solid rgba(190,188,255,.18); border-radius: 15px; color: #f4f2ff; text-align: left; cursor: pointer; background: linear-gradient(145deg, rgba(31,32,57,.96), rgba(17,18,34,.96)); transition: transform .2s var(--ease), border-color .2s var(--ease), box-shadow .2s var(--ease); }
         .discovery-action::after { content: ''; position: absolute; width: 112px; height: 112px; right: -41px; bottom: -58px; border-radius: 50%; background: radial-gradient(circle, rgba(94,234,212,.34), transparent 67%); }
@@ -641,6 +644,7 @@
                 <p class="youtoo-hero-kicker">Exploración audiovisual</p>
                 <h1>Videos y música, listos para elegir.</h1>
                 <p>La portada carga una selección directa de videos y música. Buscá un artista cuando quieras ir más allá; los efectos de sonido quedan fuera.</p>
+                <p class="personalized-note" id="personalizedNote" hidden></p>
             </section>
 
             <section class="video-stage" id="videoStage" aria-live="polite" aria-label="Reproductor de video">
@@ -775,6 +779,8 @@
         let homeFeedLoaded = false;
         let homeFeedLoading = false;
         let homeVideos = [];
+        let homeChannels = [];
+        let homePlaylists = [];
         let homeMusic = [];
 
         const audioEl = document.getElementById('audio-element');
@@ -809,6 +815,48 @@
             const div = document.createElement('div');
             div.textContent = str == null ? '' : String(str);
             return div.innerHTML;
+        }
+
+        const TASTE_STORAGE_KEY = 'youtoo_taste_v1';
+        function readTaste() {
+            try {
+                const saved = JSON.parse(localStorage.getItem(TASTE_STORAGE_KEY));
+                return { searches: Array.isArray(saved?.searches) ? saved.searches : [], plays: Array.isArray(saved?.plays) ? saved.plays : [] };
+            } catch { return { searches: [], plays: [] }; }
+        }
+        function writeTaste(taste) { localStorage.setItem(TASTE_STORAGE_KEY, JSON.stringify(taste)); }
+        function rememberSearch(query) {
+            const normalized = String(query || '').trim();
+            if (!normalized) return;
+            const taste = readTaste();
+            taste.searches = [normalized, ...taste.searches.filter(item => item.toLowerCase() !== normalized.toLowerCase())].slice(0, 8);
+            writeTaste(taste);
+        }
+        function rememberPlay(song) {
+            if (!song?.title) return;
+            const taste = readTaste();
+            const entry = { title: song.title, artist: song.artist || '', channelId: song.channelId || '', at: Date.now() };
+            taste.plays = [entry, ...taste.plays.filter(item => `${item.title}|${item.artist}` !== `${entry.title}|${entry.artist}`)].slice(0, 16);
+            writeTaste(taste);
+        }
+        function getTasteSeed() {
+            const taste = readTaste();
+            return taste.searches[0] || taste.plays[0]?.artist || taste.plays[0]?.title || '';
+        }
+        function renderPersonalizedNote() {
+            const note = document.getElementById('personalizedNote');
+            const seed = getTasteSeed();
+            if (!seed) { note.hidden = true; return; }
+            note.hidden = false;
+            note.innerHTML = `<i class="fas fa-sparkles"></i> Selección inspirada en <strong>${escapeHtml(seed)}</strong>, según tu actividad guardada en este dispositivo.`;
+        }
+        function deriveChannels(videos) {
+            const seen = new Set();
+            return videos.filter(video => {
+                if (!video.channelId || seen.has(video.channelId)) return false;
+                seen.add(video.channelId);
+                return true;
+            }).map(video => ({ title: video.channelTitle || video.artist, artist: 'Canal de YouTube', img: video.img, url: video.channelId, type: 'yt', resourceKind: 'youtube#channel', isPlaylist: false, channelId: video.channelId, channelTitle: video.channelTitle || video.artist }));
         }
 
         // --- TOASTS ---
@@ -957,6 +1005,7 @@
 
         async function performSmartSearch(query) {
             searchQuery = query;
+            if (!channelFilter) rememberSearch(query);
             activeBrowseMode = 'search';
             currentMood = null;
             document.querySelectorAll('.mood-btn').forEach(b => b.classList.remove('active'));
@@ -970,7 +1019,7 @@
                 // Una búsqueda de video por consulta: evita triplicar el consumo de cuota.
                 // Los resultados siguen llegando desde YouTube y se reproducen igual que antes.
                 const merged = channelFilter
-                    ? await fetchYouTubeSearch(query, 'video', { channelId: channelFilter.id, maxResults: 20 })
+                    ? await fetchYouTubeSearch(query, 'video,playlist', { channelId: channelFilter.id, maxResults: 25 })
                     : await fetchYouTubeSearch(query, 'video,playlist,channel', { maxResults: 20 });
 
                 if (merged.length > 0) {
@@ -995,9 +1044,9 @@
         // Entrar a ver el contenido (álbumes/canciones) de un canal específico
         function browseChannel(channelId, channelTitle) {
             channelFilter = { id: channelId, title: channelTitle };
-            searchInput.value = '';
-            searchClearBtn.classList.remove('show');
-            performSmartSearch(searchQuery || 'canciones');
+            searchInput.value = channelTitle;
+            searchClearBtn.classList.toggle('show', !!channelTitle);
+            performSmartSearch(channelTitle || 'canciones');
         }
 
         function clearChannelFilter() {
@@ -1063,7 +1112,7 @@
             performSmartSearch(mood);
         }
 
-        // La portada hace solamente una búsqueda de videos y una de música por sesión; el proxy cachea la primera.
+        // La portada hace una búsqueda de videos, una de listas y una de música por sesión; el proxy cachea las consultas de YouTube.
         async function resetView() {
             searchQuery = ""; currentMood = null; channelFilter = null; activeBrowseMode = 'home';
             searchInput.value = ""; searchClearBtn.classList.remove('show');
@@ -1079,12 +1128,17 @@
             loader.style.display = 'flex';
             container.innerHTML = '';
             try {
-                const [videos, music] = await Promise.all([
-                    fetchYouTubeSearch('official music video', 'video', { maxResults: 12 }),
-                    fetchOpenverseTracks('music', 12)
+                const seed = getTasteSeed();
+                const [videos, playlists, music] = await Promise.all([
+                    fetchYouTubeSearch(seed ? `${seed} music video` : 'official music video', 'video', { maxResults: 12 }),
+                    fetchYouTubeSearch(seed ? `${seed} playlist` : 'music playlist', 'playlist', { maxResults: 10 }),
+                    fetchOpenverseTracks(seed || 'music', 12)
                 ]);
                 homeVideos = videos;
+                homeChannels = deriveChannels(videos);
+                homePlaylists = playlists;
                 homeMusic = music;
+                renderPersonalizedNote();
                 homeFeedLoaded = true;
                 renderHomeFeed();
             } catch (error) {
@@ -1099,9 +1153,12 @@
             const container = document.getElementById('dynamicSections');
             container.innerHTML = '';
             currentList = [];
+            renderPersonalizedNote();
+            if (homeChannels.length) renderChannelRow(homeChannels, 'Canales para descubrir');
+            if (homePlaylists.length) renderPlaylistGrid(homePlaylists, 'Listas de reproducción');
             if (homeVideos.length) renderGrid(homeVideos, 'Videos para mirar', "<i class='fas fa-clapperboard'></i>");
             if (homeMusic.length) renderGrid(homeMusic, 'Música para escuchar', "<i class='fas fa-headphones'></i>");
-            if (!homeVideos.length && !homeMusic.length) renderEmptyState('No hay opciones disponibles ahora', 'Probá buscar un artista o volvé a intentar más tarde.');
+            if (!homeChannels.length && !homePlaylists.length && !homeVideos.length && !homeMusic.length) renderEmptyState('No hay opciones disponibles ahora', 'Probá buscar un artista o volvé a intentar más tarde.');
         }
 
         function showSection(section) {
@@ -1155,8 +1212,8 @@
             }
 
             if (channels.length) renderChannelRow(channels, channelFilter ? 'Canales relacionados' : `Canales: "${query}"`);
-            if (playlists.length) renderPlaylistGrid(playlists, `Listas y álbumes: "${query}"`);
-            if (videos.length) renderGrid(videos, `Videos individuales: "${query}"`, "<i class='fas fa-clapperboard'></i>");
+            if (playlists.length) renderPlaylistGrid(playlists, channelFilter ? 'Listas de reproducción del canal' : `Listas y álbumes: "${query}"`);
+            if (videos.length) renderGrid(videos, channelFilter ? 'Videos y música del canal' : `Videos individuales: "${query}"`, "<i class='fas fa-clapperboard'></i>");
         }
 
         function renderChannelRow(channels, title) {
@@ -1396,6 +1453,7 @@
             if (song.img) { img.src = song.img; img.style.display = 'block'; }
             else { img.style.display = 'none'; }
             updateFavButton(song);
+            rememberPlay(song);
             stopAll();
             updateMediaSession(song);
             setTrackLoading(true, currentSourceIdx);
