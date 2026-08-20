@@ -3128,6 +3128,18 @@
             return fetchYouTubeSearch(ROCK_METAL_DISCOVERY_QUERY, 'video', { maxResults: Math.min(Math.max(count, 6), 20) });
         }
 
+        async function fetchOpenverseGenreTracks(seedSong, count) {
+            const genre = String(seedSong?.genre || '').trim();
+            const query = genre && genre.toLowerCase() !== 'unknown'
+                ? `${genre} music`
+                : 'rock metal music';
+            try {
+                return await fetchOpenverseTracks(query, count);
+            } catch (e) {
+                return [];
+            }
+        }
+
         async function fetchSimilarArtistTracks(seedSong, count) {
             if (!seedSong || !seedSong.artist) return fetchRockMetalTracks(count);
             const artist = seedSong.artist;
@@ -3165,6 +3177,11 @@
             // Si el artista no tiene suficientes resultados, completar con artistas similares.
             if (remaining() > 0) {
                 appendUniqueSongs(await fetchSimilarArtistTracks(seed, remaining()), added, QUEUE_BATCH);
+            }
+
+            // Si YouTube no alcanza, completar con música libre del mismo género en Openverse.
+            if (remaining() > 0) {
+                appendUniqueSongs(await fetchOpenverseGenreTracks(seed, remaining()), added, QUEUE_BATCH);
             }
 
             // Último respaldo para que la radio no se quede sin contenido.
