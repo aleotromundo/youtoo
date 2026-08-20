@@ -477,6 +477,14 @@
         #pipBtn.active { color: var(--accent); opacity: 1 !important; }
         #queueToggleBtn { position: relative; }
         #queueToggleBtn.active { color: var(--accent); opacity: 1 !important; }
+        .continuous-playback-toggle { display: inline-flex; align-items: center; justify-content: center; width: 31px; height: 31px; border: 1px solid rgba(190,188,255,.22); border-radius: 50%; color: #a9aac0; background: rgba(255,255,255,.035); cursor: pointer; transition: .18s var(--ease); }
+        .continuous-playback-toggle:hover { border-color: rgba(94,234,212,.55); color: #ecfffa; }
+        .continuous-playback-toggle.on { border-color: #5eead4; color: #071016; background: #5eead4; box-shadow: 0 0 0 3px rgba(94,234,212,.1); }
+        .queue-continuous-btn { border-color: rgba(94,234,212,.28); color: #b5f6eb; }
+        .queue-continuous-btn.on { border-color: #5eead4; color: #071016; background: #5eead4; }
+        .queue-continuous-btn:hover { background: rgba(94,234,212,.15); border-color: #5eead4; color: #dffff8; }
+        .queue-continuous-btn.on:hover { background: #80f5e1; color: #071016; }
+        .queue-continuous-btn i { margin-right: 4px; }
         .queue-count-badge {
             position: absolute; top: -8px; right: -10px; background: var(--accent); color: black;
             font-size: 0.6rem; font-weight: 800; min-width: 16px; height: 16px; border-radius: 8px;
@@ -905,6 +913,7 @@
                     <i class="fas fa-list-ul"></i>
                     <span class="queue-count-badge" id="queueCountBadge">0</span>
                 </button>
+                <button type="button" class="continuous-playback-toggle" id="continuousPlayerToggle" onclick="toggleContinuousPlayback()" title="Reproducción continua" aria-label="Reproducción continua" aria-pressed="true"><i class="fas fa-infinity"></i></button>
             </div>
             <div class="progress-bar">
                 <span id="currTime">0:00</span>
@@ -937,6 +946,7 @@
         <div class="queue-panel-header">
             <div class="queue-panel-title"><i class="fas fa-list-ul"></i> Cola de reproducción</div>
             <div class="queue-panel-actions">
+                <button type="button" class="queue-clear-btn queue-continuous-btn" id="continuousQueueToggle" onclick="toggleContinuousPlayback()" title="Reproducción continua" aria-pressed="true"><i class="fas fa-infinity"></i> Continua</button>
                 <button type="button" class="queue-clear-btn" onclick="clearQueue()" title="Vaciar toda la cola"><i class="fas fa-trash"></i> Vaciar</button>
                 <button type="button" class="queue-close-btn" onclick="closeQueuePanel()" aria-label="Cerrar cola"><i class="fas fa-xmark"></i></button>
             </div>
@@ -987,9 +997,11 @@
         let isSeeking = false;
         let lastVolume = 0.8;
         const VIDEO_AUTOPLAY_STORAGE_KEY = 'youtoo_video_autoplay_v1';
+        const CONTINUOUS_PLAYBACK_STORAGE_KEY = 'nowarfy_continuous_playback_v1';
         const VIDEO_RESUME_STORAGE_KEY = 'nowarfy_video_resume_v1';
         const VIDEO_RESUME_MAX_AGE_MS = 14 * 24 * 60 * 60 * 1000;
         let videoAutoplay = localStorage.getItem(VIDEO_AUTOPLAY_STORAGE_KEY) !== 'false';
+        let continuousPlayback = localStorage.getItem(CONTINUOUS_PLAYBACK_STORAGE_KEY) !== 'false';
         let videoStageObserver = null;
         let videoStageMinimized = false;
         let pendingVideoResumeSession = null;
@@ -2644,7 +2656,7 @@
         }
 
         function beginDirectAudioCrossfade() {
-            if (crossfadeInProgress) return;
+            if (!continuousPlayback || crossfadeInProgress) return;
             const nextIndex = nextQueueIndex();
             const next = queue[nextIndex];
             if (nextIndex === currentIndex || !next || next.type !== 'mp3' || !next.url) return;
@@ -2924,6 +2936,7 @@
         }
 
         function renderQueue() {
+            renderContinuousPlaybackControls();
             currentIndex = queue.findIndex(s => s._qid === currentPlayingQid);
             const list = document.getElementById('queueList');
             const sub = document.getElementById('queueSub');
@@ -2931,7 +2944,9 @@
             if (!list) return;
 
             if (badge) { badge.textContent = String(queue.length); badge.classList.toggle('show', queue.length > 0); }
-            if (sub) sub.textContent = queue.length ? `${queue.length} canción${queue.length === 1 ? '' : 'es'} en la cola` : 'La cola está vacía';
+            if (sub) sub.textContent = queue.length
+                ? `${queue.length} canción${queue.length === 1 ? '' : 'es'} en la cola · ${continuousPlayback ? 'reproducción continua' : 'se detiene al terminar'}`
+                : `La cola está vacía · ${continuousPlayback ? 'continua lista' : 'una pista por vez'}`;
 
             list.innerHTML = '';
             if (queue.length === 0) {
@@ -3014,6 +3029,32 @@
             const sameChannel = song?.channelId ? unique.filter(item => item.channelId === song.channelId) : [];
             const otherVideos = unique.filter(item => !song?.channelId || item.channelId !== song.channelId);
             return [...sameChannel, ...otherVideos].slice(0, 8);
+        }
+
+        function renderContinuousPlaybackControls() {
+            const playerButton = document.getElementById('continuousPlayerToggle');
+            const queueButton = document.getElementById('continuousQueueToggle');
+            [playerButton, queueButton].filter(Boolean).forEach(button => {
+                button.classList.toggle('on', continuousPlayback);
+                button.setAttribute('aria-pressed', String(continuousPlayback));
+                button.title = continuousPlayback ? 'Reproducción continua activada' : 'Reproducción continua desactivada';
+            });
+            if (queueButton) queueButton.innerHTML = `<i class="fas fa-infinity"></i> ${continuousPlayback ? 'Continua' : 'Una pista'}`;
+        }
+
+        function toggleContinuousPlayback() {
+            continuousPlayback = !continuousPlayback;
+            localStorage.setItem(CONTINUOUS_PLAYBACK_STORAGE_KEY, String(continuousPlayback));
+            if (!continuousPlayback) {
+                clearAutomaticAdvance();
+                cancelDirectCrossfade();
+            }
+            renderContinuousPlaybackControls();
+            renderQueue();
+            const detail = 'mediaSession' in navigator
+                ? 'Los controles del sistema y auriculares siguen disponibles'
+                : 'El navegador puede limitar controles de pantalla bloqueada';
+            showToast(continuousPlayback ? `Reproducción continua activada · ${detail}` : 'Reproducción continua desactivada: la pista actual se detendrá al terminar', continuousPlayback ? 'fa-infinity' : 'fa-stop');
         }
 
         function renderVideoAutoplayToggle() {
@@ -3126,6 +3167,14 @@
         function queueAutomaticAdvance(reason = 'ended') {
             const targetQid = currentPlayingQid;
             if (!targetQid || playbackStoppedByUser || automaticAdvanceTargetQid === targetQid) return;
+            if (!continuousPlayback) {
+                isPlaying = false;
+                clearAutomaticAdvance();
+                updateIcon();
+                updatePlaybackState();
+                persistVideoResumeSession(true);
+                return;
+            }
             automaticAdvanceTargetQid = targetQid;
             automaticAdvanceTimer = window.setTimeout(async () => {
                 automaticAdvanceTimer = null;
