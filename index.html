@@ -1589,7 +1589,36 @@
             performSmartSearch(mood);
         }
 
-        // La portada hace una búsqueda de videos, una de listas y una de música por sesión; el proxy cachea las consultas de YouTube.
+        function uniqueMediaByUrl(items, maxItems) {
+            const seen = new Set();
+            return items.filter(item => {
+                const key = String(item?.url || '');
+                if (!key || seen.has(key)) return false;
+                seen.add(key);
+                return true;
+            }).slice(0, maxItems);
+        }
+
+        async function loadHomeCatalogSources() {
+            const seed = getTasteSeed();
+            const musicQuery = seed ? `${seed} music` : 'music';
+            const musicReserveQuery = seed ? 'independent music' : 'instrumental music';
+            const results = await Promise.allSettled([
+                fetchYouTubeSearch(seed ? `${seed} music video` : 'official music video', 'video', { maxResults: 14 }),
+                fetchYouTubeSearch(seed ? `${seed} playlist` : 'music playlist', 'playlist', { maxResults: 10 }),
+                fetchOpenverseTracks(musicQuery, 20),
+                fetchOpenverseTracks(musicReserveQuery, 20)
+            ]);
+            const value = index => results[index]?.status === 'fulfilled' ? results[index].value || [] : [];
+            homeVideos = value(0);
+            homeChannels = deriveChannels(homeVideos);
+            homePlaylists = value(1);
+            // Openverse mantiene dos búsquedas propias: una relacionada a la actividad y otra de reserva musical.
+            homeMusic = uniqueMediaByUrl([...value(2), ...value(3)], 24);
+            return homeVideos.length + homePlaylists.length + homeMusic.length > 0;
+        }
+
+        // La portada carga YouTube y Openverse en paralelo; una fuente no bloquea ni vacía a la otra.
         async function resetView() {
             searchQuery = ""; currentMood = null; channelFilter = null; activeBrowseMode = 'home';
             renderTasteChips();
@@ -1606,21 +1635,10 @@
             loader.style.display = 'flex';
             container.innerHTML = '';
             try {
-                const seed = getTasteSeed();
-                const [videos, playlists, music] = await Promise.all([
-                    fetchYouTubeSearch(seed ? `${seed} music video` : 'official music video', 'video', { maxResults: 12 }),
-                    fetchYouTubeSearch(seed ? `${seed} playlist` : 'music playlist', 'playlist', { maxResults: 10 }),
-                    fetchOpenverseTracks(seed || 'music', 12)
-                ]);
-                homeVideos = videos;
-                homeChannels = deriveChannels(videos);
-                homePlaylists = playlists;
-                homeMusic = music;
-                renderPersonalizedNote();
+                const hasContent = await loadHomeCatalogSources();
                 homeFeedLoaded = true;
-                renderHomeFeed();
-            } catch (error) {
-                renderEmptyState('No pudimos cargar la portada', 'Probá buscar un artista o recargá más tarde.');
+                if (hasContent) renderHomeFeed();
+                else renderEmptyState('No pudimos cargar propuestas ahora', 'Probá buscar un artista o recargá más tarde.');
             } finally {
                 homeFeedLoading = false;
                 loader.style.display = 'none';
@@ -1632,10 +1650,10 @@
             container.innerHTML = '';
             currentList = [];
             renderPersonalizedNote();
-            if (homeChannels.length) renderChannelRow(homeChannels, 'Canales para descubrir');
-            if (homePlaylists.length) renderPlaylistGrid(homePlaylists, 'Listas de reproducción');
-            if (homeVideos.length) renderGrid(homeVideos, 'Videos para mirar', "<i class='fas fa-clapperboard'></i>");
             if (homeMusic.length) renderGrid(homeMusic, 'Música para escuchar', "<i class='fas fa-headphones'></i>");
+            if (homeVideos.length) renderGrid(homeVideos, 'Videos para mirar', "<i class='fas fa-clapperboard'></i>");
+            if (homePlaylists.length) renderPlaylistGrid(homePlaylists, 'Listas de reproducción');
+            if (homeChannels.length) renderChannelRow(homeChannels, 'Canales para descubrir');
             if (!homeChannels.length && !homePlaylists.length && !homeVideos.length && !homeMusic.length) renderEmptyState('No hay opciones disponibles ahora', 'Probá buscar un artista o volvé a intentar más tarde.');
         }
 
@@ -1653,21 +1671,10 @@
             loader.style.display = 'flex';
             container.innerHTML = '';
             try {
-                const seed = getTasteSeed();
-                const [videos, playlists, music] = await Promise.all([
-                    fetchYouTubeSearch(seed ? `${seed} music video` : 'official music video', 'video', { maxResults: 12 }),
-                    fetchYouTubeSearch(seed ? `${seed} playlist` : 'music playlist', 'playlist', { maxResults: 10 }),
-                    fetchOpenverseTracks(seed || 'music', 12)
-                ]);
-                homeVideos = videos;
-                homeChannels = deriveChannels(videos);
-                homePlaylists = playlists;
-                homeMusic = music;
+                const hasContent = await loadHomeCatalogSources();
                 homeFeedLoaded = true;
-                return true;
-            } catch (error) {
-                renderEmptyState('No pudimos cargar el catálogo', 'Probá buscar un artista o recargá más tarde.');
-                return false;
+                if (!hasContent) renderEmptyState('No pudimos cargar el catálogo', 'Probá buscar un artista o recargá más tarde.');
+                return hasContent;
             } finally {
                 homeFeedLoading = false;
                 loader.style.display = 'none';
