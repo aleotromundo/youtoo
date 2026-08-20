@@ -748,6 +748,7 @@
                         <li data-nav="channels" onclick="showSection('channels')"><i class="fas fa-satellite-dish"></i> <span>Canales</span></li>
                         <li data-nav="playlists" onclick="showSection('playlists')"><i class="fas fa-list-ul"></i> <span>Listas</span></li>
                         <li data-nav="videos" onclick="showSection('videos')"><i class="fas fa-clapperboard"></i> <span>Videos</span></li>
+                        <li data-nav="shorts" onclick="showSection('shorts')"><i class="fas fa-mobile-screen-button"></i> <span>Videos cortos</span></li>
                         <li data-nav="music" onclick="showSection('music')"><i class="fas fa-headphones"></i> <span>Música</span></li>
                     </ul>
                 </section>
@@ -925,6 +926,7 @@
         let homeFeedLoaded = false;
         let homeFeedLoading = false;
         let homeVideos = [];
+        let homeShortVideos = [];
         let homeChannels = [];
         let homePlaylists = [];
         let homeMusic = [];
@@ -1615,9 +1617,10 @@
             ]);
             const value = index => results[index]?.status === 'fulfilled' ? results[index].value || [] : [];
             homeVideos = value(0);
+            homeShortVideos = homeVideos.filter(item => Number.isFinite(item.duration) && item.duration > 0 && item.duration <= 180);
             homeChannels = deriveChannels(homeVideos);
             homePlaylists = value(1);
-            // Openverse mantiene dos búsquedas propias: una relacionada a la actividad y otra de reserva musical.
+            // Openverse es complemento: solo completa con música libre cuando ya se priorizó el catálogo oficial de YouTube.
             homeMusic = uniqueMediaByUrl([...value(2), ...value(3)], 24);
             return homeVideos.length + homePlaylists.length + homeMusic.length > 0;
         }
@@ -1654,9 +1657,10 @@
             container.innerHTML = '';
             currentList = [];
             renderPersonalizedNote();
-            if (homeMusic.length) renderGrid(homeMusic, 'Música para escuchar', "<i class='fas fa-headphones'></i>");
-            if (homeVideos.length) renderGrid(homeVideos, 'Videos para mirar', "<i class='fas fa-clapperboard'></i>");
-            if (homePlaylists.length) renderPlaylistGrid(homePlaylists, 'Listas de reproducción');
+            if (homeVideos.length) renderGrid(homeVideos, 'Música y videos de YouTube', "<i class='fab fa-youtube'></i>");
+            if (homePlaylists.length) renderPlaylistGrid(homePlaylists, 'Listas y álbumes de YouTube');
+            if (homeShortVideos.length) renderGrid(homeShortVideos, 'Videos cortos de YouTube', "<i class='fas fa-mobile-screen-button'></i>");
+            if (homeMusic.length) renderGrid(homeMusic, 'Música libre de Openverse', "<i class='fas fa-headphones'></i>");
             if (homeChannels.length) renderChannelRow(homeChannels, 'Canales para descubrir');
             if (!homeChannels.length && !homePlaylists.length && !homeVideos.length && !homeMusic.length) renderEmptyState('No hay opciones disponibles ahora', 'Probá buscar un artista o volvé a intentar más tarde.');
         }
@@ -1751,14 +1755,21 @@
             }
             if (section === 'videos') {
                 currentList = homeVideos;
-                if (homeVideos.length) renderGrid(homeVideos, 'Videos para mirar', "<i class='fas fa-clapperboard'></i>");
+                if (homeVideos.length) renderGrid(homeVideos, 'Videos de YouTube', "<i class='fas fa-clapperboard'></i>");
                 else renderEmptyState('No hay videos disponibles ahora', 'Probá buscar un artista o tema.');
                 return;
             }
+            if (section === 'shorts') {
+                currentList = homeShortVideos;
+                if (homeShortVideos.length) renderGrid(homeShortVideos, 'Videos cortos de YouTube', "<i class='fas fa-mobile-screen-button'></i>");
+                else renderEmptyState('No hay videos cortos disponibles ahora', 'YouTube no devolvió videos embebibles de duración corta en esta selección.');
+                return;
+            }
             if (section === 'music') {
-                currentList = homeMusic;
-                if (homeMusic.length) renderGrid(homeMusic, 'Música para escuchar', "<i class='fas fa-headphones'></i>");
-                else renderEmptyState('No hay música disponible ahora', 'Probá buscar un artista o tema.');
+                currentList = [...homeVideos, ...homeMusic];
+                if (homeVideos.length) renderGrid(homeVideos, 'Música y actuaciones de YouTube', "<i class='fab fa-youtube'></i>");
+                if (homeMusic.length) renderGrid(homeMusic, 'Música libre complementaria', "<i class='fas fa-headphones'></i>");
+                if (!homeVideos.length && !homeMusic.length) renderEmptyState('No hay música disponible ahora', 'Probá buscar un artista o tema.');
             }
         }
 
