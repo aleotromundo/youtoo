@@ -691,12 +691,6 @@
                 <div class="taste-chips" id="tasteChips"></div>
             </nav>
 
-            <section class="youtoo-hero" aria-label="Descubrir en YouToo">
-                <p class="youtoo-hero-kicker">Exploración audiovisual</p>
-                <h1>Videos y música, listos para elegir.</h1>
-                <p>La portada carga una selección directa de videos y música. Buscá un artista cuando quieras ir más allá; los efectos de sonido quedan fuera.</p>
-                <p class="personalized-note" id="personalizedNote" hidden></p>
-            </section>
 
             <section class="video-stage" id="videoStage" aria-live="polite" aria-label="Reproductor de video">
                 <div class="video-stage-layout">
@@ -998,12 +992,7 @@
         }
 
         function renderPersonalizedNote() {
-            const note = document.getElementById('personalizedNote');
-            const taste = readTaste();
-            const seed = getTasteSeed();
-            if (!taste.personalization || !seed) { note.hidden = true; return; }
-            note.hidden = false;
-            note.innerHTML = `<i class="fas fa-sparkles"></i> Selección inspirada en <strong>${escapeHtml(seed)}</strong>, según tu actividad guardada solo en este dispositivo.`;
+            // La personalización sigue operando localmente; la portada ya no expone una nota descriptiva.
         }
 
         function setPersonalization(enabled) {
