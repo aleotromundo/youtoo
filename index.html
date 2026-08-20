@@ -1592,7 +1592,7 @@
             { title: 'Covers y tributos', icon: 'fa-microphone-lines', query: 'rock metal cover tribute live', description: 'Interpretaciones y homenajes destacados.' },
             { title: 'Sellos y medios', icon: 'fa-satellite-dish', query: 'rock metal record label music channel', description: 'Canales de sellos, festivales y medios.' }
         ];
-        const exploreCollectionCache = new Map();
+        const directCollectionCache = new Map();
 
         async function recoverWithRockMetal() {
             const recovery = await fetchYouTubeSearch(ROCK_METAL_DISCOVERY_QUERY, 'video,playlist,channel', { maxResults: 20 });
@@ -1851,49 +1851,79 @@
             container.appendChild(grid);
         }
 
-        function renderGenreChannels() {
-            renderDiscoveryCards('Canales por géneros', 'Elegí una escena para abrir sus canales, listas y videos. Cada categoría navega por YouTube dentro de Nowarfy.', GENRE_CHANNEL_LISTS);
-        }
-
-        async function getExploreCollectionVideos(collection) {
-            const cached = exploreCollectionCache.get(collection.query);
+        async function getDirectCollectionVideos(collection) {
+            const cached = directCollectionCache.get(collection.query);
             if (cached?.length) return cached;
-            const results = await fetchYouTubeSearch(collection.query, 'video', { maxResults: 12 });
+            let results = await fetchYouTubeSearch(collection.query, 'video', { maxResults: 12 });
+            if (!results.length) results = await fetchYouTubeLegacy(collection.query, 12);
             const videos = uniqueMediaByUrl(results, 12).filter(item => item?.type === 'yt' && item?.url);
-            if (videos.length) exploreCollectionCache.set(collection.query, videos);
+            if (videos.length) directCollectionCache.set(collection.query, videos);
             return videos;
         }
 
-        async function renderExploreCollections() {
+        async function renderDirectVideoCollections({ title, intro, icon, collections, className }) {
             const container = document.getElementById('dynamicSections');
             const loader = document.getElementById('loader');
             container.innerHTML = '';
             currentList = [];
             loader.style.display = 'flex';
             try {
-                const results = await Promise.allSettled(EXPLORE_COLLECTIONS.map(collection => getExploreCollectionVideos(collection)));
-                const rows = EXPLORE_COLLECTIONS.map((collection, index) => ({
+                const responses = await Promise.allSettled(collections.map(collection => getDirectCollectionVideos(collection)));
+                const rawRows = collections.map((collection, index) => ({
                     collection,
-                    videos: results[index]?.status === 'fulfilled' ? results[index].value || [] : []
-                })).filter(row => row.videos.length);
+                    videos: responses[index]?.status === 'fulfilled' ? responses[index].value || [] : []
+                }));
+                let fallback = uniqueMediaByUrl([...homeVideos, ...homeMusicVideos], 24).filter(item => item?.type === 'yt' && item?.url);
+                if (!fallback.length) fallback = await fetchYouTubeSearch(ROCK_METAL_DISCOVERY_QUERY, 'video', { maxResults: 20 });
+                if (!fallback.length) fallback = await fetchYouTubeLegacy(ROCK_METAL_DISCOVERY_QUERY, 20);
+                fallback = uniqueMediaByUrl(fallback, 20).filter(item => item?.type === 'yt' && item?.url);
+                const used = new Set();
+                const rows = rawRows.map(row => {
+                    const preferred = row.videos.filter(video => !used.has(String(video.url)));
+                    preferred.forEach(video => used.add(String(video.url)));
+                    const needed = Math.max(0, 5 - preferred.length);
+                    const backup = fallback.filter(video => !used.has(String(video.url))).slice(0, needed);
+                    backup.forEach(video => used.add(String(video.url)));
+                    return { ...row, videos: uniqueMediaByUrl([...preferred, ...backup], 12) };
+                }).filter(row => row.videos.length);
                 if (!rows.length) {
-                    renderEmptyState('No pudimos cargar las colecciones de Explorar', 'Probá de nuevo dentro de unos minutos o buscá un artista específico.');
+                    renderEmptyState('No pudimos cargar videos en este momento', 'La búsqueda de YouTube puede estar temporalmente ocupada. Probá recargar o buscá un artista específico.');
                     return;
                 }
                 const heading = document.createElement('div');
-                heading.innerHTML = `<div class="section-title"><i class="fas fa-compass"></i> Explorar</div><p class="discovery-intro">Filas de videos para recorrer por escena: empezá con cinco propuestas y seguí navegando a los costados.</p>`;
+                heading.innerHTML = `<div class="section-title"><i class="fas ${icon}"></i> ${escapeHtml(title)}</div><p class="discovery-intro">${escapeHtml(intro)}</p>`;
                 container.appendChild(heading);
-                currentList = uniqueMediaByUrl(rows.flatMap(row => row.videos), 72);
+                currentList = uniqueMediaByUrl(rows.flatMap(row => row.videos), 84);
                 rows.forEach(({ collection, videos }) => {
                     renderLibraryRail(videos, collection.title, `<i class="fas ${collection.icon}"></i>`, false, {
                         hint: `${collection.description} · 5 visibles`,
                         showControls: true,
-                        className: 'explore-video-rail'
+                        className
                     });
                 });
             } finally {
                 loader.style.display = 'none';
             }
+        }
+
+        async function renderGenreChannels() {
+            return renderDirectVideoCollections({
+                title: 'Canales',
+                intro: 'Videos listos para mirar, organizados por escena. Cada fila reúne contenido reproducible de rock, metal y sus vertientes.',
+                icon: 'fa-satellite-dish',
+                collections: GENRE_CHANNEL_LISTS,
+                className: 'channels-video-rail'
+            });
+        }
+
+        async function renderExploreCollections() {
+            return renderDirectVideoCollections({
+                title: 'Explorar',
+                intro: 'Videos listos para elegir por tipo de experiencia: shows, videoclips, archivo, novedades, covers y medios.',
+                icon: 'fa-compass',
+                collections: EXPLORE_COLLECTIONS,
+                className: 'explore-video-rail'
+            });
         }
 
         function renderPlaybackHistory() {
@@ -1944,7 +1974,7 @@
             if (section === 'taste') { renderTasteData(); return; }
 
             if (section === 'explore') { await renderExploreCollections(); return; }
-            if (section === 'channels') { renderGenreChannels(); return; }
+            if (section === 'channels') { await renderGenreChannels(); return; }
             const ready = await ensureHomeCatalog();
             if (!ready) return;
             const container = document.getElementById('dynamicSections');
