@@ -600,6 +600,22 @@
         .video-stage-close { align-self: flex-start; border: 1px solid rgba(255,255,255,.15); background: rgba(255,255,255,.06); color: #ecebff; border-radius: 9px; padding: 8px 10px; font-size: .75rem; cursor: pointer; }
         .video-stage-close:hover { border-color: #5eead4; color: #5eead4; }
         .video-stage.is-error .video-frame::after { content: 'Este video no permite reproducción embebida. Elegí otro resultado.'; position: absolute; inset: 0; display: grid; place-items: center; padding: 32px; text-align: center; color: #f0d1d9; background: rgba(19,11,19,.88); font-size: .9rem; z-index: 4; }
+        .video-suggestions { display: none; border-top: 1px solid rgba(190,188,255,.14); padding: 18px 20px 20px; }
+        .video-suggestions.visible { display: block; }
+        .video-suggestions-header { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
+        .video-suggestions-header h3 { margin: 0; color: #f5f3ff; font: 800 1rem 'Sora', sans-serif; letter-spacing: -.03em; }
+        .video-suggestions-header span { color: #9293ae; font-size: .7rem; }
+        .video-suggestions-list { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+        .video-suggestion { display: grid; min-width: 0; grid-template-columns: 84px minmax(0, 1fr); gap: 9px; align-items: center; border: 0; border-radius: 10px; padding: 7px; color: #eeedff; background: rgba(255,255,255,.035); text-align: left; cursor: pointer; transition: background .18s var(--ease), transform .18s var(--ease); }
+        .video-suggestion:hover { background: rgba(94,234,212,.1); transform: translateY(-2px); }
+        .video-suggestion-thumb { position: relative; width: 84px; aspect-ratio: 16 / 9; overflow: hidden; border-radius: 7px; background: #0a0a13; }
+        .video-suggestion-thumb img { width: 100%; height: 100%; object-fit: cover; }
+        .video-suggestion-thumb i { position: absolute; left: 7px; bottom: 7px; display: grid; width: 22px; height: 22px; place-items: center; border-radius: 50%; color: #071016; background: #5eead4; font-size: .62rem; }
+        .video-suggestion-title, .video-suggestion-artist { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .video-suggestion-title { color: #f2f0ff; font-size: .73rem; font-weight: 800; }
+        .video-suggestion-artist { margin-top: 4px; color: #9899b2; font-size: .65rem; }
+        @media (max-width: 1050px) { .video-suggestions-list { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+        @media (max-width: 560px) { .video-suggestions { padding: 15px; } .video-suggestions-list { grid-template-columns: 1fr; } .video-suggestion { grid-template-columns: 105px minmax(0, 1fr); } .video-suggestion-thumb { width: 105px; } }
         .video-source-badge { position: absolute; top: 9px; left: 9px; z-index: 3; padding: 5px 7px; border-radius: 6px; background: rgba(8,8,18,.78); color: #e6e1ff; font-size: .58rem; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; }
         .video-source-badge i { color: #ff7b90; margin-right: 4px; }
         .card-duration { position: absolute; right: 9px; bottom: 9px; z-index: 3; padding: 4px 6px; border-radius: 5px; background: rgba(8,8,18,.82); color: #fff; font-size: .66rem; font-weight: 800; font-variant-numeric: tabular-nums; }
@@ -746,6 +762,10 @@
                         <div><p class="video-stage-kicker">Reproduciendo desde YouTube</p><h2 class="video-stage-title" id="videoStageTitle">Elegí un video</h2><p class="video-stage-artist" id="videoStageArtist"></p></div>
                         <div><p class="video-stage-note">Algunos videos pueden estar restringidos por su creador, región o YouTube.</p><button type="button" class="video-stage-close" onclick="hideVideoStage()"><i class="fas fa-chevron-up"></i> Ocultar video</button></div>
                     </div>
+                </div>
+                <div class="video-suggestions" id="videoSuggestions" aria-label="Más videos sugeridos">
+                    <div class="video-suggestions-header"><h3>Más videos para seguir viendo</h3><span id="videoSuggestionsContext"></span></div>
+                    <div class="video-suggestions-list" id="videoSuggestionsList"></div>
                 </div>
             </section>
 
@@ -2342,12 +2362,53 @@
             });
         }
 
+        function getVideoSuggestions(song) {
+            const currentId = String(song?.url || '');
+            const candidates = [...currentList, ...homeVideos]
+                .filter(item => item && (item.type === 'yt' || item.resourceKind === 'youtube#video'))
+                .filter(item => String(item.url || '') && String(item.url || '') !== currentId);
+            const seen = new Set();
+            const unique = candidates.filter(item => {
+                const id = String(item.url || '');
+                if (seen.has(id)) return false;
+                seen.add(id);
+                return true;
+            });
+            const sameChannel = song?.channelId ? unique.filter(item => item.channelId === song.channelId) : [];
+            const otherVideos = unique.filter(item => !song?.channelId || item.channelId !== song.channelId);
+            return [...sameChannel, ...otherVideos].slice(0, 8);
+        }
+
+        function renderVideoSuggestions(song) {
+            const wrapper = document.getElementById('videoSuggestions');
+            const list = document.getElementById('videoSuggestionsList');
+            const context = document.getElementById('videoSuggestionsContext');
+            const suggestions = getVideoSuggestions(song);
+            list.innerHTML = '';
+            if (!suggestions.length) {
+                wrapper.classList.remove('visible');
+                return;
+            }
+            const fromSameChannel = suggestions.filter(item => song?.channelId && item.channelId === song.channelId).length;
+            context.textContent = fromSameChannel ? `Incluye ${fromSameChannel} del mismo canal` : 'Selección relacionada';
+            suggestions.forEach(item => {
+                const button = document.createElement('button');
+                button.type = 'button';
+                button.className = 'video-suggestion';
+                button.innerHTML = `<span class="video-suggestion-thumb"><img src="${item.img || ''}" alt="" loading="lazy" onerror="this.style.visibility='hidden';"><i class="fas fa-play"></i></span><span><span class="video-suggestion-title">${escapeHtml(item.title || 'Video')}</span><span class="video-suggestion-artist">${escapeHtml(item.channelTitle || item.artist || 'YouTube')}</span></span>`;
+                button.onclick = () => selectSong(item, item.sourceIndex ?? 0);
+                list.appendChild(button);
+            });
+            wrapper.classList.add('visible');
+        }
+
         function showVideoStage(song) {
             const stage = document.getElementById('videoStage');
             stage.classList.remove('is-error');
             stage.classList.add('visible');
             document.getElementById('videoStageTitle').textContent = song.title || 'Video de YouTube';
             document.getElementById('videoStageArtist').textContent = song.artist || '';
+            renderVideoSuggestions(song);
         }
 
         function hideVideoStage(pauseVideo = true) {
