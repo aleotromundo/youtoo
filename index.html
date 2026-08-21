@@ -843,6 +843,11 @@
         .nowarfy-qr-launch > i { color: #5eead4; font-size: .88rem; }
         .nowarfy-qr-modal[hidden] { display: none; }
         .nowarfy-auth-modal[hidden] { display: none; }
+        .nowarfy-handoff-prompt { position: fixed; z-index: 10002; left: 50%; bottom: 24px; transform: translateX(-50%); width: min(92vw, 420px); padding: 14px 16px; display: grid; grid-template-columns: 1fr auto; gap: 12px; align-items: center; border: 1px solid rgba(94,234,212,.4); border-radius: 16px; color: #f8f7ff; background: rgba(23,24,43,.97); box-shadow: 0 18px 50px rgba(0,0,0,.45); }
+        .nowarfy-handoff-prompt[hidden] { display: none !important; }
+        .nowarfy-handoff-prompt strong { font-size: .82rem; }
+        .nowarfy-handoff-prompt small { display: block; margin-top: 3px; color: #b8bad0; line-height: 1.35; }
+        .nowarfy-handoff-prompt button { border: 0; border-radius: 11px; padding: 10px 13px; color: #10111d; background: var(--accent-2); font-weight: 800; white-space: nowrap; cursor: pointer; }
         .nowarfy-auth-modal { position: fixed; z-index: 10001; inset: 0; display: grid; place-items: center; padding: 22px; background: rgba(2,3,10,.78); backdrop-filter: blur(10px); }
         .nowarfy-auth-dialog { position: relative; width: min(92vw, 430px); padding: 28px; border: 1px solid rgba(190,188,255,.28); border-radius: 22px; background: linear-gradient(145deg, #20213b, #0f101e); box-shadow: 0 28px 75px rgba(0,0,0,.55); }
         .nowarfy-auth-dialog h2 { margin: 0; color: #fbfaff; font: 800 1.28rem 'Sora', sans-serif; letter-spacing: -.04em; }
@@ -1256,6 +1261,8 @@
         <div class="queue-drop-trash" id="queueTrash"><i class="fas fa-trash"></i> Soltá aquí para quitarla de la Playlist</div>
     </div>
 
+    <div class="nowarfy-handoff-prompt" id="nowarfyHandoffPrompt" hidden><div><strong>La reproducción llegó a este dispositivo</strong><small>El navegador necesita una pulsación para habilitar el audio.</small></div><button type="button" onclick="unlockNowarfyHandoff()"><i class="fas fa-play"></i> Reproducir</button></div>
+
     <div class="nowarfy-auth-modal" id="nowarfyAuthModal" role="dialog" aria-modal="true" aria-labelledby="nowarfyAuthTitle" hidden onclick="if (event.target === this) closeNowarfyAuth()">
         <div class="nowarfy-auth-dialog">
             <button type="button" class="nowarfy-auth-close" onclick="closeNowarfyAuth()" aria-label="Cerrar cuenta"><i class="fas fa-xmark"></i></button>
@@ -1313,6 +1320,8 @@
         let nowarfyRemoteDevices = [];
         let nowarfyDeviceRefreshTimer = null;
         let nowarfyRemoteStateTimer = null;
+        let nowarfyAudioUnlocked = false;
+        let nowarfyPendingHandoff = null;
         const NOWARFY_REMOTE_DEVICE_KEY = 'nowarfy_remote_device_key_v1';
         const nowarfyRemoteDeviceKey = localStorage.getItem(NOWARFY_REMOTE_DEVICE_KEY) || (() => { const key = (crypto.randomUUID?.() || `${Date.now()}-${Math.random()}-${Math.random()}`).replace(/-/g, ''); localStorage.setItem(NOWARFY_REMOTE_DEVICE_KEY, key); return key; })();
         function authStatus(message, isError = false) {
@@ -1645,9 +1654,9 @@
         }
         async function releaseNowarfyPlayer() { if (!nowarfySupabase || !nowarfyRemoteSession || !nowarfyRemoteIsPlayer) return; await nowarfySupabase.from('youtoo_remote_sessions').update({ active_device_id: null, state: remoteStateSnapshot(), version: Number(nowarfyRemoteSession.version || 0) + 1, updated_at: new Date().toISOString() }).eq('id', nowarfyRemoteSession.id); nowarfyRemoteIsPlayer = false; updateNowarfyAuthUI(); remoteStatus('Reproductor liberado; este dispositivo queda como control.'); }
         async function publishNowarfyRemoteState() { if (!nowarfySupabase || !nowarfyRemoteSession || !nowarfyRemoteIsPlayer) return; const state = remoteStateSnapshot(); const result = await nowarfySupabase.from('youtoo_remote_sessions').update({ state, version: Number(nowarfyRemoteSession.version || 0) + 1, updated_at: new Date().toISOString() }).eq('id', nowarfyRemoteSession.id).eq('active_device_id', nowarfyRemoteDeviceId); if (!result.error) nowarfyRemoteSession.state = state; }
-        function updateRemoteControlsFromState(state) {
+        function updateRemoteControlsFromState(state, forceQueue = false) {
             if (!state) return;
-            if (!nowarfyRemoteIsPlayer && Array.isArray(state.playlist) && state.playlist.length) {
+            if ((!nowarfyRemoteIsPlayer || forceQueue) && Array.isArray(state.playlist) && state.playlist.length) {
                 const remoteQueue = state.playlist.map(item => ({ ...item, _qid: item._qid || queueIdCounter++ })).filter(item => item.url);
                 if (remoteQueue.length) {
                     queue = remoteQueue;
@@ -1671,12 +1680,25 @@
             if (volume && document.activeElement !== volume && Number.isFinite(Number(state.volume))) { volume.value = Number(state.volume) / 100; volume.style.background = `linear-gradient(to right, var(--accent) ${Number(state.volume)}%, #535353 ${Number(state.volume)}%)`; }
         }
         async function sendNowarfyCommand(type, value = null) { if (!nowarfySupabase || !nowarfyAuthUser || !nowarfyRemoteSession) return; if (nowarfyRemoteIsPlayer) { await executeNowarfyRemoteCommand({ type, value }); return; } const result = await nowarfySupabase.from('youtoo_remote_commands').insert({ session_id: nowarfyRemoteSession.id, user_id: nowarfyAuthUser.id, device_id: nowarfyRemoteDeviceId, command: { type, value } }); if (result.error) remoteStatus('No se pudo enviar el comando remoto.'); }
+        function showNowarfyHandoffPrompt() { const prompt = document.getElementById('nowarfyHandoffPrompt'); if (prompt) prompt.hidden = false; }
+        async function unlockNowarfyHandoff() {
+            nowarfyAudioUnlocked = true;
+            const prompt = document.getElementById('nowarfyHandoffPrompt'); if (prompt) prompt.hidden = true;
+            const pending = nowarfyPendingHandoff; nowarfyPendingHandoff = null;
+            if (!pending) return;
+            const song = queue[pending.idx];
+            try {
+                if (song?.type === 'yt' && ytPlayer?.playVideo) ytPlayer.playVideo();
+                else if (activeAudioEl) { await activeAudioEl.play(); if (Number(pending.state.position) > 0) activeAudioEl.currentTime = Number(pending.state.position) || 0; }
+                isPlaying = true; updateIcon(); await publishNowarfyRemoteState();
+            } catch (error) { isPlaying = false; updateIcon(); remoteStatus('El navegador no permitió iniciar el audio en este dispositivo.'); }
+        }
         async function executeNowarfyRemoteCommand(command) {
             if (!nowarfyRemoteIsPlayer) return;
             const type = command.type;
             if (type === 'handoff') {
                 const state = command.state || nowarfyRemoteSession?.state || {};
-                if (Array.isArray(state.playlist) && state.playlist.length) updateRemoteControlsFromState(state);
+                if (Array.isArray(state.playlist) && state.playlist.length) updateRemoteControlsFromState(state, true);
                 const targetUrl = state.resourceId || state.title;
                 let idx = queue.findIndex(song => (state.currentQid && song._qid === state.currentQid) || (targetUrl && String(song.url) === String(targetUrl)));
                 if (idx < 0 && state.resourceId) {
@@ -1684,11 +1706,15 @@
                     queue.unshift(incoming); queueSeenKeys.add(songKey(incoming)); idx = 0;
                 }
                 if (idx >= 0) {
-                    playbackStoppedByUser = false;
-                    playQueueAt(idx, { resumeSession: { ...state, wasPlaying: state.isPlaying !== false } });
+                    const shouldPlay = state.isPlaying !== false;
+                    const deferAutoplay = shouldPlay && !nowarfyAudioUnlocked;
+                    nowarfyPendingHandoff = deferAutoplay ? { idx, state } : null;
+                    playbackStoppedByUser = !shouldPlay;
+                    playQueueAt(idx, { deferAutoplay, resumeSession: { ...state, wasPlaying: shouldPlay && !deferAutoplay } });
                     const volume = Math.max(0, Math.min(100, Number(state.volume ?? 80))) / 100;
                     setVolume(volume);
-                    if (state.type !== 'yt' && Number(state.position) > 0) window.setTimeout(() => { if (activeAudioEl) activeAudioEl.currentTime = Number(state.position) || 0; }, 250);
+                    if (deferAutoplay) showNowarfyHandoffPrompt();
+                    if (!shouldPlay && state.type !== 'yt' && Number(state.position) > 0) window.setTimeout(() => { if (activeAudioEl) activeAudioEl.currentTime = Number(state.position) || 0; }, 250);
                 }
                 return;
             }
@@ -4175,7 +4201,7 @@
                 freeVideoEl.hidden = true;
                 showVideoStage(song);
                 if (ytApiReady && window.YT && window.YT.Player) {
-                    initYTPlayer(song.url, song.isPlaylist, resumeSession);
+                    initYTPlayer(song.url, song.isPlaylist, resumeSession, !!options.deferAutoplay);
                 } else {
                     pendingYTRequest = { resourceId: song.url, isPlaylist: song.isPlaylist, resumeSession };
                     loadYouTubeAPI();
@@ -4193,7 +4219,7 @@
                     if (freeVideoEl === activeAudioEl && currentQueueSong()?.type === 'freevideo') renderVideoStageDetails({ ...song, duration: freeVideoEl.duration || song.duration });
                 };
                 freeVideoEl.load();
-                freeVideoEl.play().catch(e => { console.error(e); setTrackLoading(false); showToast('No se pudo reproducir este video libre', 'fa-triangle-exclamation'); });
+                if (!options.deferAutoplay) freeVideoEl.play().catch(e => { console.error(e); setTrackLoading(false); showToast('No se pudo reproducir este video libre', 'fa-triangle-exclamation'); });
             } else {
                 hideVideoStage(false);
                 activeAudioEl = audioEl;
@@ -4204,7 +4230,7 @@
                 audioEl.dataset.queueId = String(song._qid);
                 applyVolume(parseFloat(document.getElementById('volumeSlider').value));
                 bindDirectAudioEvents(audioEl);
-                audioEl.play().catch(e => { console.error(e); setTrackLoading(false); showToast('No se pudo reproducir esta pista', 'fa-triangle-exclamation'); });
+                if (!options.deferAutoplay) audioEl.play().catch(e => { console.error(e); setTrackLoading(false); showToast('No se pudo reproducir esta pista', 'fa-triangle-exclamation'); });
             }
 
             growQueueIfNeeded();
@@ -4929,7 +4955,7 @@
             videoStageObserver.observe(stage);
         }
 
-        function initYTPlayer(resourceId, isPlaylist = false, resumeSession = null) {
+        function initYTPlayer(resourceId, isPlaylist = false, resumeSession = null, deferAutoplay = false) {
             pendingVideoResumeSession = resumeSession || pendingVideoResumeSession;
             clearTimeout(ytStartupTimer);
             ytStartupTimer = null;
@@ -4938,7 +4964,7 @@
                 host: 'https://www.youtube-nocookie.com',
                 height: '100%',
                 width: '100%',
-                playerVars: { 'autoplay': 1, 'controls': 1, 'playsinline': 1, 'enablejsapi': 1, 'rel': 0, 'modestbranding': 1, 'origin': window.location.origin },
+                playerVars: { 'autoplay': deferAutoplay ? 0 : 1, 'controls': 1, 'playsinline': 1, 'enablejsapi': 1, 'rel': 0, 'modestbranding': 1, 'origin': window.location.origin },
                 events: { 'onReady': onYTReady, 'onStateChange': onYTStateChange, 'onError': onYTError }
             };
 
@@ -5033,6 +5059,7 @@
 
         function togglePlay() {
             if (nowarfyAuthUser && nowarfyRemoteSession && !nowarfyRemoteIsPlayer) { void sendNowarfyCommand('toggle'); return; }
+            nowarfyAudioUnlocked = true;
             if (currentIndex === -1 || !queue[currentIndex]) return;
             // Si venimos de restaurar la cola guardada y todavía no se cargó nada en el reproductor, arrancarla.
             if (!ytPlayer && !audioEl.src && !freeVideoEl.src) {
