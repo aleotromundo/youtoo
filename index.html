@@ -1836,7 +1836,7 @@
                     return [];
                 }
                 const mapped = data.items && data.items.length ? mapYouTubeItems(data.items) : [];
-                void reserveDiscoveredCandidates(mapped, { context: opts.reserveContext || 'manual', seed: opts.seed || null });
+                void reserveDiscoveredCandidates(mapped, { context: opts.reserveContext || 'manual', seed: opts.seed || null, queryContext: `${query} ${resourceTypes}`.trim().toLowerCase() });
                 return mapped;
             } catch (e) {
                 return [];
@@ -1970,10 +1970,13 @@
                 });
                 // YouTube conserva la prioridad visual, pero Openverse se consulta siempre y se muestra en su propio rail.
                 const openverseQuery = channelFilter ? query : `${query} music`;
+                const cachedSearchIsSufficient = !channelFilter && localSongs.length >= 3;
                 const [youtubeResult, openverseResult] = await Promise.allSettled([
-                    channelFilter
-                        ? fetchYouTubeSearch(query, 'video,playlist', { channelId: channelFilter.id, maxResults: 25 })
-                        : fetchYouTubeSearch(query, 'video,playlist,channel', { maxResults: 20 }),
+                    cachedSearchIsSufficient
+                        ? Promise.resolve([])
+                        : (channelFilter
+                            ? fetchYouTubeSearch(query, 'video,playlist', { channelId: channelFilter.id, maxResults: 25 })
+                            : fetchYouTubeSearch(query, 'video,playlist,channel', { maxResults: 20 })),
                     fetchOpenverseTracks(openverseQuery, 20, { reserveContext: 'manual', seed: { artist: query, title: query } })
                 ]);
                 const fresh = youtubeResult.status === 'fulfilled' ? youtubeResult.value || [] : [];
@@ -1985,8 +1988,8 @@
 
                 if (merged.length > 0) renderYouTubeSearchResults(merged, query);
                 if (openverseTracks.length > 0) renderOpenverseSearchResults(openverseTracks, query);
-                if (!channelFilter && fresh.length === 0 && localSongs.length > 0) {
-                    showToast(`YouTube sin resultados nuevos: usando candidatos guardados de ${inferArtistStyle(query, localSongs)}`, 'fa-database');
+                if (!channelFilter && localSongs.length > 0 && fresh.length === 0) {
+                    showToast(cachedSearchIsSufficient ? `Resultados guardados reutilizados para “${query}”` : `YouTube sin resultados nuevos: usando candidatos guardados de ${inferArtistStyle(query, localSongs)}`, 'fa-database');
                 }
                 if (!merged.length && !openverseTracks.length) {
                     if (channelFilter) renderEmptyState(`Sin resultados para "${query}" en este canal`);
@@ -2047,7 +2050,7 @@
                     sourceUrl: track.foreign_landing_url || track.detail_url || ''
                 }))
                 .sort((a, b) => (b.img ? 1 : 0) - (a.img ? 1 : 0));
-            void reserveDiscoveredCandidates(mappedTracks, { context: options.reserveContext || 'manual', seed: options.seed || null });
+            void reserveDiscoveredCandidates(mappedTracks, { context: options.reserveContext || 'manual', seed: options.seed || null, queryContext: `${query} openverse`.trim().toLowerCase() });
             return mappedTracks;
         }
 
@@ -2966,7 +2969,7 @@
             if (explicit && explicit !== 'unknown') return explicit;
             return typeof getRadioStyle === 'function' ? getRadioStyle(seed || song) : 'rock metal';
         }
-        function normalizeReserveCandidate(song, { context = 'manual', seed = null } = {}) {
+        function normalizeReserveCandidate(song, { context = 'manual', seed = null, queryContext = '' } = {}) {
             if (!song?.url || !['yt', 'mp3'].includes(song.type)) return null;
             const candidateKey = reserveCandidateKey(song);
             if (!candidateKey) return null;
@@ -2979,6 +2982,20 @@
                 styleKey,
                 radioEligible: context === 'radio' && typeof isRadioMusicTrack === 'function' ? isRadioMusicTrack(song) : false,
                 context,
+                queryContext: String(song.queryContext || queryContext || '').trim(),
+                metadata: {
+                    resourceKind: song.resourceKind || '',
+                    isPlaylist: Boolean(song.isPlaylist),
+                    itemCount: song.itemCount ?? null,
+                    channelId: song.channelId || '',
+                    channelTitle: song.channelTitle || '',
+                    publishedAt: song.publishedAt || '',
+                    viewCount: song.viewCount || '',
+                    likeCount: song.likeCount || '',
+                    commentCount: song.commentCount || '',
+                    definition: song.definition || '',
+                    captionsAvailable: Boolean(song.captionsAvailable)
+                },
                 discoveredAt: Number(song.discoveredAt || Date.now()),
                 lastSeenAt: Date.now(),
                 lastUsedAt: song.lastUsedAt || null,
@@ -3038,8 +3055,8 @@
                 body: JSON.stringify({ action: 'upsert', entries: entries.slice(0, 100) })
             }).finally(() => { globalReserveSyncInFlight = false; });
         }
-        async function reserveGetGlobalCandidates({ styleKey = '', artist = '', source = '', limit = 20 } = {}) {
-            const params = new URLSearchParams({ action: 'search', styleKey, artist, source, limit: String(Math.min(Math.max(Number(limit) || 20, 1), 50)) });
+        async function reserveGetGlobalCandidates({ styleKey = '', artist = '', source = '', query = '', scope = 'radio', limit = 20 } = {}) {
+            const params = new URLSearchParams({ action: 'search', styleKey, artist, source, query, scope, limit: String(Math.min(Math.max(Number(limit) || 20, 1), 50)) });
             const data = await globalReserveRequest(`${GLOBAL_RESERVE_ENDPOINT}?${params.toString()}`);
             return Array.isArray(data?.results) ? data.results : [];
         }
@@ -3136,7 +3153,7 @@
         }
         async function reserveSearchCandidates(query, { styleKey = '', limit = 20 } = {}) {
             const db = await openReserveDb();
-            let items = await reserveGetGlobalCandidates({ styleKey, limit });
+            let items = await reserveGetGlobalCandidates({ styleKey, query, scope: 'search', limit });
             if (db) {
                 const localItems = await new Promise(resolve => {
                     try {
@@ -3152,7 +3169,7 @@
             const needle = String(query || '').toLowerCase().trim();
             const style = String(styleKey || '').toLowerCase().trim();
             return items.filter(item => {
-                if (!item.radioEligible || item.status === 'invalid' || item.status === 'expired') return false;
+                if (item.status === 'invalid' || item.status === 'expired') return false;
                 if (item.expiresAt && Number(item.expiresAt) <= Date.now()) return false;
                 const text = `${item.title || ''} ${item.artist || ''} ${item.description || ''}`.toLowerCase();
                 const matchesQuery = !needle || text.includes(needle);

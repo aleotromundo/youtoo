@@ -135,10 +135,15 @@ function queryUrl(req) {
   const artist = text(req.query.artist, 300);
   const source = text(req.query.source, 32);
   const query = text(req.query.query, 300).toLowerCase();
-  if (style) params.set('style_key', `ilike.*${style.replace(/[*]/g, '')}*`);
-  if (artist) params.set('artist', `ilike.*${artist.replace(/[*]/g, '')}*`);
+  const scope = text(req.query.scope, 32).toLowerCase();
+  if (style) params.set('style_key', `ilike.*${style.replace(/[*,()]/g, '')}*`);
+  if (artist) params.set('artist', `ilike.*${artist.replace(/[*,()]/g, '')}*`);
   if (source && ALLOWED_SOURCES.has(source)) params.set('source', `eq.${source}`);
-  params.set('radio_eligible', 'eq.true');
+  if (query) {
+    const safeQuery = query.replace(/[*,()]/g, ' ').replace(/\s+/g, ' ').trim();
+    if (safeQuery) params.set('or', `(query_context.ilike.*${safeQuery}*,title.ilike.*${safeQuery}*,artist.ilike.*${safeQuery}*,description.ilike.*${safeQuery}*)`);
+  }
+  if (scope !== 'search') params.set('radio_eligible', 'eq.true');
   params.set('status', 'in.(available,queued,played)');
   params.set('order', 'last_used_at.asc.nullsfirst,discovered_at.desc');
   params.set('limit', String(boundedInt(req.query.limit, 20, MAX_LIMIT)));
