@@ -1057,8 +1057,8 @@
         .nowarfy-mobile-action { display: none; }
         @media (max-width: 768px) {
             body.mode-youtoo .sidebar { position: sticky; top: 0; z-index: 900; width: 100%; min-height: 58px; height: auto; padding: 9px 12px; display: grid; grid-template-columns: 1fr auto auto; gap: 8px; align-items: center; overflow: visible; }
-            body.mode-youtoo .sidebar .logo { padding: 0; min-width: 0; }
-            body.mode-youtoo .sidebar .brand-youtoo { font-size: 1rem; gap: 6px; white-space: nowrap; }
+            body.mode-youtoo .sidebar .logo { display: flex; align-items: center; padding: 0; min-width: 0; overflow: hidden; }
+            body.mode-youtoo .sidebar .brand-youtoo { display: flex !important; align-items: center; min-width: 0; overflow: hidden; color: #fff; font-size: 1rem; gap: 6px; white-space: nowrap; }
             body.mode-youtoo .sidebar .brand-youtoo img { width: 30px; height: 30px; }
             .nowarfy-mobile-action { display: inline-flex; align-items: center; justify-content: center; width: 40px; height: 40px; border: 1px solid rgba(190,188,255,.2); border-radius: 12px; color: #f4f2ff; background: rgba(255,255,255,.08); font-size: 1rem; }
             .nowarfy-mobile-action:active { transform: scale(.94); }
