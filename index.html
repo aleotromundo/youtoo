@@ -1942,18 +1942,20 @@
             const unwantedAudioTerms = /\b(sound effect|sound-effect|sfx|foley|ambient|ambience|ambiente|noise|ruido|whoosh|impact|explosion|sample|sampling|loop|drum loop|drum circle|water|sonar|test tone|tone generator|field recording|field-recording|white noise|pink noise)\b/i;
             return data.results
                 .filter(track => allowedAudioTypes.has(String(track.filetype || '').toLowerCase()))
-                .filter(track => String(track.url || '').trim() && String(track.thumbnail || '').trim())
+                .filter(track => String(track.url || '').trim())
                 .filter(track => String(track.title || '').trim() && String(track.creator || '').trim())
                 .filter(track => (track.category || '').toLowerCase() !== 'sound_effect')
                 .filter(track => Number(track.duration) >= 60000)
                 .filter(track => {
-                    const tags = Array.isArray(track.tags) ? track.tags.join(' ') : String(track.tags || '');
+                    const tags = Array.isArray(track.tags)
+                        ? track.tags.map(tag => typeof tag === 'object' ? tag.name || '' : tag).join(' ')
+                        : String(track.tags || '');
                     const searchable = `${track.title || ''} ${track.creator || ''} ${track.category || ''} ${tags}`;
                     return !unwantedAudioTerms.test(searchable);
                 })
                 .map(track => ({
                     title: track.title, artist: track.creator,
-                    img: track.thumbnail || '', url: track.url, type: 'mp3',
+                    img: track.thumbnail || 'assets/nowarfy-icon-512.png', url: track.url, type: 'mp3',
                     duration: track.duration ? Math.round(track.duration / 1000) : null,
                     genre: (track.genres && track.genres[0]) || 'unknown',
                     license: track.license || '',

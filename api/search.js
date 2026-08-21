@@ -276,22 +276,23 @@ export default async function handler(req, res) {
     if (type === 'openverse') {
       const clientId = process.env.OPENVERSE_CLIENT_ID;
       const clientSecret = process.env.OPENVERSE_CLIENT_SECRET;
-      if (!clientId || !clientSecret) return res.status(500).json({ error: { source: 'openverse', message: 'Faltan credenciales de Openverse en Vercel' } });
       if (!query || typeof query !== 'string') return res.status(400).json({ error: { source: 'openverse', message: 'Falta el término de búsqueda' } });
-
-      const tokenResp = await fetch('https://api.openverse.org/v1/auth_tokens/token/', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: new URLSearchParams({ client_id: clientId, client_secret: clientSecret, grant_type: 'client_credentials' })
-      });
-      const tokenData = await tokenResp.json();
-      if (!tokenResp.ok || !tokenData.access_token) {
-        return res.status(tokenResp.status || 502).json({ error: { source: 'openverse', message: tokenData?.detail || 'No se pudo autenticar Openverse' } });
-      }
 
       const pageSize = Math.min(boundedMax(req.query.maxResults, 20), 20);
       const searchUrl = `https://api.openverse.org/v1/audio/?q=${encodeURIComponent(query)}&page_size=${pageSize}`;
-      const searchResp = await fetch(searchUrl, { headers: { Authorization: `Bearer ${tokenData.access_token}` } });
+      const headers = {};
+      // Openverse permite consultas públicas sin token. Si Vercel tiene credenciales,
+      // las usamos para aumentar el margen de cuota sin hacerlas obligatorias.
+      if (clientId && clientSecret) {
+        const tokenResp = await fetch('https://api.openverse.org/v1/auth_tokens/token/', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: new URLSearchParams({ client_id: clientId, client_secret: clientSecret, grant_type: 'client_credentials' })
+        });
+        const tokenData = await tokenResp.json();
+        if (tokenResp.ok && tokenData.access_token) headers.Authorization = `Bearer ${tokenData.access_token}`;
+      }
+      const searchResp = await fetch(searchUrl, { headers });
       const searchData = await searchResp.json();
       if (!searchResp.ok) {
         return res.status(searchResp.status || 502).json({ error: { source: 'openverse', message: searchData?.detail || 'No se pudo consultar Openverse' } });
