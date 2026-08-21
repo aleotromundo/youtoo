@@ -1470,11 +1470,12 @@
                     .on('postgres_changes', { event: '*', schema: 'public', table: 'youtoo_remote_sessions', filter: `user_id=eq.${nowarfyAuthUser.id}` }, payload => {
                         nowarfyRemoteSession = payload.new;
                         nowarfyRemoteIsPlayer = payload.new.active_device_id === nowarfyRemoteDeviceId;
+                        updateNowarfyAuthUI();
                         if (payload.new.state) updateRemoteControlsFromState(payload.new.state);
                         remoteStatus(nowarfyRemoteIsPlayer ? 'Este dispositivo es el reproductor activo.' : 'Control remoto conectado; el reproductor activo está en otro dispositivo.');
                     })
                     .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'youtoo_remote_commands', filter: `user_id=eq.${nowarfyAuthUser.id}` }, payload => { if (payload.new.device_id !== nowarfyRemoteDeviceId) void executeNowarfyRemoteCommand(payload.new.command || {}); })
-                    .subscribe(status => { if (status === 'SUBSCRIBED') remoteStatus(nowarfyRemoteIsPlayer ? 'Este dispositivo es el reproductor activo.' : 'Control remoto conectado; elegí otro dispositivo como reproductor.'); });
+                    .subscribe(status => { if (status === 'SUBSCRIBED') { updateNowarfyAuthUI(); remoteStatus(nowarfyRemoteIsPlayer ? 'Este dispositivo es el reproductor activo.' : 'Control remoto conectado; elegí otro dispositivo como reproductor.'); } });
                 if (nowarfyRemoteStateTimer) clearInterval(nowarfyRemoteStateTimer);
                 nowarfyRemoteStateTimer = setInterval(() => { if (nowarfyRemoteIsPlayer) void publishNowarfyRemoteState(); }, 3000);
             } catch (error) { remoteStatus('Control remoto no disponible todavía; la reproducción local sigue funcionando.'); }
@@ -1515,7 +1516,7 @@
                 updateNowarfyAuthUI();
             }
         }
-        async function releaseNowarfyPlayer() { if (!nowarfySupabase || !nowarfyRemoteSession || !nowarfyRemoteIsPlayer) return; await nowarfySupabase.from('youtoo_remote_sessions').update({ active_device_id: null, state: remoteStateSnapshot(), version: Number(nowarfyRemoteSession.version || 0) + 1, updated_at: new Date().toISOString() }).eq('id', nowarfyRemoteSession.id); nowarfyRemoteIsPlayer = false; remoteStatus('Reproductor liberado; este dispositivo queda como control.'); }
+        async function releaseNowarfyPlayer() { if (!nowarfySupabase || !nowarfyRemoteSession || !nowarfyRemoteIsPlayer) return; await nowarfySupabase.from('youtoo_remote_sessions').update({ active_device_id: null, state: remoteStateSnapshot(), version: Number(nowarfyRemoteSession.version || 0) + 1, updated_at: new Date().toISOString() }).eq('id', nowarfyRemoteSession.id); nowarfyRemoteIsPlayer = false; updateNowarfyAuthUI(); remoteStatus('Reproductor liberado; este dispositivo queda como control.'); }
         async function publishNowarfyRemoteState() { if (!nowarfySupabase || !nowarfyRemoteSession || !nowarfyRemoteIsPlayer) return; const state = remoteStateSnapshot(); const result = await nowarfySupabase.from('youtoo_remote_sessions').update({ state, version: Number(nowarfyRemoteSession.version || 0) + 1, updated_at: new Date().toISOString() }).eq('id', nowarfyRemoteSession.id).eq('active_device_id', nowarfyRemoteDeviceId); if (!result.error) nowarfyRemoteSession.state = state; }
         function updateRemoteControlsFromState(state) {
             if (!state) return;
