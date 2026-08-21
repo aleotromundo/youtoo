@@ -2501,7 +2501,7 @@
                     rendered += channels.length;
                     renderChannelRow(channels, GENRE_CHANNEL_LISTS[index].title, GENRE_CHANNEL_LISTS[index].description);
                 });
-                if (!rendered && !readTaste().channels.length) renderEmptyState('No hay canales disponibles ahora', 'Probá volver a intentarlo cuando YouTube vuelva a responder o buscá un canal por nombre.');
+                if (!rendered && !container.querySelector('.saved-entities-rail')) renderEmptyState('No hay canales disponibles ahora', 'Probá volver a intentarlo cuando YouTube vuelva a responder o buscá un canal por nombre.');
             } finally {
                 loader.style.display = 'none';
             }
