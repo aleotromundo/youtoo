@@ -2170,27 +2170,47 @@
             return { items: source.slice(offset).concat(source.slice(0, offset)), edition, theme };
         }
 
+        function diversityKey(item) {
+            return String(item?.url || item?.id || item?.videoId || '').trim();
+        }
+        function takeNovelItems(items, used, limit = 12) {
+            const result = [];
+            for (const item of uniqueMediaByUrl(items || [], (items || []).length)) {
+                const key = diversityKey(item);
+                if (!key || used.has(key)) continue;
+                used.add(key);
+                result.push(item);
+                if (result.length >= limit) break;
+            }
+            return result;
+        }
         function renderHomeFeed() {
             const container = document.getElementById('dynamicSections');
             const taste = readTaste();
             container.innerHTML = '';
             currentList = [];
-            const resume = uniqueMediaByUrl(taste.plays.map(normalizeTasteTrack).filter(Boolean), 12);
-            if (resume.length) renderLibraryRail(resume, 'Seguí desde donde quedaste', "<i class='fas fa-clock-rotate-left'></i>", false, { hint: 'Tu actividad reciente · 5 visibles', showControls: true, className: 'home-resume-rail' });
-            if (homeRecommended.length) renderLibraryRail(homeRecommended, taste.personalization && getTasteSeed() ? 'Recomendado para vos' : 'Para empezar ahora', "<i class='fas fa-wand-magic-sparkles'></i>", false, { hint: taste.personalization && getTasteSeed() ? 'Según tu actividad local · 5 visibles' : 'Rock y metal para arrancar · 5 visibles', showControls: true, className: 'home-recommended-rail' });
-            if (homeVideos.length) {
-                const featured = getFeaturedEdition(homeVideos);
-                renderLibraryRail(featured.items, 'Videos destacados', "<i class='fas fa-clapperboard'></i>", false, {
-                    className: `featured-rail featured-rail--${featured.theme}`,
-                    eyebrow: `Edición ${featured.edition}`,
-                    hint: '5 visibles · selección rotativa',
+            const used = new Set();
+            const resume = takeNovelItems(taste.plays.map(normalizeTasteTrack).filter(Boolean), used, 8);
+            if (resume.length) renderLibraryRail(resume, 'Seguí desde donde quedaste', "<i class='fas fa-clock-rotate-left'></i>", false, { hint: 'Tu actividad reciente · sin repetir en otras sesiones', showControls: true, className: 'home-resume-rail' });
+            const recommended = takeNovelItems(homeRecommended, used, 8);
+            if (recommended.length) renderLibraryRail(recommended, taste.personalization && getTasteSeed() ? 'Recomendado para vos' : 'Para empezar ahora', "<i class='fas fa-wand-magic-sparkles'></i>", false, { hint: taste.personalization && getTasteSeed() ? 'Según tu actividad local · selección nueva' : 'Selección inicial · contenido no repetido', showControls: true, className: 'home-recommended-rail' });
+            const edition = getFeaturedEdition(homeVideos);
+            const featured = takeNovelItems(edition.items, used, 8);
+            if (featured.length >= 3) {
+                renderLibraryRail(featured, 'Videos destacados', "<i class='fas fa-clapperboard'></i>", false, {
+                    className: `featured-rail featured-rail--${edition.theme}`,
+                    eyebrow: `Edición ${edition.edition}`,
+                    hint: 'Selección rotativa · sin repetir Inicio',
                     showControls: true
                 });
             }
-            if (homeMusicVideos.length) renderLibraryRail(homeMusicVideos, 'Música para escuchar', "<i class='fab fa-youtube'></i>", false, { hint: 'Videos musicales · 5 visibles', showControls: true });
-            if (homePlaylists.length) renderLibraryRail(homePlaylists, 'Listas y álbumes', "<i class='fas fa-layer-group'></i>", true, { hint: 'Abrí una lista para ver su contenido', showControls: true });
-            if (homeMusic.length) renderLibraryRail(homeMusic, 'Música libre disponible', "<i class='fas fa-headphones'></i>", false, { hint: 'Audio con carátula y licencia · 5 visibles', showControls: true });
-            if (!homeVideos.length && !homeMusicVideos.length && !homePlaylists.length && !homeMusic.length && !homeRecommended.length) renderEmptyState('No hay opciones disponibles ahora', 'Probá recargar dentro de unos segundos o buscá un artista.');
+            const musicVideos = takeNovelItems(homeMusicVideos, used, 8);
+            if (musicVideos.length >= 3) renderLibraryRail(musicVideos, 'Música para escuchar', "<i class='fab fa-youtube'></i>", false, { hint: 'Videoclips nuevos · sin repetir las sesiones anteriores', showControls: true });
+            const playlists = takeNovelItems(homePlaylists, used, 12);
+            if (playlists.length >= 2) renderLibraryRail(playlists, 'Listas y álbumes', "<i class='fas fa-layer-group'></i>", true, { hint: 'Colecciones diferentes para seguir explorando', showControls: true });
+            const freeMusic = takeNovelItems(homeMusic, used, 12);
+            if (freeMusic.length >= 2) renderLibraryRail(freeMusic, 'Música libre disponible', "<i class='fas fa-headphones'></i>", false, { hint: 'Audio con carátula y licencia · sin repetir videos', showControls: true });
+            if (!resume.length && !recommended.length && !featured.length && !musicVideos.length && !playlists.length && !freeMusic.length) renderEmptyState('No hay opciones disponibles ahora', 'Probá recargar dentro de unos segundos o buscá un artista.');
         }
 
         function activateNavigation(section) {
@@ -2246,13 +2266,16 @@
         }
 
         function buildCollectionRows(collections) {
-            const catalog = uniqueMediaByUrl([...homeRecommended, ...homeVideos, ...homeMusicVideos, ...EMERGENCY_VIDEO_CATALOG], 36)
+            const catalog = uniqueMediaByUrl([...homeRecommended, ...homeVideos, ...homeMusicVideos, ...EMERGENCY_VIDEO_CATALOG], 60)
                 .filter(item => item?.type === 'yt' && item?.url);
-            return collections.map((collection, index) => {
-                const offset = (index * 5) % Math.max(catalog.length, 1);
-                const rotated = catalog.slice(offset).concat(catalog.slice(0, offset));
-                return { collection, videos: rotated };
-            }).filter(row => row.videos.length);
+            const rows = [];
+            let cursor = 0;
+            for (const collection of collections) {
+                const videos = catalog.slice(cursor, cursor + 6);
+                cursor += videos.length;
+                if (videos.length) rows.push({ collection, videos });
+            }
+            return rows;
         }
 
         async function renderDirectVideoCollections({ title, intro, icon, collections, className }) {
