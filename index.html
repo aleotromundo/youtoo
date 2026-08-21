@@ -3425,6 +3425,11 @@
         function getRadioStyle(seedSong) {
             const explicit = String(seedSong?.genre || '').trim().toLowerCase();
             if (explicit && explicit !== 'unknown') return explicit;
+            const artistName = String(seedSong?.artist || '').trim().toLowerCase();
+            const artistHint = typeof ARTIST_STYLE_HINTS !== 'undefined'
+                ? Object.entries(ARTIST_STYLE_HINTS).find(([artist]) => artistName === artist || artistName.includes(artist))?.[1]
+                : null;
+            if (artistHint) return artistHint;
             const text = `${seedSong?.title || ''} ${seedSong?.description || ''} ${seedSong?.artist || ''} ${currentMood || ''}`.toLowerCase();
             const styles = ['heavy metal', 'metalcore', 'nu metal', 'hard rock', 'alternative rock', 'punk rock', 'grunge', 'industrial metal', 'rock', 'metal'];
             return styles.find(style => text.includes(style)) || (currentMood ? String(currentMood).toLowerCase() : 'rock metal');
