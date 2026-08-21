@@ -1279,9 +1279,17 @@
             return clean.length > maxLength ? `${clean.slice(0, maxLength).trimEnd()}…` : clean;
         }
 
+        function hasUsablePlaylistItems(item) {
+            if (!(item?.resourceKind === 'youtube#playlist' || item?.type === 'playlist' || item?.isPlaylist)) return true;
+            if (item.itemCount === null || item.itemCount === undefined || item.itemCount === '') return true;
+            const count = Number(item.itemCount);
+            return Number.isFinite(count) ? count > 0 : true;
+        }
+
         function contentMetaLabel(item) {
             if (item?.resourceKind === 'youtube#playlist') {
-                return Number.isFinite(Number(item.itemCount)) ? `${item.itemCount} videos · Lista de reproducción` : 'Lista de reproducción';
+                const count = Number(item.itemCount);
+                return Number.isFinite(count) && count > 0 ? `${count} videos · Lista de reproducción` : 'Lista de reproducción';
             }
             if (item?.resourceKind === 'youtube#channel') return 'Canal de YouTube';
             if (item?.resourceKind === 'youtube#video' || item?.type === 'yt') {
@@ -2239,7 +2247,7 @@
             }
             const musicVideos = takeNovelItems(homeMusicVideos, used, 8);
             if (musicVideos.length >= 3) renderLibraryRail(musicVideos, 'Música para escuchar', "<i class='fab fa-youtube'></i>", false, { hint: 'Videoclips nuevos · sin repetir las sesiones anteriores', showControls: true });
-            const playlists = takeNovelItems(homePlaylists, used, 12);
+            const playlists = takeNovelItems(homePlaylists.filter(hasUsablePlaylistItems), used, 12);
             if (playlists.length >= 2) renderLibraryRail(playlists, 'Listas y álbumes', "<i class='fas fa-layer-group'></i>", true, { hint: 'Colecciones diferentes para seguir explorando', showControls: true });
             const freeMusic = takeNovelItems(homeMusic, used, 12);
             if (freeMusic.length >= 2) renderLibraryRail(freeMusic, 'Música libre disponible', "<i class='fas fa-headphones'></i>", false, { hint: 'Audio con carátula y licencia · sin repetir videos', showControls: true });
@@ -2510,7 +2518,7 @@
         // Separa resultados por tipo real para no confundir una canción suelta con una lista completa.
         function renderYouTubeSearchResults(list, query) {
             const channels = list.filter(result => result.resourceKind === 'youtube#channel');
-            const playlists = list.filter(result => result.resourceKind === 'youtube#playlist').map((item, index) => ({ ...item, sourceIndex: index }));
+            const playlists = list.filter(result => result.resourceKind === 'youtube#playlist' && hasUsablePlaylistItems(result)).map((item, index) => ({ ...item, sourceIndex: index }));
             const videos = list.filter(result => result.resourceKind === 'youtube#video').map((item, index) => ({ ...item, sourceIndex: index }));
 
             if (!channels.length && !playlists.length && !videos.length) {
@@ -2617,7 +2625,7 @@
         }
 
         function renderPlaylistGrid(list, title) {
-            const visiblePlaylists = itemsWithArtwork(list);
+            const visiblePlaylists = itemsWithArtwork(list).filter(hasUsablePlaylistItems);
             if (!visiblePlaylists.length) return;
             const container = document.getElementById('dynamicSections');
             const section = document.createElement('div');
@@ -2783,7 +2791,7 @@
         }
 
         function renderLibraryRail(list, title, icon, isPlaylist = false, options = {}) {
-            const visibleItems = itemsWithArtwork(list);
+            const visibleItems = itemsWithArtwork(list).filter(item => !isPlaylist || hasUsablePlaylistItems(item));
             if (!visibleItems.length) return;
             const container = document.getElementById('dynamicSections');
             const section = document.createElement('section');
