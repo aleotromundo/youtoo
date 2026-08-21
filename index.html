@@ -1887,12 +1887,8 @@
             { title: 'Slipknot - Psychosocial (Live from Day Of The Gusano)', artist: 'Slipknot', channelTitle: 'Slipknot', url: 'AQ0ktXH3LfI', img: 'https://i.ytimg.com/vi/AQ0ktXH3LfI/hqdefault.jpg', type: 'yt', resourceKind: 'youtube#video', description: 'Presentación en vivo de Slipknot.' },
             { title: 'ALL FOR METAL - Gods Of Metal (Official Music Video)', artist: 'Reigning Phoenix Music', channelTitle: 'Reigning Phoenix Music', url: '5A04DZNtH-w', img: 'https://i.ytimg.com/vi/5A04DZNtH-w/hqdefault.jpg', type: 'yt', resourceKind: 'youtube#video', description: 'Videoclip oficial de ALL FOR METAL.' }
         ];
-        const EMERGENCY_PLAYLISTS = [
-            { title: '90s Hard Rock & Metal Videos', artist: 'YouTube', url: 'PL9tY0BWXOZFttlH3kI3b9sHyKOT4H-F9S', img: 'https://i.ytimg.com/vi/hTWKbfoikeg/hqdefault.jpg', type: 'playlist', itemCount: 0, fallbackOffset: 0, description: 'Selección pública de rock y metal de los años noventa.' },
-            { title: 'New Official Music Videos · Heavy Metal & Hard Rock', artist: 'YouTube', url: 'PLxJJcP5YX06cLFAQ5MbdtXRH-0AxUs4ld', img: 'https://i.ytimg.com/vi/5A04DZNtH-w/hqdefault.jpg', type: 'playlist', itemCount: 0, fallbackOffset: 2, description: 'Videoclips oficiales de heavy metal y hard rock.' },
-            { title: 'Greatest Metal Songs of All Time', artist: 'YouTube', url: 'PLmXxqSJJq-yUwqtbp8MHBoTDoDULMoViq', img: 'https://i.ytimg.com/vi/G1G9D8A4Fiw/hqdefault.jpg', type: 'playlist', itemCount: 0, fallbackOffset: 4, description: 'Selección pública de clásicos y canciones de metal.' },
-            { title: 'Rock / Heavy Metal Music Videos', artist: 'YouTube', url: 'PLA95943A38DCA4D46', img: 'https://i.ytimg.com/vi/AQ0ktXH3LfI/hqdefault.jpg', type: 'playlist', itemCount: 0, fallbackOffset: 6, description: 'Videoclips de rock y metal para seguir explorando.' }
-        ];
+        // No se fabrican playlists de emergencia: una lista solo aparece si YouTube o la reserva global/local la devolvieron realmente.
+        const EMERGENCY_PLAYLISTS = [];
         const GENRE_CHANNEL_LISTS = [
             { title: 'Rock', icon: 'fa-guitar', query: 'rock official music channels', description: 'Rock clásico, alternativo y contemporáneo.' },
             { title: 'Metal', icon: 'fa-hand-fist', query: 'metal official music channels', description: 'Metal clásico, extremo y moderno.' },
@@ -2163,7 +2159,7 @@
                 const discoveredVideos = uniqueMediaByUrl(value(0), 24);
                 homeVideos = discoveredVideos.length ? discoveredVideos : uniqueMediaByUrl(EMERGENCY_VIDEO_CATALOG, 24);
                 homeMusicVideos = uniqueMediaByUrl([...discoveredVideos, ...EMERGENCY_VIDEO_CATALOG], 24);
-                homePlaylists = uniqueMediaByUrl(EMERGENCY_PLAYLISTS, 20);
+                homePlaylists = [];
                 homeMusic = uniqueMediaByUrl([...value(1), ...value(2)], 24);
                 persistCatalogCache();
             }
