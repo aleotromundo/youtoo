@@ -1415,9 +1415,13 @@
                 return { song, position, duration };
             } catch (_) { return { song: null, position: 0, duration: 0 }; }
         }
+        function remoteSongSnapshot(song) {
+            if (!song?.url) return null;
+            return { _qid: song._qid || null, url: song.url, type: song.type || 'yt', title: song.title || '', artist: song.artist || '', img: song.img || '', channelId: song.channelId || '', channelTitle: song.channelTitle || '', duration: Number(song.duration) || 0, categoryId: song.categoryId || '', description: song.description || '', genre: song.genre || '' };
+        }
         function remoteStateSnapshot() {
             const { song, position, duration } = currentRemotePosition();
-            return { resourceId: song?.url || null, title: song?.title || '', artist: song?.artist || '', type: song?.type || null, img: song?.img || '', channelId: song?.channelId || '', isPlaying: !!isPlaying, volume: Math.round(lastVolume * 100), position: Math.round(position * 10) / 10, duration: Math.round(duration * 10) / 10, updatedAt: new Date().toISOString() };
+            return { resourceId: song?.url || null, title: song?.title || '', artist: song?.artist || '', type: song?.type || null, img: song?.img || '', channelId: song?.channelId || '', isPlaying: !!isPlaying, volume: Math.round(lastVolume * 100), position: Math.round(position * 10) / 10, duration: Math.round(duration * 10) / 10, currentQid: currentPlayingQid || song?._qid || null, queueRound, playlist: Array.isArray(queue) ? queue.slice(0, 100).map(remoteSongSnapshot).filter(Boolean) : [], updatedAt: new Date().toISOString() };
         }
         async function ensureNowarfyRemoteSession() {
             if (!nowarfySupabase || !nowarfyAuthUser) return null;
@@ -1476,6 +1480,9 @@
                     })
                     .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'youtoo_remote_commands', filter: `user_id=eq.${nowarfyAuthUser.id}` }, payload => { if (payload.new.device_id !== nowarfyRemoteDeviceId) void executeNowarfyRemoteCommand(payload.new.command || {}); })
                     .subscribe(status => { if (status === 'SUBSCRIBED') { updateNowarfyAuthUI(); remoteStatus(nowarfyRemoteIsPlayer ? 'Este dispositivo es el reproductor activo.' : 'Control remoto conectado; elegí otro dispositivo como reproductor.'); } });
+                // Un ingreso nuevo debe hidratarse con el estado existente de la cuenta antes de
+                // mostrar su Playlist local. Solo el reproductor activo conserva su estado local.
+                if (!nowarfyRemoteIsPlayer && nowarfyRemoteSession?.state) updateRemoteControlsFromState(nowarfyRemoteSession.state);
                 if (nowarfyRemoteStateTimer) clearInterval(nowarfyRemoteStateTimer);
                 nowarfyRemoteStateTimer = setInterval(() => { if (nowarfyRemoteIsPlayer) void publishNowarfyRemoteState(); }, 3000);
             } catch (error) { remoteStatus('Control remoto no disponible todavía; la reproducción local sigue funcionando.'); }
@@ -1520,6 +1527,18 @@
         async function publishNowarfyRemoteState() { if (!nowarfySupabase || !nowarfyRemoteSession || !nowarfyRemoteIsPlayer) return; const state = remoteStateSnapshot(); const result = await nowarfySupabase.from('youtoo_remote_sessions').update({ state, version: Number(nowarfyRemoteSession.version || 0) + 1, updated_at: new Date().toISOString() }).eq('id', nowarfyRemoteSession.id).eq('active_device_id', nowarfyRemoteDeviceId); if (!result.error) nowarfyRemoteSession.state = state; }
         function updateRemoteControlsFromState(state) {
             if (!state) return;
+            if (!nowarfyRemoteIsPlayer && Array.isArray(state.playlist) && state.playlist.length) {
+                const remoteQueue = state.playlist.map(item => ({ ...item, _qid: item._qid || queueIdCounter++ })).filter(item => item.url);
+                if (remoteQueue.length) {
+                    queue = remoteQueue;
+                    queueSeenKeys = new Set(queue.map(songKey));
+                    currentPlayingQid = state.currentQid || state.resourceId || queue[0]?._qid || null;
+                    currentIndex = queue.findIndex(item => item._qid === state.currentQid || String(item.url) === String(state.resourceId));
+                    if (currentIndex < 0) currentIndex = 0;
+                    persistQueue();
+                    renderQueue();
+                }
+            }
             if (!nowarfyRemoteIsPlayer && state.resourceId) {
                 const nextShadow = { type: state.type || 'yt', url: state.resourceId, title: state.title || 'Reproduciendo en otro dispositivo', artist: state.artist || '', img: state.img || '', channelId: state.channelId || '' };
                 if (!nowarfyRemoteShadowSong || nowarfyRemoteShadowSong.url !== nextShadow.url || nowarfyRemoteShadowSong.title !== nextShadow.title) { nowarfyRemoteShadowSong = nextShadow; updateNowPlaying(nextShadow); }
