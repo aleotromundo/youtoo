@@ -861,6 +861,13 @@
         .nowarfy-auth-account[hidden] { display: none !important; }
         .nowarfy-auth-account strong { color: #fff; word-break: break-word; }
         .nowarfy-auth-account button { border: 1px solid rgba(255,255,255,.16); border-radius: 10px; padding: 10px; color: #fff; background: rgba(255,255,255,.08); cursor: pointer; }
+        .nowarfy-device-picker { display: grid; gap: 7px; padding: 10px; border: 1px solid rgba(255,255,255,.12); border-radius: 12px; background: rgba(5,8,20,.42); }
+        .nowarfy-device-picker[hidden] { display: none !important; }
+        .nowarfy-device-picker-title { display:flex; justify-content:space-between; gap:8px; color:#dce8ff; font-size:.78rem; font-weight:700; }
+        .nowarfy-device-list { display:grid; gap:6px; max-height:180px; overflow:auto; }
+        .nowarfy-device-option { display:flex; align-items:center; justify-content:space-between; gap:8px; width:100%; text-align:left; padding:8px 10px !important; font-size:.76rem; }
+        .nowarfy-device-option.is-active { border-color: rgba(87,239,199,.75) !important; background: rgba(87,239,199,.14) !important; }
+        .nowarfy-device-option small { color:#aebbd5; font-size:.68rem; }
         .nowarfy-account-btn { width: 100%; margin-top: 10px; border: 1px solid rgba(190,188,255,.2); border-radius: 10px; padding: 9px 10px; color: #e8e7ff; background: rgba(255,255,255,.06); cursor: pointer; font: inherit; font-size: .72rem; text-align: left; }
         .auth-modal-open { overflow: hidden; }
         .nowarfy-qr-modal { position: fixed; z-index: 10000; inset: 0; display: grid; place-items: center; padding: 22px; background: rgba(2,3,10,.78); backdrop-filter: blur(10px); }
@@ -1218,7 +1225,7 @@
                     <button type="button" class="nowarfy-auth-magic" onclick="submitNowarfyAuth('magic')"><i class="fas fa-wand-magic-sparkles"></i> Enviarme un enlace mágico</button>
                 </div>
             </div>
-            <div id="nowarfyAuthUserPanel" class="nowarfy-auth-account" hidden><strong id="nowarfyAuthUserEmail"></strong><span>Sesión iniciada en este dispositivo. El reproductor y sus controles se sincronizan con los demás dispositivos de la misma cuenta.</span><small id="nowarfyRemoteStatus">Conectando dispositivos…</small><button type="button" id="nowarfyClaimPlayerBtn" onclick="claimNowarfyPlayer()"><i class="fas fa-broadcast-tower"></i> Usar este dispositivo como reproductor</button><button type="button" onclick="switchNowarfyUser()"><i class="fas fa-user-gear"></i> Cambiar de usuario</button><button type="button" onclick="signOutNowarfy()"><i class="fas fa-right-from-bracket"></i> Cerrar sesión</button></div>
+            <div id="nowarfyAuthUserPanel" class="nowarfy-auth-account" hidden><strong id="nowarfyAuthUserEmail"></strong><span>Sesión iniciada en este dispositivo. El reproductor y sus controles se sincronizan con los demás dispositivos de la misma cuenta.</span><small id="nowarfyRemoteStatus">Conectando dispositivos…</small><button type="button" id="nowarfyDevicePickerBtn" onclick="toggleNowarfyDevicePicker()"><i class="fas fa-mobile-screen-button"></i> Elegir dispositivo de reproducción <span id="nowarfyDeviceCount">(0)</span></button><div id="nowarfyDevicePicker" class="nowarfy-device-picker" hidden><div class="nowarfy-device-picker-title"><span>Dispositivos conectados</span><small id="nowarfyDevicePickerHint">Actualizando…</small></div><div id="nowarfyDeviceList" class="nowarfy-device-list"></div></div><button type="button" id="nowarfyClaimPlayerBtn" onclick="claimNowarfyPlayer()"><i class="fas fa-broadcast-tower"></i> Reproducir en este dispositivo</button><button type="button" onclick="switchNowarfyUser()"><i class="fas fa-user-gear"></i> Cambiar de usuario</button><button type="button" onclick="signOutNowarfy()"><i class="fas fa-right-from-bracket"></i> Cerrar sesión</button></div>
             <div class="nowarfy-auth-status" id="nowarfyAuthStatus" aria-live="polite"></div>
         </div>
     </div>
@@ -1257,6 +1264,8 @@
         let nowarfyRemoteDeviceId = null;
         let nowarfyRemoteIsPlayer = false;
         let nowarfyClaimInFlight = false;
+        let nowarfyRemoteDevices = [];
+        let nowarfyDeviceRefreshTimer = null;
         let nowarfyRemoteStateTimer = null;
         const NOWARFY_REMOTE_DEVICE_KEY = 'nowarfy_remote_device_key_v1';
         const nowarfyRemoteDeviceKey = localStorage.getItem(NOWARFY_REMOTE_DEVICE_KEY) || (() => { const key = (crypto.randomUUID?.() || `${Date.now()}-${Math.random()}-${Math.random()}`).replace(/-/g, ''); localStorage.setItem(NOWARFY_REMOTE_DEVICE_KEY, key); return key; })();
@@ -1276,6 +1285,8 @@
                 if (guest) guest.hidden = true;
                 if (userPanel) userPanel.hidden = false;
                 if (email) email.textContent = nowarfyAuthUser.email || 'Usuario autenticado';
+                const deviceCount = document.getElementById('nowarfyDeviceCount');
+                if (deviceCount) deviceCount.textContent = `(${nowarfyRemoteDevices.length})`;
                 const claimButton = document.getElementById('nowarfyClaimPlayerBtn');
                 if (claimButton) {
                     claimButton.disabled = nowarfyClaimInFlight || !!nowarfyRemoteIsPlayer;
@@ -1483,6 +1494,9 @@
                 // Un ingreso nuevo debe hidratarse con el estado existente de la cuenta antes de
                 // mostrar su Playlist local. Solo el reproductor activo conserva su estado local.
                 if (!nowarfyRemoteIsPlayer && nowarfyRemoteSession?.state) updateRemoteControlsFromState(nowarfyRemoteSession.state);
+                await refreshNowarfyRemoteDevices();
+                if (nowarfyDeviceRefreshTimer) clearInterval(nowarfyDeviceRefreshTimer);
+                nowarfyDeviceRefreshTimer = setInterval(() => { void refreshNowarfyRemoteDevices(); }, 5000);
                 if (nowarfyRemoteStateTimer) clearInterval(nowarfyRemoteStateTimer);
                 nowarfyRemoteStateTimer = setInterval(() => { void touchNowarfyRemoteDevice(); if (nowarfyRemoteIsPlayer) void publishNowarfyRemoteState(); }, 3000);
             } catch (error) { remoteStatus('Control remoto no disponible todavía; la reproducción local sigue funcionando.'); }
@@ -1491,41 +1505,64 @@
             if (!nowarfySupabase || !nowarfyAuthUser || !nowarfyRemoteDeviceId) return;
             await nowarfySupabase.from('youtoo_remote_devices').update({ last_seen_at: new Date().toISOString(), role: nowarfyRemoteIsPlayer ? 'player' : 'controller' }).eq('id', nowarfyRemoteDeviceId).eq('user_id', nowarfyAuthUser.id);
         }
-        async function teardownNowarfyRemoteControl() { if (nowarfyRemoteStateTimer) clearInterval(nowarfyRemoteStateTimer); nowarfyRemoteStateTimer = null; if (nowarfyRemoteChannel && nowarfySupabase) await nowarfySupabase.removeChannel(nowarfyRemoteChannel); nowarfyRemoteChannel = null; nowarfyRemoteSession = null; nowarfyRemoteShadowSong = null; nowarfyRemoteDeviceId = null; nowarfyRemoteIsPlayer = false; }
-        async function claimNowarfyPlayer() {
+        async function refreshNowarfyRemoteDevices() {
+            if (!nowarfySupabase || !nowarfyAuthUser) return [];
+            const cutoff = new Date(Date.now() - 15000).toISOString();
+            const result = await nowarfySupabase.from('youtoo_remote_devices').select('id,device_name,role,last_seen_at').eq('user_id', nowarfyAuthUser.id).gte('last_seen_at', cutoff).order('last_seen_at', { ascending: false });
+            if (result.error) return nowarfyRemoteDevices;
+            nowarfyRemoteDevices = result.data || [];
+            const count = document.getElementById('nowarfyDeviceCount');
+            if (count) count.textContent = `(${nowarfyRemoteDevices.length})`;
+            const hint = document.getElementById('nowarfyDevicePickerHint');
+            if (hint) hint.textContent = `${nowarfyRemoteDevices.length} conectado${nowarfyRemoteDevices.length === 1 ? '' : 's'}`;
+            const list = document.getElementById('nowarfyDeviceList');
+            if (list) {
+                list.innerHTML = nowarfyRemoteDevices.length ? nowarfyRemoteDevices.map((device, index) => {
+                    const isSelected = device.id === nowarfyRemoteSession?.active_device_id;
+                    const isCurrent = device.id === nowarfyRemoteDeviceId;
+                    return `<button type="button" class="nowarfy-device-option${isSelected ? ' is-active' : ''}" onclick="selectNowarfyPlaybackDevice('${device.id}')"><span><i class="fas ${isSelected ? 'fa-volume-high' : 'fa-mobile-screen'}"></i> ${index + 1}. ${escapeHtml(device.device_name || 'Dispositivo Nowarfy')}</span><small>${isSelected ? 'Reproduciendo aquí' : isCurrent ? 'Este dispositivo' : 'Disponible'}</small></button>`;
+                }).join('') : '<small>No hay dispositivos activos en este momento.</small>';
+            }
+            updateNowarfyAuthUI();
+            return nowarfyRemoteDevices;
+        }
+        function toggleNowarfyDevicePicker() {
+            const picker = document.getElementById('nowarfyDevicePicker');
+            if (!picker) return;
+            picker.hidden = !picker.hidden;
+            if (!picker.hidden) void refreshNowarfyRemoteDevices();
+        }
+        async function teardownNowarfyRemoteControl() { if (nowarfyRemoteStateTimer) clearInterval(nowarfyRemoteStateTimer); if (nowarfyDeviceRefreshTimer) clearInterval(nowarfyDeviceRefreshTimer); nowarfyRemoteStateTimer = null; nowarfyDeviceRefreshTimer = null; nowarfyRemoteDevices = []; if (nowarfyRemoteChannel && nowarfySupabase) await nowarfySupabase.removeChannel(nowarfyRemoteChannel); nowarfyRemoteChannel = null; nowarfyRemoteSession = null; nowarfyRemoteShadowSong = null; nowarfyRemoteDeviceId = null; nowarfyRemoteIsPlayer = false; }
+        async function claimNowarfyPlayer() { return selectNowarfyPlaybackDevice(nowarfyRemoteDeviceId); }
+        async function selectNowarfyPlaybackDevice(deviceId) {
             if (nowarfyClaimInFlight) return;
             if (!nowarfySupabase || !nowarfyAuthUser) { remoteStatus('La sesión todavía no está lista.'); return; }
-            if (!nowarfyRemoteSession) {
-                try { await setupNowarfyRemoteControl(); } catch (_) {}
-            }
-            if (!nowarfyRemoteSession || !nowarfyRemoteDeviceId) { remoteStatus('No se pudo preparar este dispositivo para reproducir.'); return; }
+            if (!nowarfyRemoteSession) { try { await setupNowarfyRemoteControl(); } catch (_) {} }
+            if (!nowarfyRemoteSession || !deviceId) { remoteStatus('No se encontró ese dispositivo conectado.'); return; }
             nowarfyClaimInFlight = true;
             updateNowarfyAuthUI();
-            remoteStatus('Reclamando este dispositivo como reproductor…');
+            remoteStatus(deviceId === nowarfyRemoteDeviceId ? 'Conectando este dispositivo como reproductor…' : 'Enviando la reproducción al dispositivo elegido…');
             try {
-                const nextState = remoteStateSnapshot();
+                const nextState = nowarfyRemoteIsPlayer ? remoteStateSnapshot() : (nowarfyRemoteSession.state || remoteStateSnapshot());
                 const result = await nowarfySupabase.from('youtoo_remote_sessions')
-                    .update({ active_device_id: nowarfyRemoteDeviceId, state: nextState, version: Number(nowarfyRemoteSession.version || 0) + 1, updated_at: new Date().toISOString(), expires_at: new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString() })
-                    .eq('id', nowarfyRemoteSession.id)
-                    .eq('user_id', nowarfyAuthUser.id)
-                    .select('*')
-                    .maybeSingle();
+                    .update({ active_device_id: deviceId, state: nextState, version: Number(nowarfyRemoteSession.version || 0) + 1, updated_at: new Date().toISOString(), expires_at: new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString() })
+                    .eq('id', nowarfyRemoteSession.id).eq('user_id', nowarfyAuthUser.id).select('*').maybeSingle();
                 if (result.error) throw result.error;
-                if (!result.data || result.data.active_device_id !== nowarfyRemoteDeviceId) throw new Error('Supabase no confirmó este dispositivo como reproductor.');
+                if (!result.data || result.data.active_device_id !== deviceId) throw new Error('Supabase no confirmó el dispositivo elegido.');
                 nowarfyRemoteSession = result.data;
-                nowarfyRemoteIsPlayer = true;
-                await touchNowarfyRemoteDevice();
-                remoteStatus('Este dispositivo es el reproductor activo.');
+                nowarfyRemoteIsPlayer = deviceId === nowarfyRemoteDeviceId;
+                if (nowarfyRemoteIsPlayer) await touchNowarfyRemoteDevice();
+                remoteStatus(nowarfyRemoteIsPlayer ? 'Este dispositivo es el reproductor activo.' : 'Reproduciendo en el dispositivo elegido.');
                 updateNowarfyAuthUI();
-                await publishNowarfyRemoteState();
-                showToast('Este dispositivo ya controla el reproductor real.', 'fa-broadcast-tower');
+                await refreshNowarfyRemoteDevices();
+                if (nowarfyRemoteIsPlayer) await publishNowarfyRemoteState();
+                showToast(nowarfyRemoteIsPlayer ? 'Este dispositivo reproduce ahora.' : 'Reproducción enviada al dispositivo elegido.', 'fa-mobile-screen-button');
             } catch (error) {
-                nowarfyRemoteIsPlayer = false;
-                remoteStatus(`No se pudo tomar el reproductor: ${error?.message || 'error de sesión'}`);
-                updateNowarfyAuthUI();
+                remoteStatus(`No se pudo elegir el dispositivo: ${error?.message || 'error de sesión'}`);
             } finally {
                 nowarfyClaimInFlight = false;
                 updateNowarfyAuthUI();
+                await refreshNowarfyRemoteDevices();
             }
         }
         async function releaseNowarfyPlayer() { if (!nowarfySupabase || !nowarfyRemoteSession || !nowarfyRemoteIsPlayer) return; await nowarfySupabase.from('youtoo_remote_sessions').update({ active_device_id: null, state: remoteStateSnapshot(), version: Number(nowarfyRemoteSession.version || 0) + 1, updated_at: new Date().toISOString() }).eq('id', nowarfyRemoteSession.id); nowarfyRemoteIsPlayer = false; updateNowarfyAuthUI(); remoteStatus('Reproductor liberado; este dispositivo queda como control.'); }
