@@ -1431,11 +1431,16 @@
                 // debe tomar el iFrame real automáticamente. De lo contrario, Play enviaba comandos
                 // a una sesión sin player y la interfaz quedaba aparentemente congelada.
                 const activeExpired = nowarfyRemoteSession?.expires_at && new Date(nowarfyRemoteSession.expires_at).getTime() <= Date.now();
-                if (nowarfyRemoteSession && (!nowarfyRemoteSession.active_device_id || activeExpired)) {
+                let activeDeviceStale = false;
+                if (nowarfyRemoteSession?.active_device_id && nowarfyRemoteSession.active_device_id !== nowarfyRemoteDeviceId) {
+                    const activeDevice = await nowarfySupabase.from('youtoo_remote_devices').select('last_seen_at').eq('id', nowarfyRemoteSession.active_device_id).maybeSingle();
+                    activeDeviceStale = !!activeDevice.error || !activeDevice.data || (Date.now() - new Date(activeDevice.data.last_seen_at).getTime() > 45000);
+                }
+                if (nowarfyRemoteSession && (!nowarfyRemoteSession.active_device_id || activeExpired || activeDeviceStale)) {
                     const claimBuilder = nowarfySupabase.from('youtoo_remote_sessions')
                         .update({ active_device_id: nowarfyRemoteDeviceId, state: remoteStateSnapshot(), version: Number(nowarfyRemoteSession.version || 0) + 1, updated_at: new Date().toISOString(), expires_at: new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString() })
                         .eq('id', nowarfyRemoteSession.id);
-                    if (activeExpired) claimBuilder.eq('active_device_id', nowarfyRemoteSession.active_device_id);
+                    if (activeExpired || activeDeviceStale) claimBuilder.eq('active_device_id', nowarfyRemoteSession.active_device_id);
                     else claimBuilder.is('active_device_id', null);
                     const claim = await claimBuilder.select('*').maybeSingle();
                     if (!claim.error && claim.data) {
