@@ -1774,6 +1774,8 @@
                     playlists: { ...data.playlists, items: mapPlaylistApiItems(data.playlists?.items, fallback) },
                     uploads: { ...data.uploads, items: mapPlaylistVideoItems(data.uploads?.items, fallback) }
                 };
+                void reserveDiscoveredCandidates(activeChannelCatalog.playlists.items, { context: 'channel', queryContext: `channel:${data.channel.id}:playlists` });
+                void reserveDiscoveredCandidates(activeChannelCatalog.uploads.items, { context: 'channel', queryContext: `channel:${data.channel.id}:uploads` });
                 searchInput.value = data.channel.snippet?.title || channelTitle;
                 searchClearBtn.classList.add('show');
                 rememberChannel(data.channel.id, data.channel.snippet?.title || channelTitle, {
@@ -1795,7 +1797,9 @@
             const data = await response.json();
             if (!response.ok) throw new Error('more_playlists_unavailable');
             const fallback = { channelId: state.channel.id, channelTitle: state.channel.snippet?.title || '', img: state.channel.snippet?.thumbnails?.medium?.url || '' };
-            state.playlists = { ...data, items: [...(state.playlists.items || []), ...mapPlaylistApiItems(data.items, fallback)] };
+            const nextPlaylists = mapPlaylistApiItems(data.items, fallback);
+            state.playlists = { ...data, items: [...(state.playlists.items || []), ...nextPlaylists] };
+            void reserveDiscoveredCandidates(nextPlaylists, { context: 'channel', queryContext: `channel:${state.channel.id}:playlists` });
             renderChannelCatalog();
         }
 
@@ -1808,6 +1812,7 @@
             const fallback = { channelId: state.channel.id, channelTitle: state.channel.snippet?.title || '', img: state.channel.snippet?.thumbnails?.medium?.url || '' };
             const nextItems = mapPlaylistVideoItems(data.items, fallback, state.uploads.items.length);
             state.uploads = { ...data, items: [...(state.uploads.items || []), ...nextItems] };
+            void reserveDiscoveredCandidates(nextItems, { context: 'channel', queryContext: `channel:${state.channel.id}:uploads` });
             renderChannelCatalog();
         }
 
@@ -2752,6 +2757,7 @@
                 if (!response.ok || !data.items?.length) throw new Error('playlist_unavailable');
                 const tracks = mapPlaylistVideoItems(data.items, { channelId: playlist.channelId || '', channelTitle: playlist.artist || '', img: playlist.img || '', collectionId: playlist.url, collectionTitle: playlist.title, collectionImg: playlist.img || '' });
                 if (!tracks.length) throw new Error('playlist_empty');
+                void reserveDiscoveredCandidates(tracks, { context: 'playlist', queryContext: `playlist:${playlist.url}` });
                 activePlaylistCatalog = {
                     playlist,
                     tracks,
@@ -2791,6 +2797,7 @@
             if (!response.ok) throw new Error('more_playlist_items_unavailable');
             const nextTracks = mapPlaylistVideoItems(data.items, { channelId: state.playlist.channelId || '', channelTitle: state.playlist.artist || '', img: state.playlist.img || '', collectionId: state.playlist.url, collectionTitle: state.playlist.title, collectionImg: state.playlist.img || '' }, state.tracks.length);
             state.tracks = [...state.tracks, ...nextTracks];
+            void reserveDiscoveredCandidates(nextTracks, { context: 'playlist', queryContext: `playlist:${state.playlist.url}` });
             state.pageInfo = data.pageInfo || state.pageInfo;
             state.nextPageToken = data.nextPageToken || '';
             renderOpenedPlaylist();
@@ -2989,6 +2996,7 @@
         const GLOBAL_RESERVE_ENDPOINT = '/api/reserve';
         let reserveDbPromise = null;
         let globalReserveSyncInFlight = false;
+        let globalReservePendingEntries = [];
 
         function reserveCandidateKey(song) {
             if (!song?.url) return '';
@@ -3012,7 +3020,7 @@
                 source: song.source || (song.type === 'yt' ? 'youtube' : 'openverse'),
                 sourceId: String(song.sourceId || song.url),
                 styleKey,
-                radioEligible: context === 'radio' && typeof isRadioMusicTrack === 'function' ? isRadioMusicTrack(song) : false,
+                radioEligible: (song.type === 'mp3' || song.resourceKind === 'youtube#video') && typeof isRadioMusicTrack === 'function' ? isRadioMusicTrack(song) : false,
                 context,
                 queryContext: String(song.queryContext || queryContext || '').trim(),
                 metadata: {
@@ -3079,13 +3087,24 @@
                 return response.ok ? data : null;
             } catch (error) { return null; }
         }
-        function reserveSyncGlobal(entries) {
-            if (!Array.isArray(entries) || !entries.length || globalReserveSyncInFlight) return;
+        function flushReserveGlobal() {
+            if (globalReserveSyncInFlight || !globalReservePendingEntries.length) return;
+            const batch = globalReservePendingEntries.splice(0, 100);
             globalReserveSyncInFlight = true;
             void globalReserveRequest(GLOBAL_RESERVE_ENDPOINT, {
                 method: 'POST',
-                body: JSON.stringify({ action: 'upsert', entries: entries.slice(0, 100) })
-            }).finally(() => { globalReserveSyncInFlight = false; });
+                body: JSON.stringify({ action: 'upsert', entries: batch })
+            }).finally(() => {
+                globalReserveSyncInFlight = false;
+                flushReserveGlobal();
+            });
+        }
+        function reserveSyncGlobal(entries) {
+            if (!Array.isArray(entries) || !entries.length) return;
+            const merged = new Map(globalReservePendingEntries.map(item => [item.candidateKey, item]));
+            entries.forEach(entry => merged.set(entry.candidateKey, { ...merged.get(entry.candidateKey), ...entry }));
+            globalReservePendingEntries = [...merged.values()];
+            flushReserveGlobal();
         }
         function reserveQueryKey(source, query, styleKey = '', resourceTypes = '', channelId = '') {
             return [source, resourceTypes || 'all', channelId || 'all', styleKey || 'rock metal', query].map(value => String(value || '').trim().toLowerCase()).join(':').slice(0, 512);
@@ -3289,6 +3308,7 @@
             const q = withQid(song);
             queueSeenKeys.add(k);
             queue.push(q);
+            void reserveDiscoveredCandidates([song], { context: 'queue', seed: song, queryContext: 'queue' });
             persistQueue();
             renderQueue();
             showToast('Añadido a la cola', 'fa-list');
