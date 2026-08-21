@@ -147,7 +147,7 @@ function queryUrl(req) {
   params.set('status', 'in.(available,queued,played)');
   params.set('order', 'last_used_at.asc.nullsfirst,discovered_at.desc');
   params.set('limit', String(boundedInt(req.query.limit, 20, MAX_LIMIT)));
-  return query.toString();
+  return params.toString();
 }
 
 function quoteCsv(value) {
