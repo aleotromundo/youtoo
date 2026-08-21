@@ -110,7 +110,7 @@ async function enrichVideoItems(items, apiKey) {
     part: 'contentDetails,status,statistics,snippet',
     id: videoIds.join(','),
     key: apiKey,
-    fields: 'items(id,contentDetails(duration),status(embeddable),statistics(viewCount,likeCount,commentCount),snippet(publishedAt,liveBroadcastContent))'
+    fields: 'items(id,contentDetails(duration,definition,caption),status(embeddable),statistics(viewCount,likeCount,commentCount),snippet(publishedAt,liveBroadcastContent,categoryId,tags))'
   });
   const { response, data } = await youtubeRequest('videos', detailsParams);
   if (!response.ok) return items || [];

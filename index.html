@@ -1286,6 +1286,19 @@
             return Number.isFinite(count) ? count > 0 : true;
         }
 
+        function videoStatsLabel(item) {
+            if (!(item?.resourceKind === 'youtube#video' || item?.type === 'yt')) return '';
+            const parts = [];
+            const views = Number(item.viewCount);
+            const likes = Number(item.likeCount);
+            const comments = Number(item.commentCount);
+            if (Number.isFinite(views)) parts.push(`${formatCompactNumber(views)} vistas`);
+            if (Number.isFinite(likes)) parts.push(`${formatCompactNumber(likes)} likes`);
+            if (Number.isFinite(comments)) parts.push(`${formatCompactNumber(comments)} comentarios`);
+            if (item.definition) parts.push(String(item.definition).toUpperCase());
+            return parts.join(' · ');
+        }
+
         function contentMetaLabel(item) {
             if (item?.resourceKind === 'youtube#playlist') {
                 const count = Number(item.itemCount);
@@ -1612,6 +1625,15 @@
                         resourceKind: item.id.kind,
                         isPlaylist: item.id.kind === 'youtube#playlist',
                         duration: parseYouTubeDuration(item.contentDetails && item.contentDetails.duration),
+                        publishedAt: item.videoSnippet?.publishedAt || item.snippet.publishedAt || '',
+                        viewCount: item.statistics?.viewCount || '',
+                        likeCount: item.statistics?.likeCount || '',
+                        commentCount: item.statistics?.commentCount || '',
+                        definition: item.contentDetails?.definition || '',
+                        captionsAvailable: item.contentDetails?.caption === 'true',
+                        liveBroadcastContent: item.videoSnippet?.liveBroadcastContent || item.snippet.liveBroadcastContent || 'none',
+                        categoryId: item.videoSnippet?.categoryId || '',
+                        tags: Array.isArray(item.videoSnippet?.tags) ? item.videoSnippet.tags : [],
                         channelId: item.snippet.channelId,
                         channelTitle: item.snippet.channelTitle
                     };
@@ -2371,14 +2393,30 @@
         }
 
         async function renderGenreChannels() {
-            await renderDirectVideoCollections({
-                title: 'Canales',
-                intro: 'Videos listos para mirar, organizados por escena. Cada fila reúne contenido reproducible de rock, metal y sus vertientes.',
-                icon: 'fa-satellite-dish',
-                collections: GENRE_CHANNEL_LISTS,
-                className: 'channels-video-rail'
-            });
-            renderSavedChannelsRail();
+            const container = document.getElementById('dynamicSections');
+            const loader = document.getElementById('loader');
+            container.innerHTML = '';
+            currentList = [];
+            loader.style.display = 'flex';
+            try {
+                const heading = document.createElement('div');
+                heading.innerHTML = `<div class="section-title"><i class="fas fa-satellite-dish"></i> Canales</div><p class="discovery-intro">Canales reales de YouTube agrupados por escena. Abrí uno para ver su descripción, estadísticas, listas y videos publicados.</p>`;
+                container.appendChild(heading);
+                renderSavedChannelsRail();
+                const settled = await Promise.allSettled(GENRE_CHANNEL_LISTS.map(collection => fetchYouTubeSearch(collection.query, 'channel', { maxResults: 8, reserveContext: 'channels' })));
+                let rendered = 0;
+                settled.forEach((result, index) => {
+                    const channels = result.status === 'fulfilled'
+                        ? uniqueMediaByUrl(result.value.filter(item => item?.resourceKind === 'youtube#channel'), 8)
+                        : [];
+                    if (!channels.length) return;
+                    rendered += channels.length;
+                    renderChannelRow(channels, GENRE_CHANNEL_LISTS[index].title, GENRE_CHANNEL_LISTS[index].description);
+                });
+                if (!rendered && !readTaste().channels.length) renderEmptyState('No hay canales disponibles ahora', 'Probá volver a intentarlo cuando YouTube vuelva a responder o buscá un canal por nombre.');
+            } finally {
+                loader.style.display = 'none';
+            }
         }
 
         async function renderExploreCollections() {
@@ -2546,12 +2584,12 @@
             if (videos.length) renderGrid(videos, channelFilter ? 'Videos y música del canal' : `Videos individuales: "${query}"`, "<i class='fas fa-clapperboard'></i>");
         }
 
-        function renderChannelRow(channels, title) {
+        function renderChannelRow(channels, title, hint = 'Canales encontrados en YouTube') {
             const visibleChannels = itemsWithArtwork(channels);
             if (!visibleChannels.length) return;
             const container = document.getElementById('dynamicSections');
             const section = document.createElement('div');
-            section.innerHTML = `<div class="section-title"><i class="fas fa-satellite-dish"></i> ${escapeHtml(title)}</div>`;
+            section.innerHTML = `<div class="section-title"><i class="fas fa-satellite-dish"></i> ${escapeHtml(title)} <span class="library-rail-hint">${escapeHtml(hint)}</span></div>`;
             const scroll = document.createElement('div');
             scroll.className = 'channel-scroll';
 
@@ -2752,7 +2790,7 @@
                 <div class="play-btn"><i class="fas fa-play"></i></div>
                 <div class="card-title" title="${escapeHtml(song.title)}">${escapeHtml(song.title)}</div>
                 <div class="card-desc${artistClickable ? ' artist-link' : ''}">${escapeHtml(song.artist)}</div>
-                <div class="card-meta">${escapeHtml(contentMetaLabel(song))}</div>
+                <div class="card-meta">${escapeHtml(contentMetaLabel(song))}${videoStatsLabel(song) ? `<span class="card-stats">${escapeHtml(videoStatsLabel(song))}</span>` : ''}</div>
                 ${descriptionExcerpt(song.description) ? `<p class="card-summary" title="${escapeHtml(song.description)}">${escapeHtml(descriptionExcerpt(song.description))}</p>` : ''}`;
             div.onclick = () => selectSong(song, song.sourceIndex ?? idx);
             div.querySelector('.card-favorite').onclick = (e) => {
