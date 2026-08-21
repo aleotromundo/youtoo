@@ -1785,7 +1785,9 @@
                     if (response.status === 429 || data?.error?.reason === 'RATE_LIMIT_EXCEEDED') markYouTubeQuotaUnavailable();
                     return [];
                 }
-                return data.items && data.items.length ? mapYouTubeItems(data.items) : [];
+                const mapped = data.items && data.items.length ? mapYouTubeItems(data.items) : [];
+                void reserveDiscoveredCandidates(mapped, { context: opts.reserveContext || 'manual', seed: opts.seed || null });
+                return mapped;
             } catch (e) {
                 return [];
             }
@@ -1942,7 +1944,7 @@
             if (!response.ok || !data.results?.length) return [];
             const allowedAudioTypes = new Set(['mp3', 'ogg', 'opus', 'm4a', 'aac']);
             const unwantedAudioTerms = /\b(sound effect|sound-effect|sfx|foley|ambient|ambience|ambiente|noise|ruido|whoosh|impact|explosion|sample|sampling|loop|drum loop|drum circle|water|sonar|test tone|tone generator|field recording|field-recording|white noise|pink noise|audiobook|audio book|audiolibro|spoken word|narration|narrator|chapter|book reading|story|stories|lecture|podcast|interview|meditation|sleep music|children|bedtime)\b/i;
-            return data.results
+            const mappedTracks = data.results
                 .filter(track => allowedAudioTypes.has(String(track.filetype || '').toLowerCase()))
                 .filter(track => String(track.url || '').trim())
                 .filter(track => String(track.title || '').trim() && String(track.creator || '').trim())
@@ -1967,6 +1969,8 @@
                     sourceUrl: track.foreign_landing_url || track.detail_url || ''
                 }))
                 .sort((a, b) => (b.img ? 1 : 0) - (a.img ? 1 : 0));
+            void reserveDiscoveredCandidates(mappedTracks, { context: options.reserveContext || 'manual', seed: options.seed || null });
+            return mappedTracks;
         }
 
         async function fetchCommonsVideos(query, limit = 12) {
@@ -1991,7 +1995,7 @@
         async function fetchFreeMusicCollection(collection) {
             const cacheKey = `openverse:${collection.query}`;
             if (freeMediaCollectionCache.has(cacheKey)) return freeMediaCollectionCache.get(cacheKey);
-            const tracks = await fetchOpenverseTracks(collection.query, 20, { radioOnly: true });
+            const tracks = await fetchOpenverseTracks(collection.query, 20, { radioOnly: true, reserveContext: 'radio' });
             freeMediaCollectionCache.set(cacheKey, tracks);
             return tracks;
         }
@@ -2814,6 +2818,176 @@
             };
         }
 
+        // --- RESERVA LOCAL DE CANDIDATOS (IndexedDB + fallback localStorage) ---
+        const RESERVE_DB_NAME = 'nowarfy_reserve_v1';
+        const RESERVE_DB_VERSION = 1;
+        const RESERVE_CANDIDATES_STORE = 'candidates';
+        const RESERVE_QUERIES_STORE = 'queries';
+        const RESERVE_META_STORE = 'reserveMeta';
+        const RESERVE_FALLBACK_KEY = 'nowarfy_discovery_reserve_v1';
+        const RESERVE_MAX_CANDIDATES = 1000;
+        let reserveDbPromise = null;
+
+        function reserveCandidateKey(song) {
+            if (!song?.url) return '';
+            if (song.type === 'yt') return `yt:${String(song.url).trim()}`;
+            if (song.type === 'mp3') return `openverse:${String(song.sourceUrl || song.url).trim()}`;
+            return `${song.type || 'media'}:${String(song.sourceUrl || song.url).trim()}`;
+        }
+        function reserveStyleKey(song, seed = null) {
+            const explicit = String(song?.genre || '').trim().toLowerCase();
+            if (explicit && explicit !== 'unknown') return explicit;
+            return typeof getRadioStyle === 'function' ? getRadioStyle(seed || song) : 'rock metal';
+        }
+        function normalizeReserveCandidate(song, { context = 'manual', seed = null } = {}) {
+            if (!song?.url || !['yt', 'mp3'].includes(song.type)) return null;
+            const candidateKey = reserveCandidateKey(song);
+            if (!candidateKey) return null;
+            const styleKey = reserveStyleKey(song, seed);
+            return {
+                ...song,
+                candidateKey,
+                source: song.type === 'yt' ? 'youtube' : 'openverse',
+                sourceId: String(song.url),
+                styleKey,
+                radioEligible: context === 'radio' && typeof isRadioMusicTrack === 'function' ? isRadioMusicTrack(song) : false,
+                context,
+                discoveredAt: Number(song.discoveredAt || Date.now()),
+                lastSeenAt: Date.now(),
+                lastUsedAt: song.lastUsedAt || null,
+                useCount: Number(song.useCount || 0),
+                status: song.status || 'available',
+                expiresAt: Number(song.expiresAt || (Date.now() + (song.type === 'yt' ? 30 : 14) * 24 * 60 * 60 * 1000))
+            };
+        }
+        function openReserveDb() {
+            if (reserveDbPromise) return reserveDbPromise;
+            if (!window.indexedDB) return Promise.resolve(null);
+            reserveDbPromise = new Promise(resolve => {
+                try {
+                    const request = indexedDB.open(RESERVE_DB_NAME, RESERVE_DB_VERSION);
+                    request.onupgradeneeded = event => {
+                        const db = event.target.result;
+                        const candidates = db.objectStoreNames.contains(RESERVE_CANDIDATES_STORE)
+                            ? event.target.transaction.objectStore(RESERVE_CANDIDATES_STORE)
+                            : db.createObjectStore(RESERVE_CANDIDATES_STORE, { keyPath: 'candidateKey' });
+                        if (!candidates.indexNames.contains('styleKey')) candidates.createIndex('styleKey', 'styleKey', { unique: false });
+                        if (!candidates.indexNames.contains('radioEligible')) candidates.createIndex('radioEligible', 'radioEligible', { unique: false });
+                        if (!candidates.indexNames.contains('lastUsedAt')) candidates.createIndex('lastUsedAt', 'lastUsedAt', { unique: false });
+                        if (!candidates.indexNames.contains('source')) candidates.createIndex('source', 'source', { unique: false });
+                        if (!candidates.indexNames.contains('status')) candidates.createIndex('status', 'status', { unique: false });
+                        if (!db.objectStoreNames.contains(RESERVE_QUERIES_STORE)) db.createObjectStore(RESERVE_QUERIES_STORE, { keyPath: 'queryKey' });
+                        if (!db.objectStoreNames.contains(RESERVE_META_STORE)) db.createObjectStore(RESERVE_META_STORE, { keyPath: 'id' });
+                    };
+                    request.onsuccess = event => resolve(event.target.result);
+                    request.onerror = () => resolve(null);
+                } catch (error) { resolve(null); }
+            });
+            return reserveDbPromise;
+        }
+        function readReserveFallback() {
+            try {
+                const value = JSON.parse(localStorage.getItem(RESERVE_FALLBACK_KEY) || '[]');
+                return Array.isArray(value) ? value : [];
+            } catch (error) { return []; }
+        }
+        function writeReserveFallback(items) {
+            try {
+                localStorage.setItem(RESERVE_FALLBACK_KEY, JSON.stringify(items.slice(-200)));
+            } catch (error) { /* almacenamiento lleno o no disponible */ }
+        }
+        async function reserveDiscoveredCandidates(songs, options = {}) {
+            const entries = (songs || []).map(song => normalizeReserveCandidate(song, options)).filter(Boolean);
+            if (!entries.length) return;
+            const db = await openReserveDb();
+            if (!db) {
+                const merged = new Map(readReserveFallback().map(item => [item.candidateKey, item]));
+                entries.forEach(entry => merged.set(entry.candidateKey, { ...merged.get(entry.candidateKey), ...entry }));
+                writeReserveFallback([...merged.values()].slice(-200));
+                return;
+            }
+            await new Promise(resolve => {
+                try {
+                    const transaction = db.transaction(RESERVE_CANDIDATES_STORE, 'readwrite');
+                    const store = transaction.objectStore(RESERVE_CANDIDATES_STORE);
+                    entries.forEach(entry => {
+                        const getRequest = store.get(entry.candidateKey);
+                        getRequest.onsuccess = () => {
+                            const previous = getRequest.result || {};
+                            store.put({
+                                ...previous,
+                                ...entry,
+                                radioEligible: Boolean(previous.radioEligible || entry.radioEligible),
+                                discoveredAt: previous.discoveredAt || entry.discoveredAt,
+                                useCount: Number(previous.useCount || entry.useCount || 0),
+                                lastUsedAt: previous.lastUsedAt || entry.lastUsedAt || null
+                            });
+                        };
+                    });
+                    transaction.oncomplete = () => resolve();
+                    transaction.onerror = () => resolve();
+                    transaction.onabort = () => resolve();
+                } catch (error) { resolve(); }
+            });
+            void reserveTrim();
+        }
+        async function reserveGetCandidates({ styleKey = '', artist = '', source = '', limit = 20 } = {}) {
+            const db = await openReserveDb();
+            let items = [];
+            if (db) {
+                items = await new Promise(resolve => {
+                    try {
+                        const request = db.transaction(RESERVE_CANDIDATES_STORE, 'readonly').objectStore(RESERVE_CANDIDATES_STORE).getAll();
+                        request.onsuccess = () => resolve(request.result || []);
+                        request.onerror = () => resolve([]);
+                    } catch (error) { resolve([]); }
+                });
+            }
+            if (!items.length) items = readReserveFallback();
+            const style = String(styleKey || '').toLowerCase();
+            const targetArtist = String(artist || '').toLowerCase();
+            return items
+                .filter(item => item.radioEligible && item.status !== 'invalid' && item.status !== 'expired')
+                .filter(item => !source || item.source === source)
+                .filter(item => !style || String(item.styleKey || '').toLowerCase() === style || String(item.styleKey || '').toLowerCase().includes(style))
+                .filter(item => !targetArtist || String(item.artist || '').toLowerCase().includes(targetArtist))
+                .filter(item => !item.expiresAt || Number(item.expiresAt) > Date.now())
+                .sort((a, b) => Number(a.lastUsedAt || 0) - Number(b.lastUsedAt || 0) || Number(b.lastSeenAt || 0) - Number(a.lastSeenAt || 0))
+                .slice(0, limit);
+        }
+        async function reserveMarkUsed(song) {
+            const key = reserveCandidateKey(song);
+            if (!key) return;
+            const db = await openReserveDb();
+            if (!db) return;
+            try {
+                const transaction = db.transaction(RESERVE_CANDIDATES_STORE, 'readwrite');
+                const store = transaction.objectStore(RESERVE_CANDIDATES_STORE);
+                const request = store.get(key);
+                request.onsuccess = () => {
+                    if (request.result) store.put({ ...request.result, status: 'played', lastUsedAt: Date.now(), useCount: Number(request.result.useCount || 0) + 1 });
+                };
+            } catch (error) { /* la reproducción no depende de la reserva */ }
+        }
+        async function reserveTrim() {
+            const db = await openReserveDb();
+            if (!db) return;
+            try {
+                const transaction = db.transaction(RESERVE_CANDIDATES_STORE, 'readwrite');
+                const store = transaction.objectStore(RESERVE_CANDIDATES_STORE);
+                const request = store.getAll();
+                request.onsuccess = () => {
+                    const items = request.result || [];
+                    const expired = items.filter(item => item.status === 'invalid' || (item.expiresAt && Number(item.expiresAt) < Date.now()));
+                    expired.forEach(item => store.delete(item.candidateKey));
+                    if (items.length > RESERVE_MAX_CANDIDATES) {
+                        items.sort((a, b) => Number(a.lastUsedAt || 0) - Number(b.lastUsedAt || 0));
+                        items.slice(0, items.length - RESERVE_MAX_CANDIDATES).forEach(item => store.delete(item.candidateKey));
+                    }
+                };
+            } catch (error) { /* limpieza best-effort */ }
+        }
+
         // --- CLAVE única de canción (para no repetir en la cola) ---
         function songKey(song) { return `${(song.title || '').toLowerCase().trim()}|${(song.artist || '').toLowerCase().trim()}`; }
         function withQid(song) { return { ...song, _qid: ++queueIdCounter }; }
@@ -2828,6 +3002,7 @@
             persistQueue();
             renderQueue();
             playQueueAt(0, { sourceIdx });
+            void reserveDiscoveredCandidates([song], { context: 'radio', seed: song });
             // Cada elección reinicia la radio con una tanda completa detrás.
             growQueueIfNeeded(true);
         }
@@ -3119,6 +3294,7 @@
             if (!resumeSession) clearVideoResumeSession();
             updateNowPlaying(song);
             rememberPlay(song);
+            void reserveMarkUsed(song);
             stopAll();
             updateMediaSession(song);
             setTrackLoading(true, currentSourceIdx);
@@ -3182,10 +3358,10 @@
             const style = getRadioStyle(seedSong);
             let raw = [];
             if (seedSong.channelId) {
-                raw = await fetchYouTubeSearch(seedSong.artist, 'video', { channelId: seedSong.channelId, maxResults: Math.min(count, 20) });
+                raw = await fetchYouTubeSearch(seedSong.artist, 'video', { channelId: seedSong.channelId, maxResults: Math.min(count, 20), reserveContext: 'radio', seed: seedSong });
             }
             if (raw.length < count) {
-                const extra = await fetchYouTubeSearch(`${seedSong.artist} ${style} official music`, 'video', { maxResults: count });
+                const extra = await fetchYouTubeSearch(`${seedSong.artist} ${style} official music`, 'video', { maxResults: count, reserveContext: 'radio', seed: seedSong });
                 const artistLower = seedSong.artist.toLowerCase();
                 const filtered = extra.filter(s => (s.artist || '').toLowerCase().includes(artistLower) || artistLower.includes((s.artist || '').toLowerCase()));
                 raw = raw.concat(filtered);
@@ -3193,8 +3369,8 @@
             return raw.slice(0, count);
         }
 
-        async function fetchRockMetalTracks(count, style = 'rock metal') {
-            return fetchYouTubeSearch(`${style} official music`, 'video', { maxResults: Math.min(Math.max(count, 6), 20) });
+        async function fetchRockMetalTracks(count, style = 'rock metal', seedSong = null) {
+            return fetchYouTubeSearch(`${style} official music`, 'video', { maxResults: Math.min(Math.max(count, 6), 20), reserveContext: 'radio', seed: seedSong });
         }
 
         async function fetchOpenverseGenreTracks(seedSong, count) {
@@ -3209,7 +3385,7 @@
                 }
             } catch (e) { /* almacenamiento no disponible */ }
             try {
-                const fresh = (await fetchOpenverseTracks(query, Math.min(Math.max(count, 10), 20), { radioOnly: true }))
+                const fresh = (await fetchOpenverseTracks(query, Math.min(Math.max(count, 10), 20), { radioOnly: true, reserveContext: 'radio', seed: seedSong }))
                     .filter(isRadioMusicTrack);
                 if (fresh.length) {
                     try {
@@ -3220,17 +3396,18 @@
                     return fresh;
                 }
             } catch (e) { /* cuota o red agotada: usar caché */ }
-            return [...cached, ...homeMusic].filter(isRadioMusicTrack);
+            const reserved = await reserveGetCandidates({ styleKey: style, source: 'openverse', limit: Math.max(count, 20) });
+            return [...cached, ...reserved, ...homeMusic].filter(isRadioMusicTrack);
         }
 
         async function fetchSimilarArtistTracks(seedSong, count) {
-            if (!seedSong || !seedSong.artist) return fetchRockMetalTracks(count, getRadioStyle(seedSong));
+            if (!seedSong || !seedSong.artist) return fetchRockMetalTracks(count, getRadioStyle(seedSong), seedSong);
             const artist = seedSong.artist;
             const style = getRadioStyle(seedSong);
             try {
                 const [radio, related] = await Promise.all([
-                    fetchYouTubeSearch(`${artist} ${style} radio mix`, 'video', { maxResults: Math.max(6, Math.ceil(count * 0.7)) }),
-                    fetchYouTubeSearch(`${style} artists similar to ${artist}`, 'video', { maxResults: Math.max(6, Math.ceil(count * 0.6)) })
+                    fetchYouTubeSearch(`${artist} ${style} radio mix`, 'video', { maxResults: Math.max(6, Math.ceil(count * 0.7)), reserveContext: 'radio', seed: seedSong }),
+                    fetchYouTubeSearch(`${style} artists similar to ${artist}`, 'video', { maxResults: Math.max(6, Math.ceil(count * 0.6)), reserveContext: 'radio', seed: seedSong })
                 ]);
                 const artistLower = artist.toLowerCase();
                 const merged = shuffleArray([...radio, ...related]).filter(s => (s.artist || '').toLowerCase() !== artistLower);
@@ -3257,17 +3434,25 @@
 
         async function buildAutomaticBatch(seed) {
             const added = [];
+            const style = getRadioStyle(seed);
             const remaining = () => QUEUE_BATCH - added.length;
 
-            // Primera prioridad: canciones del mismo artista, siempre sin repetir.
+            // Primera prioridad: canciones del mismo artista, primero frescas y luego de la reserva.
+
             if (queueRound === 0) {
                 appendUniqueSongs(await fetchSameArtistTracks(seed, remaining()), added, QUEUE_BATCH);
+                if (remaining() > 0 && seed?.artist) {
+                    appendUniqueSongs(await reserveGetCandidates({ styleKey: style, artist: seed.artist, limit: remaining() }), added, QUEUE_BATCH);
+                }
                 queueRound = 1;
             }
 
             // Si el artista no tiene suficientes resultados, completar con artistas similares.
             if (remaining() > 0) {
                 appendUniqueSongs(await fetchSimilarArtistTracks(seed, remaining()), added, QUEUE_BATCH);
+                if (remaining() > 0) {
+                    appendUniqueSongs(await reserveGetCandidates({ styleKey: style, limit: remaining() }), added, QUEUE_BATCH);
+                }
             }
 
             // Si YouTube no alcanza, completar con música libre del mismo género en Openverse.
@@ -3277,7 +3462,7 @@
 
             // Último respaldo para que la radio no se quede sin contenido.
             if (remaining() > 0) {
-                appendUniqueSongs(await fetchRockMetalTracks(remaining(), getRadioStyle(seed)), added, QUEUE_BATCH);
+                appendUniqueSongs(await fetchRockMetalTracks(remaining(), getRadioStyle(seed), seed), added, QUEUE_BATCH);
             }
 
             return added;
