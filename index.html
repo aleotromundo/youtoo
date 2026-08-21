@@ -1427,6 +1427,28 @@
             if (!nowarfyAuthUser || !nowarfySupabase) { await teardownNowarfyRemoteControl(); return; }
             try {
                 await ensureNowarfyRemoteSession();
+                // Si no existe un reproductor activo —o su sesión venció— este primer dispositivo
+                // debe tomar el iFrame real automáticamente. De lo contrario, Play enviaba comandos
+                // a una sesión sin player y la interfaz quedaba aparentemente congelada.
+                const activeExpired = nowarfyRemoteSession?.expires_at && new Date(nowarfyRemoteSession.expires_at).getTime() <= Date.now();
+                if (nowarfyRemoteSession && (!nowarfyRemoteSession.active_device_id || activeExpired)) {
+                    const claimBuilder = nowarfySupabase.from('youtoo_remote_sessions')
+                        .update({ active_device_id: nowarfyRemoteDeviceId, state: remoteStateSnapshot(), version: Number(nowarfyRemoteSession.version || 0) + 1, updated_at: new Date().toISOString(), expires_at: new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString() })
+                        .eq('id', nowarfyRemoteSession.id);
+                    if (activeExpired) claimBuilder.eq('active_device_id', nowarfyRemoteSession.active_device_id);
+                    else claimBuilder.is('active_device_id', null);
+                    const claim = await claimBuilder.select('*').maybeSingle();
+                    if (!claim.error && claim.data) {
+                        nowarfyRemoteSession = claim.data;
+                        nowarfyRemoteIsPlayer = true;
+                    } else {
+                        const refreshed = await nowarfySupabase.from('youtoo_remote_sessions').select('*').eq('id', nowarfyRemoteSession.id).maybeSingle();
+                        if (!refreshed.error && refreshed.data) {
+                            nowarfyRemoteSession = refreshed.data;
+                            nowarfyRemoteIsPlayer = refreshed.data.active_device_id === nowarfyRemoteDeviceId;
+                        }
+                    }
+                }
                 if (nowarfyRemoteChannel) await nowarfySupabase.removeChannel(nowarfyRemoteChannel);
                 nowarfyRemoteChannel = nowarfySupabase.channel(`nowarfy-remote-${nowarfyAuthUser.id}`)
                     .on('postgres_changes', { event: '*', schema: 'public', table: 'youtoo_remote_sessions', filter: `user_id=eq.${nowarfyAuthUser.id}` }, payload => {
