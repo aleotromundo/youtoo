@@ -2448,13 +2448,23 @@
             }
         }
 
-        function renderSavedChannelsRail() {
-            const channels = itemsWithArtwork(readTaste().channels);
+        async function renderSavedChannelsRail() {
+            const localChannels = readTaste().channels.map(channel => ({
+                ...channel,
+                url: channel.id,
+                type: 'yt',
+                resourceKind: 'youtube#channel',
+                channelId: channel.id,
+                channelTitle: channel.title,
+                artist: 'Canal de YouTube'
+            }));
+            const globalChannels = await reserveGetGlobalCandidates({ source: 'youtube', kind: 'youtube#channel', scope: 'search', limit: 50 });
+            const channels = itemsWithArtwork(uniqueMediaByUrl([...globalChannels, ...localChannels], 60));
             if (!channels.length) return;
             const container = document.getElementById('dynamicSections');
             const section = document.createElement('section');
             section.className = 'library-rail-section saved-entities-rail';
-            section.innerHTML = `<div class="library-rail-title"><i class="fas fa-bookmark"></i><span>Canales abiertos anteriormente</span><span class="library-rail-hint">Guardados en este dispositivo</span></div>`;
+            section.innerHTML = `<div class="library-rail-title"><i class="fas fa-bookmark"></i><span>Canales abiertos anteriormente</span><span class="library-rail-hint">Reserva global + este dispositivo</span></div>`;
             const rail = document.createElement('div');
             rail.className = 'library-rail';
             channels.forEach((channel, index) => {
@@ -2480,7 +2490,7 @@
                 const heading = document.createElement('div');
                 heading.innerHTML = `<div class="section-title"><i class="fas fa-satellite-dish"></i> Canales</div><p class="discovery-intro">Canales reales de YouTube agrupados por escena. Abrí uno para ver su descripción, estadísticas, listas y videos publicados.</p>`;
                 container.appendChild(heading);
-                renderSavedChannelsRail();
+                await renderSavedChannelsRail();
                 const settled = await Promise.allSettled(GENRE_CHANNEL_LISTS.map(collection => fetchYouTubeSearch(collection.query, 'channel', { maxResults: 8, reserveContext: 'channels' })));
                 let rendered = 0;
                 settled.forEach((result, index) => {
@@ -3160,8 +3170,8 @@
                 body: JSON.stringify({ action: 'query-upsert', ...payload })
             });
         }
-        async function reserveGetGlobalCandidates({ styleKey = '', artist = '', source = '', query = '', scope = 'radio', limit = 20 } = {}) {
-            const params = new URLSearchParams({ action: 'search', styleKey, artist, source, query, scope, limit: String(Math.min(Math.max(Number(limit) || 20, 1), 50)) });
+        async function reserveGetGlobalCandidates({ styleKey = '', artist = '', source = '', query = '', scope = 'radio', kind = '', limit = 20 } = {}) {
+            const params = new URLSearchParams({ action: 'search', styleKey, artist, source, query, scope, kind, limit: String(Math.min(Math.max(Number(limit) || 20, 1), 50)) });
             const data = await globalReserveRequest(`${GLOBAL_RESERVE_ENDPOINT}?${params.toString()}`);
             return Array.isArray(data?.results) ? data.results : [];
         }

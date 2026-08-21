@@ -177,11 +177,13 @@ function queryUrl(req) {
   const style = text(req.query.styleKey, 200);
   const artist = text(req.query.artist, 300);
   const source = text(req.query.source, 32);
+  const kind = text(req.query.kind, 80);
   const query = text(req.query.query, 300).toLowerCase();
   const scope = text(req.query.scope, 32).toLowerCase();
   if (style) params.set('style_key', `ilike.*${style.replace(/[*,()]/g, '')}*`);
   if (artist) params.set('artist', `ilike.*${artist.replace(/[*,()]/g, '')}*`);
   if (source && ALLOWED_SOURCES.has(source)) params.set('source', `eq.${source}`);
+  if (kind) params.set('metadata->>resourceKind', `eq.${kind}`);
   if (query) {
     const safeQuery = query.replace(/[*,()]/g, ' ').replace(/\s+/g, ' ').trim();
     if (safeQuery) params.set('or', `(query_context.ilike.*${safeQuery}*,title.ilike.*${safeQuery}*,artist.ilike.*${safeQuery}*,description.ilike.*${safeQuery}*)`);
