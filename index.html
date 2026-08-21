@@ -1275,7 +1275,7 @@
             const email = document.getElementById('nowarfyAuthUserEmail');
             if (nowarfyAuthUser) {
                 if (button) button.innerHTML = '<i class="fas fa-user-check"></i> Cuenta: ' + escapeHtml(nowarfyAuthUser.email || 'autenticada');
-                if (deviceStatus) deviceStatus.textContent = 'Cuenta autenticada; este dispositivo ya puede sincronizarse cuando se habilite el control remoto.';
+                if (deviceStatus) deviceStatus.textContent = 'Cuenta autenticada; este dispositivo ya puede sincronizarse con tus otros dispositivos.';
                 if (guest) guest.hidden = true;
                 if (userPanel) userPanel.hidden = false;
                 if (email) email.textContent = nowarfyAuthUser.email || 'Usuario autenticado';
