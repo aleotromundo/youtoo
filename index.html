@@ -179,6 +179,13 @@
         .home-recommended-rail, .home-resume-rail { position: relative; overflow: hidden; margin-top: 18px; padding: 14px 15px 8px; border: 1px solid rgba(190,188,255,.14); border-radius: 17px; }
         .home-recommended-rail { background: radial-gradient(500px 230px at 8% -55%, rgba(94,234,212,.17), transparent 72%), linear-gradient(118deg, rgba(20,45,57,.62), rgba(17,18,35,.76)); }
         .home-resume-rail { background: radial-gradient(420px 190px at 12% -45%, rgba(167,139,250,.18), transparent 72%), linear-gradient(118deg, rgba(42,31,70,.62), rgba(17,18,35,.76)); }
+        .home-welcome { position: relative; overflow: hidden; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 18px; align-items: center; margin: 4px 0 18px; padding: 22px 24px; border: 1px solid rgba(167,139,250,.28); border-radius: 22px; background: radial-gradient(520px 180px at 8% 0%, rgba(167,139,250,.24), transparent 70%), linear-gradient(118deg, rgba(32,27,57,.92), rgba(13,18,34,.88) 68%, rgba(14,48,51,.72)); box-shadow: 0 22px 52px rgba(0,0,0,.22), inset 0 1px 0 rgba(255,255,255,.06); }
+        .home-welcome::after { content: ''; position: absolute; width: 220px; height: 220px; right: -72px; top: -116px; border-radius: 50%; background: radial-gradient(circle, rgba(94,234,212,.22), transparent 68%); pointer-events: none; }
+        .home-welcome-kicker { color: #a7f3d0; font-size: .68rem; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; }
+        .home-welcome h1 { margin: 7px 0 5px; color: #fff; font-size: clamp(1.25rem, 2.2vw, 1.85rem); line-height: 1.1; }
+        .home-welcome p { max-width: 680px; margin: 0; color: rgba(232,231,255,.76); line-height: 1.5; }
+        .home-welcome-art { position: relative; z-index: 1; width: 96px; height: 96px; object-fit: cover; border-radius: 18px; box-shadow: 0 13px 30px rgba(0,0,0,.34); }
+        @media (max-width: 620px) { .home-welcome { grid-template-columns: 1fr; } .home-welcome-art { width: 76px; height: 76px; } }
         .home-recommended-rail .library-rail, .home-resume-rail .library-rail { padding-bottom: 13px; }
         @keyframes featured-ambient-flow { 0%, 100% { transform: translate3d(0,0,0) scale(1); } 50% { transform: translate3d(-32px,34px,0) scale(1.13); } }
         @media (prefers-reduced-motion: reduce) { .featured-rail::before { animation: none; } }
@@ -2259,12 +2266,28 @@
             }
             return result;
         }
+        function renderHomeWelcome(lastViewed) {
+            const container = document.getElementById('dynamicSections');
+            const welcome = document.createElement('button');
+            welcome.type = 'button';
+            welcome.className = 'home-welcome';
+            if (lastViewed?.title) {
+                welcome.innerHTML = `<span><span class="home-welcome-kicker">Bienvenido de nuevo</span><h1>Seguimos desde donde quedaste</h1><p>Lo último que viste fue <strong>${escapeHtml(lastViewed.title)}</strong>${lastViewed.artist ? ` · ${escapeHtml(lastViewed.artist)}` : ''}. El reproductor empieza detenido: tocá esta tarjeta o el botón de reproducir cuando quieras continuar.</p></span>${lastViewed.img ? `<img class="home-welcome-art" src="${escapeHtml(lastViewed.img)}" alt="" loading="lazy">` : ''}`;
+                welcome.addEventListener('click', () => selectSong(lastViewed, 0));
+            } else {
+                welcome.innerHTML = `<span><span class="home-welcome-kicker">Bienvenido a Nowarfy · YouToo</span><h1>Descubrí música real, sin límites</h1><p>Explorá artistas, canales y fuentes musicales. El reproductor empieza detenido para que vos elijas cuándo comenzar.</p></span>`;
+            }
+            container.appendChild(welcome);
+        }
         function renderHomeFeed() {
             const container = document.getElementById('dynamicSections');
             const taste = readTaste();
             container.innerHTML = '';
             currentList = [];
             const used = new Set();
+            const lastViewed = normalizeTasteTrack(taste.plays[0]);
+            renderHomeWelcome(lastViewed);
+            if (lastViewed) used.add(songKey(lastViewed));
             const resume = takeNovelItems(taste.plays.map(normalizeTasteTrack).filter(Boolean), used, 8);
             if (resume.length) renderLibraryRail(resume, 'Seguí desde donde quedaste', "<i class='fas fa-clock-rotate-left'></i>", false, { hint: 'Tu actividad reciente · sin repetir en otras sesiones', showControls: true, className: 'home-resume-rail' });
             const recommended = takeNovelItems(homeRecommended, used, 8);
@@ -3856,8 +3879,8 @@
 
                 const resume = readVideoResumeSession();
                 if (song.type === 'yt' && resume && String(resume.resourceId) === String(song.url) && (!resume.qid || Number(resume.qid) === Number(qid))) {
+                    // Se conserva la posición para el próximo clic en reproducir, pero nunca se inicia solo.
                     pendingVideoResumeSession = resume;
-                    window.setTimeout(() => playQueueAt(idx, { resumeSession: resume, restoreMinimized: !!resume.minimized }), 0);
                 }
             } catch (e) { /* nada que restaurar */ }
         }
@@ -4382,7 +4405,11 @@
         function togglePlay() {
             if (currentIndex === -1 || !queue[currentIndex]) return;
             // Si venimos de restaurar la cola guardada y todavía no se cargó nada en el reproductor, arrancarla.
-            if (!ytPlayer && !audioEl.src && !freeVideoEl.src) { playQueueAt(currentIndex); return; }
+            if (!ytPlayer && !audioEl.src && !freeVideoEl.src) {
+                const resume = pendingVideoResumeSession;
+                playQueueAt(currentIndex, resume ? { resumeSession: resume, restoreMinimized: !!resume.minimized } : {});
+                return;
+            }
             const song = queue[currentIndex];
             if (isPlaying) {
                 playbackStoppedByUser = true;
