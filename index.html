@@ -1261,7 +1261,7 @@
         <div class="queue-drop-trash" id="queueTrash"><i class="fas fa-trash"></i> Soltá aquí para quitarla de la Playlist</div>
     </div>
 
-    <div class="nowarfy-handoff-prompt" id="nowarfyHandoffPrompt" hidden><div><strong>La reproducción llegó a este dispositivo</strong><small>El navegador necesita una pulsación para habilitar el audio.</small></div><button type="button" onclick="unlockNowarfyHandoff()"><i class="fas fa-play"></i> Reproducir</button></div>
+    <div class="nowarfy-handoff-prompt" id="nowarfyHandoffPrompt" hidden role="status" aria-live="polite"><div><strong>El audio llegó a este dispositivo</strong><small>Por la política de autoplay, tocá “Desbloquear audio” una vez. Después, este dispositivo seguirá reproduciendo y los demás conservarán el control remoto.</small></div><button type="button" aria-label="Desbloquear audio en este dispositivo" onclick="unlockNowarfyHandoff()"><i class="fas fa-volume-high"></i> Desbloquear audio</button></div>
 
     <div class="nowarfy-auth-modal" id="nowarfyAuthModal" role="dialog" aria-modal="true" aria-labelledby="nowarfyAuthTitle" hidden onclick="if (event.target === this) closeNowarfyAuth()">
         <div class="nowarfy-auth-dialog">
@@ -1756,6 +1756,7 @@
         let searchTimeout = null;
         let ytPlayer = null;
         let ytStartupTimer = null;
+        let ytPlaybackIntent = false;
         let ytApiReady = false;
         let pendingYTRequest = null;
         let progressInterval = null;
@@ -4825,6 +4826,9 @@
             automaticAdvanceTimer = window.setTimeout(async () => {
                 automaticAdvanceTimer = null;
                 if (playbackStoppedByUser || currentPlayingQid !== targetQid) return;
+                // Ante un bloqueo de YouTube, preferir una fuente directa ya reservada
+                // (Openverse/Jamendo) antes de encadenar otro embed que pueda fallar igual.
+                if (reason.startsWith('youtube-') && await recoverAutomaticQueue(targetQid)) return;
                 if (nextSong(false)) return;
                 if (await recoverAutomaticQueue(targetQid)) return;
                 isPlaying = false;
@@ -4977,6 +4981,7 @@
                 playerConfig.videoId = resourceId;
             }
 
+            ytPlaybackIntent = !deferAutoplay;
             ytPlayer = new YT.Player('yt-player', playerConfig);
         }
 
@@ -5003,6 +5008,7 @@
             // La acción original del usuario ya habilitó reproducción: reintentamos
             // explícitamente al recibir onReady para que el primer Play no quede en -1.
             if (song?.type === 'yt' && !playbackStoppedByUser && !(resume?.wasPlaying === false) && ytPlayer.playVideo) {
+                ytPlaybackIntent = true;
                 window.setTimeout(() => {
                     if (ytPlayer && currentQueueSong()?.url === song.url && !playbackStoppedByUser) {
                         ytPlayer.playVideo();
@@ -5010,7 +5016,7 @@
                         ytStartupTimer = setTimeout(() => {
                             if (currentQueueSong()?.url !== song.url || playbackStoppedByUser || !ytPlayer?.getPlayerState) return;
                             const state = ytPlayer.getPlayerState();
-                            if (state !== YT.PlayerState.PLAYING && state !== YT.PlayerState.PAUSED) {
+                            if (state !== YT.PlayerState.PLAYING) {
                                 setTrackLoading(false);
                                 document.getElementById('videoStage')?.classList.add('is-error');
                                 showToast('YouTube no pudo iniciar este video; continuamos con otra pista', 'fa-forward');
@@ -5031,8 +5037,12 @@
                 setTrackLoading(false);
                 if (!progressInterval) startProgress(ytPlayer);
             } else if (event.data === YT.PlayerState.PAUSED) {
-                clearTimeout(ytStartupTimer);
-                ytStartupTimer = null;
+                // Una pausa voluntaria cancela el timeout; una pausa con intención de play
+                // puede ser el estado que deja el challenge anti-bot de YouTube.
+                if (playbackStoppedByUser || !ytPlaybackIntent) {
+                    clearTimeout(ytStartupTimer);
+                    ytStartupTimer = null;
+                }
                 isPlaying = false;
                 persistVideoResumeSession(true);
             } else if (event.data === YT.PlayerState.BUFFERING) {
@@ -5077,7 +5087,11 @@
                 playbackStoppedByUser = false;
             }
             if (song.type === 'yt') {
-                if (ytPlayer) { if (isPlaying) ytPlayer.pauseVideo(); else ytPlayer.playVideo(); isPlaying = !isPlaying; }
+                if (ytPlayer) {
+                    if (isPlaying) { ytPlaybackIntent = false; ytPlayer.pauseVideo(); }
+                    else { ytPlaybackIntent = true; ytPlayer.playVideo(); }
+                    isPlaying = !isPlaying;
+                }
             } else {
                 if (crossfadeInProgress) cancelDirectCrossfade();
                 if (isPlaying) activeAudioEl.pause(); else activeAudioEl.play(); isPlaying = !isPlaying;
@@ -5115,6 +5129,7 @@
             clearAutomaticAdvance();
             clearTimeout(ytStartupTimer);
             ytStartupTimer = null;
+            ytPlaybackIntent = false;
             if (ytPlayer) { ytPlayer.stopVideo(); ytPlayer.destroy(); ytPlayer = null; }
             pendingYTRequest = null;
             freeVideoEl.pause();
