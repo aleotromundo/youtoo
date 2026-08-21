@@ -2,6 +2,7 @@ const ALLOWED_SOURCES = new Set(['youtube', 'openverse', 'commons', 'jamendo']);
 const ALLOWED_MEDIA_TYPES = new Set(['yt', 'mp3', 'freevideo']);
 const MAX_BATCH = 100;
 const MAX_LIMIT = 50;
+const ALLOWED_QUERY_SOURCES = new Set(['youtube', 'openverse', 'commons']);
 
 function json(res, status, payload, headers = {}) {
   Object.entries({ 'Content-Type': 'application/json; charset=utf-8', ...headers }).forEach(([key, value]) => res.setHeader(key, value));
@@ -75,6 +76,48 @@ function asRow(entry) {
     last_error: text(entry.lastError || entry.last_error, 1000) || null,
     metadata: entry.metadata && typeof entry.metadata === 'object' && !Array.isArray(entry.metadata) ? entry.metadata : {}
   };
+}
+
+function asQueryRow(body = {}) {
+  const source = text(body.source, 32);
+  const query = text(body.query, 300);
+  const styleKey = text(body.styleKey || body.style_key, 200) || 'rock metal';
+  const queryKey = text(body.queryKey || body.query_key, 512) || `${source}:${styleKey}:${query}`.toLowerCase();
+  if (!queryKey || !query || !ALLOWED_QUERY_SOURCES.has(source)) return null;
+  const status = ['ok', 'quota', 'error'].includes(body.status) ? body.status : 'ok';
+  return {
+    query_key: queryKey,
+    source,
+    query,
+    style_key: styleKey,
+    seed_key: text(body.seedKey || body.seed_key, 512) || null,
+    next_page_token: text(body.nextPageToken || body.next_page_token, 1000) || null,
+    pages_consumed: Math.max(0, Number.parseInt(body.pagesConsumed || body.pages_consumed || 0, 10) || 0),
+    status,
+    last_attempt_at: isoOrNull(body.lastAttemptAt || body.last_attempt_at) || new Date().toISOString(),
+    last_success_at: isoOrNull(body.lastSuccessAt || body.last_success_at) || (status === 'ok' ? new Date().toISOString() : null),
+    retry_after: isoOrNull(body.retryAfter || body.retry_after),
+    result_count: Math.max(0, Number.parseInt(body.resultCount || body.result_count || 0, 10) || 0),
+    metadata: body.metadata && typeof body.metadata === 'object' && !Array.isArray(body.metadata) ? body.metadata : {},
+    updated_at: new Date().toISOString()
+  };
+}
+
+function queryLookupUrl(req) {
+  const params = new URLSearchParams({ select: '*' });
+  const queryKey = text(req.query.queryKey || req.query.query_key, 512);
+  if (queryKey) params.set('query_key', `eq.${queryKey}`);
+  else {
+    const source = text(req.query.source, 32);
+    const query = text(req.query.query, 300);
+    const styleKey = text(req.query.styleKey || req.query.style_key, 200) || 'rock metal';
+    if (!ALLOWED_QUERY_SOURCES.has(source) || !query) return null;
+    params.set('source', `eq.${source}`);
+    params.set('query', `eq.${query}`);
+    params.set('style_key', `eq.${styleKey}`);
+  }
+  params.set('limit', '1');
+  return params.toString();
 }
 
 function fromRow(row) {
@@ -166,6 +209,15 @@ export default async function handler(req, res) {
 
   try {
     const action = text(req.query.action || (req.method === 'GET' ? 'search' : 'upsert'), 40);
+    if (req.method === 'GET' && action === 'query') {
+      const lookup = queryLookupUrl(req);
+      if (!lookup) return json(res, 400, { error: { source: 'supabase', message: 'Faltan queryKey o source, query y styleKey válidos' } });
+      const result = await supabaseRequest(`youtoo_discovery_queries?${lookup}`);
+      if (!result.response?.ok) return json(res, result.response?.status || 502, { error: { source: 'supabase', message: result.data?.message || 'No se pudo leer el estado de la consulta' } });
+      compactCache(res);
+      return json(res, 200, { query: Array.isArray(result.data) ? result.data[0] || null : null });
+    }
+
     if (req.method === 'GET' && action === 'search') {
       const result = await supabaseRequest(`youtoo_discovery_candidates?${queryUrl(req)}`);
       if (!result.response?.ok) return json(res, result.response?.status || 502, { error: { source: 'supabase', message: result.data?.message || 'No se pudo leer la reserva global' } });
@@ -184,6 +236,14 @@ export default async function handler(req, res) {
 
     if (req.method !== 'POST') return json(res, 405, { error: { source: 'supabase', message: 'Método no permitido' } });
     const body = req.body || {};
+
+    if (action === 'query-upsert') {
+      const row = asQueryRow(body);
+      if (!row) return json(res, 400, { error: { source: 'supabase', message: 'Estado de consulta inválido' } });
+      const result = await supabaseRequest('youtoo_discovery_queries?on_conflict=query_key', { method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' }, body: JSON.stringify(row) });
+      if (!result.response?.ok) return json(res, result.response?.status || 502, { error: { source: 'supabase', message: result.data?.message || 'No se pudo guardar el estado de la consulta' } });
+      return json(res, 200, { saved: true, queryKey: row.query_key });
+    }
 
     if (action === 'upsert') {
       const entries = (Array.isArray(body.entries) ? body.entries : []).slice(0, MAX_BATCH).map(asRow).filter(Boolean);

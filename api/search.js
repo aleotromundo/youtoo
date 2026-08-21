@@ -253,9 +253,10 @@ export default async function handler(req, res) {
         maxResults: String(maxResults),
         q: query.trim(),
         key: apiKey,
-        fields: 'items(id(kind,videoId,playlistId,channelId),snippet(title,description,publishedAt,channelId,channelTitle,thumbnails))'
+        fields: 'nextPageToken,prevPageToken,pageInfo(totalResults,resultsPerPage),items(id(kind,videoId,playlistId,channelId),snippet(title,description,publishedAt,channelId,channelTitle,thumbnails))'
       });
       if (req.query.channelId && typeof req.query.channelId === 'string') params.set('channelId', req.query.channelId);
+      if (req.query.pageToken && typeof req.query.pageToken === 'string') params.set('pageToken', req.query.pageToken);
       if (resourceTypes === 'video') {
         params.set('videoEmbeddable', 'true');
         params.set('videoSyndicated', 'true');

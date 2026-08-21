@@ -1820,29 +1820,42 @@
 
             const channelParam = opts.channelId ? `&channelId=${encodeURIComponent(opts.channelId)}` : '';
             const maxResults = opts.maxResults || 20;
+            const styleKey = opts.styleKey || inferArtistStyle(query, []);
+            const pageToken = String(opts.pageToken || '').trim();
+            const queryKey = reserveQueryKey('youtube', query, styleKey, resourceTypes, opts.channelId || '');
             try {
+                const previous = await reserveGetQueryState({ source: 'youtube', query, styleKey, queryKey });
+                const retryAt = previous?.retry_after ? Date.parse(previous.retry_after) : 0;
+                if (previous?.status === 'quota' && retryAt > Date.now()) return [];
                 let response;
                 if (YOUTUBE_API_KEY) {
                     const videoFilters = resourceTypes === 'video' ? '&videoEmbeddable=true&videoSyndicated=true' : '';
-                    const url = `https://www.googleapis.com/youtube/v3/search?part=snippet&type=${resourceTypes}&maxResults=${maxResults}&q=${encodeURIComponent(query)}${channelParam}${videoFilters}&key=${YOUTUBE_API_KEY}`;
+                    const pageParam = pageToken ? `&pageToken=${encodeURIComponent(pageToken)}` : '';
+                    const url = `https://www.googleapis.com/youtube/v3/search?part=snippet&type=${resourceTypes}&maxResults=${maxResults}&q=${encodeURIComponent(query)}${channelParam}${videoFilters}${pageParam}&key=${YOUTUBE_API_KEY}`;
                     response = await fetch(url);
                 } else {
-                    response = await fetch(`/api/search?query=${encodeURIComponent(query)}&type=youtube&resourceTypes=${resourceTypes}${channelParam}&maxResults=${maxResults}`);
+                    const pageParam = pageToken ? `&pageToken=${encodeURIComponent(pageToken)}` : '';
+                    response = await fetch(`/api/search?query=${encodeURIComponent(query)}&type=youtube&resourceTypes=${resourceTypes}${channelParam}&maxResults=${maxResults}${pageParam}`);
                 }
 
                 const data = await response.json();
                 if (!response.ok) {
-                    if (response.status === 429 || data?.error?.reason === 'RATE_LIMIT_EXCEEDED') markYouTubeQuotaUnavailable();
+                    const reason = data?.error?.reason || data?.error?.status || '';
+                    const quota = response.status === 429 || /quota|rate.?limit/i.test(reason);
+                    if (quota) markYouTubeQuotaUnavailable();
+                    reserveSaveQueryState({ queryKey, source: 'youtube', query, styleKey, seedKey: opts.seed?.artist || null, pagesConsumed: Number(previous?.pages_consumed || 0), status: quota ? 'quota' : 'error', retryAfter: new Date(Date.now() + (quota ? 30 : 5) * 60 * 1000).toISOString(), resultCount: 0, metadata: { resourceTypes, channelId: opts.channelId || null, pageToken: pageToken || null, errorReason: reason || null } });
                     return [];
                 }
                 const mapped = data.items && data.items.length ? mapYouTubeItems(data.items) : [];
+                const nextPageToken = String(data.nextPageToken || '').trim();
+                reserveSaveQueryState({ queryKey, source: 'youtube', query, styleKey, seedKey: opts.seed?.artist || null, nextPageToken, pagesConsumed: Number(previous?.pages_consumed || 0) + 1, status: 'ok', retryAfter: null, resultCount: Number(data.pageInfo?.totalResults || mapped.length || 0), metadata: { resourceTypes, channelId: opts.channelId || null, pageToken: pageToken || null, nextPageToken, resultsReturned: mapped.length, pageInfo: data.pageInfo || null } });
                 void reserveDiscoveredCandidates(mapped, { context: opts.reserveContext || 'manual', seed: opts.seed || null, queryContext: `${query} ${resourceTypes}`.trim().toLowerCase() });
                 return mapped;
-            } catch (e) {
+                        } catch (e) {
+                reserveSaveQueryState({ queryKey, source: 'youtube', query, styleKey, seedKey: opts.seed?.artist || null, status: 'error', retryAfter: new Date(Date.now() + 5 * 60 * 1000).toISOString(), metadata: { resourceTypes, channelId: opts.channelId || null, pageToken: pageToken || null, error: String(e?.message || e) } });
                 return [];
             }
         }
-
         // Formato "clásico" de pedido al backend (el que funcionaba antes): sin resourceTypes ni channelId.
         async function fetchYouTubeLegacy(query, maxResults = 20) {
             try {
@@ -3050,6 +3063,22 @@
                 method: 'POST',
                 body: JSON.stringify({ action: 'upsert', entries: entries.slice(0, 100) })
             }).finally(() => { globalReserveSyncInFlight = false; });
+        }
+        function reserveQueryKey(source, query, styleKey = '', resourceTypes = '', channelId = '') {
+            return [source, resourceTypes || 'all', channelId || 'all', styleKey || 'rock metal', query].map(value => String(value || '').trim().toLowerCase()).join(':').slice(0, 512);
+        }
+        async function reserveGetQueryState({ source = 'youtube', query = '', styleKey = '', queryKey = '' } = {}) {
+            const params = new URLSearchParams({ action: 'query', source, query, styleKey });
+            if (queryKey) params.set('queryKey', queryKey);
+            const data = await globalReserveRequest(`${GLOBAL_RESERVE_ENDPOINT}?${params.toString()}`);
+            return data?.query || null;
+        }
+        function reserveSaveQueryState(payload) {
+            if (!payload?.source || !payload?.query) return;
+            void globalReserveRequest(GLOBAL_RESERVE_ENDPOINT, {
+                method: 'POST',
+                body: JSON.stringify({ action: 'query-upsert', ...payload })
+            });
         }
         async function reserveGetGlobalCandidates({ styleKey = '', artist = '', source = '', query = '', scope = 'radio', limit = 20 } = {}) {
             const params = new URLSearchParams({ action: 'search', styleKey, artist, source, query, scope, limit: String(Math.min(Math.max(Number(limit) || 20, 1), 50)) });
