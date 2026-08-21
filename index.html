@@ -1936,7 +1936,7 @@
             if (q) performSmartSearch(q); else resetView();
         }
 
-        async function fetchOpenverseTracks(query, limit = 20) {
+        async function fetchOpenverseTracks(query, limit = 20, options = {}) {
             const response = await fetch(`/api/search?type=openverse&query=${encodeURIComponent(query)}&maxResults=${Math.min(Math.max(limit, 1), 20)}`);
             const data = await response.json();
             if (!response.ok || !data.results?.length) return [];
@@ -1946,9 +1946,10 @@
                 .filter(track => allowedAudioTypes.has(String(track.filetype || '').toLowerCase()))
                 .filter(track => String(track.url || '').trim())
                 .filter(track => String(track.title || '').trim() && String(track.creator || '').trim())
-                .filter(track => !/sound_effect|audiobook|audio_book|spoken|podcast|lecture/i.test(String(track.category || '')))
-                .filter(track => Number(track.duration) >= 60000)
+                .filter(track => !options.radioOnly || !/sound_effect|audiobook|audio_book|spoken|podcast|lecture/i.test(String(track.category || '')))
+                .filter(track => !options.radioOnly || Number(track.duration) >= 60000)
                 .filter(track => {
+                    if (!options.radioOnly) return true;
                     const tags = Array.isArray(track.tags)
                         ? track.tags.map(tag => typeof tag === 'object' ? tag.name || '' : tag).join(' ')
                         : String(track.tags || '');
@@ -1990,7 +1991,7 @@
         async function fetchFreeMusicCollection(collection) {
             const cacheKey = `openverse:${collection.query}`;
             if (freeMediaCollectionCache.has(cacheKey)) return freeMediaCollectionCache.get(cacheKey);
-            const tracks = await fetchOpenverseTracks(collection.query, 20);
+            const tracks = await fetchOpenverseTracks(collection.query, 20, { radioOnly: true });
             freeMediaCollectionCache.set(cacheKey, tracks);
             return tracks;
         }
@@ -3208,7 +3209,7 @@
                 }
             } catch (e) { /* almacenamiento no disponible */ }
             try {
-                const fresh = (await fetchOpenverseTracks(query, Math.min(Math.max(count, 10), 20)))
+                const fresh = (await fetchOpenverseTracks(query, Math.min(Math.max(count, 10), 20), { radioOnly: true }))
                     .filter(isRadioMusicTrack);
                 if (fresh.length) {
                     try {
@@ -3276,7 +3277,7 @@
 
             // Último respaldo para que la radio no se quede sin contenido.
             if (remaining() > 0) {
-                appendUniqueSongs(await fetchRockMetalTracks(remaining()), added, QUEUE_BATCH);
+                appendUniqueSongs(await fetchRockMetalTracks(remaining(), getRadioStyle(seed)), added, QUEUE_BATCH);
             }
 
             return added;
