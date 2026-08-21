@@ -3389,11 +3389,11 @@
                     cached = Array.isArray(entry.tracks) ? entry.tracks : [];
                 }
             } catch (e) { /* almacenamiento no disponible */ }
+            let fresh = [];
             try {
                 const freshResults = await Promise.allSettled(queryVariants.map(variant =>
                     fetchOpenverseTracks(variant, Math.min(Math.max(count, 10), 20), { radioOnly: true, reserveContext: 'radio', seed: seedSong })
                 ));
-                const fresh = [];
                 const freshKeys = new Set();
                 freshResults.forEach(result => {
                     if (result.status !== 'fulfilled') return;
@@ -3408,11 +3408,10 @@
                         store[query] = { savedAt: Date.now(), tracks: fresh.slice(0, 40) };
                         localStorage.setItem(OPENVERSE_RADIO_CACHE_KEY, JSON.stringify(store));
                     } catch (e) { /* almacenamiento no disponible */ }
-                    return fresh;
                 }
             } catch (e) { /* cuota o red agotada: usar caché */ }
             const reserved = await reserveGetCandidates({ styleKey: style, source: 'openverse', limit: Math.max(count, 20) });
-            return [...cached, ...reserved, ...homeMusic].filter(isRadioMusicTrack);
+            return [...fresh, ...cached, ...reserved, ...homeMusic].filter(isRadioMusicTrack);
         }
 
         async function fetchSimilarArtistTracks(seedSong, count) {
@@ -3487,7 +3486,8 @@
             if (queueFetching || queue.length === 0) return;
             const idx = queue.findIndex(s => s._qid === currentPlayingQid);
             const remaining = queue.length - (idx + 1);
-            if (!force && remaining > QUEUE_LOW_WATER) return;
+            const needsInitialTopUp = queue.length < QUEUE_BATCH;
+            if (!force && !needsInitialTopUp && remaining > QUEUE_LOW_WATER) return;
             const seed = queue[idx] || queue[queue.length - 1];
             if (!seed) return;
             queueFetching = true;
