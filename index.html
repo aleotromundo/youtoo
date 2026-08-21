@@ -1336,18 +1336,31 @@
             if (!email) { authStatus('Escribí un email válido.', true); return; }
             if ((mode === 'signin' || mode === 'signup') && password.length < 6) { authStatus('La contraseña debe tener al menos 6 caracteres.', true); return; }
             authStatus('Procesando…');
-            let result;
-            if (mode === 'magic') {
-                result = await nowarfySupabase.auth.signInWithOtp({ email, options: { emailRedirectTo: `${window.location.origin}${window.location.pathname}` } });
-            } else if (mode === 'signup') {
-                result = await nowarfySupabase.auth.signUp({ email, password, options: { emailRedirectTo: `${window.location.origin}${window.location.pathname}` } });
-            } else {
-                result = await nowarfySupabase.auth.signInWithPassword({ email, password });
+            try {
+                let result;
+                if (mode === 'magic') {
+                    result = await nowarfySupabase.auth.signInWithOtp({ email, options: { emailRedirectTo: `${window.location.origin}${window.location.pathname}` } });
+                } else if (mode === 'signup') {
+                    result = await nowarfySupabase.auth.signUp({ email, password, options: { emailRedirectTo: `${window.location.origin}${window.location.pathname}` } });
+                } else {
+                    result = await nowarfySupabase.auth.signInWithPassword({ email, password });
+                }
+                if (result.error) { authStatus(result.error.message || 'No se pudo completar la autenticación.', true); return; }
+                if (mode === 'magic') {
+                    closeNowarfyAuth();
+                    showToast('Enlace mágico enviado. Revisá tu correo para continuar.', 'fa-envelope');
+                } else if (mode === 'signup' && !result.data?.session) {
+                    closeNowarfyAuth();
+                    showToast('Cuenta creada. Revisá tu correo para confirmar el email y luego iniciá sesión.', 'fa-envelope');
+                } else {
+                    authStatus('Sesión iniciada correctamente.');
+                    updateNowarfyAuthUI();
+                    closeNowarfyAuth();
+                    showToast('Sesión iniciada. Este dispositivo ya puede sincronizarse.', 'fa-user-check');
+                }
+            } catch (error) {
+                authStatus(error?.message || 'No se pudo completar la autenticación.', true);
             }
-            if (result.error) { authStatus(result.error.message || 'No se pudo completar la autenticación.', true); return; }
-            if (mode === 'magic') authStatus('Te enviamos un enlace mágico. Abrilo en este dispositivo para completar el acceso.');
-            else if (mode === 'signup' && !result.data?.session) authStatus('Cuenta creada. Revisá tu correo para confirmar el email antes de iniciar sesión.');
-            else { authStatus('Sesión iniciada correctamente.'); updateNowarfyAuthUI(); }
         }
         async function signOutNowarfy() {
             if (nowarfySupabase) await nowarfySupabase.auth.signOut();
