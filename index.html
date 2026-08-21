@@ -2893,8 +2893,8 @@
             return {
                 ...song,
                 candidateKey,
-                source: song.type === 'yt' ? 'youtube' : 'openverse',
-                sourceId: String(song.url),
+                source: song.source || (song.type === 'yt' ? 'youtube' : 'openverse'),
+                sourceId: String(song.sourceId || song.url),
                 styleKey,
                 radioEligible: context === 'radio' && typeof isRadioMusicTrack === 'function' ? isRadioMusicTrack(song) : false,
                 context,
@@ -3519,6 +3519,29 @@
             return [...fresh, ...cached, ...reserved, ...homeMusic].filter(isRadioMusicTrack);
         }
 
+        async function fetchJamendoGenreTracks(seedSong, count) {
+            const style = getRadioStyle(seedSong);
+            const query = `${style} music`;
+            try {
+                const response = await fetch(`/api/search?type=jamendo&query=${encodeURIComponent(query)}&style=${encodeURIComponent(style)}&maxResults=${Math.min(Math.max(count, 10), 20)}`);
+                const data = await response.json();
+                if (!response.ok || !Array.isArray(data.results)) return [];
+                const tracks = data.results.map(track => ({
+                    ...track,
+                    type: 'mp3',
+                    source: 'jamendo',
+                    sourceId: String(track.sourceId || track.id || track.url),
+                    img: track.img || track.thumbnail || 'assets/nowarfy-icon-512.png',
+                    genre: track.genre || style,
+                    license: track.license || 'Jamendo catalog license',
+                    sourceUrl: track.sourceUrl || ''
+                })).filter(isRadioMusicTrack);
+                void reserveDiscoveredCandidates(tracks, { context: 'radio', seed: seedSong });
+                return tracks;
+            } catch (e) {
+                return [];
+            }
+        }
         async function fetchSimilarArtistTracks(seedSong, count) {
             if (!seedSong || !seedSong.artist) return fetchRockMetalTracks(count, getRadioStyle(seedSong), seedSong);
             const artist = seedSong.artist;
@@ -3579,6 +3602,10 @@
                 appendUniqueSongs(await fetchOpenverseGenreTracks(seed, remaining()), added, QUEUE_BATCH);
             }
 
+            // Segunda fuente alternativa: Jamendo, consultada con el mismo estilo.
+            if (remaining() > 0) {
+                appendUniqueSongs(await fetchJamendoGenreTracks(seed, remaining()), added, QUEUE_BATCH);
+            }
             // Último respaldo para que la radio no se quede sin contenido.
             if (remaining() > 0) {
                 appendUniqueSongs(await fetchRockMetalTracks(remaining(), getRadioStyle(seed), seed), added, QUEUE_BATCH);

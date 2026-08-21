@@ -58,6 +58,31 @@ function mapCommonsVideoPage(page) {
   };
 }
 
+function mapJamendoTrack(track) {
+  const audio = String(track?.audio || '').trim();
+  const title = String(track?.name || '').trim();
+  const artist = String(track?.artist_name || '').trim();
+  if (!audio || !title || !artist) return null;
+  const genres = track?.musicinfo?.tags?.genres || track?.musicinfo?.tags?.instruments || [];
+  const license = String(track?.license_ccurl || track?.license || '').trim();
+  return {
+    id: String(track.id || ''),
+    title,
+    artist,
+    album: String(track.album_name || '').trim(),
+    description: String(track.album_name || '').trim(),
+    genre: Array.isArray(genres) ? genres.join(', ') : String(genres || ''),
+    duration: Number.isFinite(Number(track.duration)) ? Number(track.duration) : null,
+    url: audio,
+    thumbnail: String(track.image || track.album_image || '').trim(),
+    sourceUrl: String(track.shareurl || `https://www.jamendo.com/track/${track.id || ''}`).trim(),
+    license,
+    licenseVersion: license,
+    source: 'jamendo',
+    sourceId: String(track.id || '')
+  };
+}
+
 function parseChannelReference(value) {
   const raw = String(value || '').trim();
   if (!raw) return null;
@@ -271,6 +296,35 @@ export default async function handler(req, res) {
         .slice(0, boundedMax(req.query.maxResults, 12));
       compactCache(res);
       return res.status(200).json({ results });
+    }
+
+    if (type === 'jamendo') {
+      const clientId = String(process.env.JAMENDO_CLIENT_ID || '').trim();
+      if (!clientId) {
+        return res.status(503).json({ error: { source: 'jamendo', code: 'missing_client_id', message: 'Jamendo está preparado pero requiere JAMENDO_CLIENT_ID en Vercel' } });
+      }
+      if (!query || typeof query !== 'string') return res.status(400).json({ error: { source: 'jamendo', message: 'Falta el término de búsqueda' } });
+      const limit = Math.min(boundedMax(req.query.maxResults, 20), 50);
+      const style = String(req.query.style || query || '').trim();
+      const params = new URLSearchParams({
+        client_id: clientId,
+        format: 'json',
+        limit: String(limit),
+        search: query.trim().slice(0, 120),
+        fuzzytags: style.slice(0, 80),
+        audioformat: 'mp32',
+        imagesize: '300',
+        include: 'licenses,musicinfo',
+        type: 'single albumtrack'
+      });
+      const jamendoResp = await fetch(`https://api.jamendo.com/v3.0/tracks/?${params.toString()}`, {
+        headers: { 'User-Agent': 'Nowarfy-YouToo/1.0 (music discovery)' }
+      });
+      const jamendoData = await jamendoResp.json();
+      if (!jamendoResp.ok) return res.status(jamendoResp.status || 502).json({ error: { source: 'jamendo', message: jamendoData?.headers?.error_message || 'No se pudo consultar Jamendo' } });
+      const results = (jamendoData.results || []).map(mapJamendoTrack).filter(Boolean);
+      compactCache(res);
+      return res.status(200).json({ results, headers: jamendoData.headers || {} });
     }
 
     if (type === 'openverse') {

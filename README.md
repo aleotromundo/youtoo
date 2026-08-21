@@ -25,6 +25,12 @@ El despliegue actual es estático en Vercel. Las rutas desconocidas se sirven de
 
 Las búsquedas manuales de YouTube y Openverse permanecen abiertas. La radio automática aplica su propio contexto de género y estilo para priorizar canciones coherentes con la pista actual, conservar la deduplicación y utilizar caché local cuando una fuente externa no responde.
 
+Jamendo funciona como fuente alternativa opcional para la radio. Debe configurarse `JAMENDO_CLIENT_ID` únicamente como variable de entorno de Vercel; nunca se expone en `index.html`. Cuando está disponible, la radio consulta Jamendo por el estilo actual y guarda sus pistas, portadas, licencias y enlaces de origen en la reserva IndexedDB. Si falta la variable, el endpoint responde de forma controlada y la radio continúa con Openverse, la reserva local y el respaldo existente:
+
+```env
+JAMENDO_CLIENT_ID=...
+```
+
 ## Historial
 
 Las variantes antiguas del frontend fueron movidas a `archive/legacy/` para conservarlas sin confundirlas con la entrada activa. El historial completo de cambios permanece disponible en Git mediante `git log`.
