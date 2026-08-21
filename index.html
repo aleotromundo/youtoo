@@ -842,6 +842,26 @@
         .nowarfy-qr-copy small { margin-top: 1px; color: #9596b0; font-size: .6rem; }
         .nowarfy-qr-launch > i { color: #5eead4; font-size: .88rem; }
         .nowarfy-qr-modal[hidden] { display: none; }
+        .nowarfy-auth-modal[hidden] { display: none; }
+        .nowarfy-auth-modal { position: fixed; z-index: 10001; inset: 0; display: grid; place-items: center; padding: 22px; background: rgba(2,3,10,.78); backdrop-filter: blur(10px); }
+        .nowarfy-auth-dialog { position: relative; width: min(92vw, 430px); padding: 28px; border: 1px solid rgba(190,188,255,.28); border-radius: 22px; background: linear-gradient(145deg, #20213b, #0f101e); box-shadow: 0 28px 75px rgba(0,0,0,.55); }
+        .nowarfy-auth-dialog h2 { margin: 0; color: #fbfaff; font: 800 1.28rem 'Sora', sans-serif; letter-spacing: -.04em; }
+        .nowarfy-auth-dialog p { margin: 8px 0 18px; color: #adaec4; font-size: .82rem; line-height: 1.5; }
+        .nowarfy-auth-close { position: absolute; top: 12px; right: 12px; border: 0; background: transparent; color: #c8c8dd; font-size: 1.15rem; cursor: pointer; }
+        .nowarfy-auth-form { display: grid; gap: 10px; }
+        .nowarfy-auth-form label { color: #c9c9dc; font-size: .72rem; font-weight: 700; }
+        .nowarfy-auth-form input { width: 100%; box-sizing: border-box; border: 1px solid rgba(190,188,255,.24); border-radius: 11px; padding: 12px 13px; background: rgba(255,255,255,.08); color: #fff; outline: none; }
+        .nowarfy-auth-form input:focus { border-color: var(--accent, #9d8cff); box-shadow: 0 0 0 3px rgba(157,140,255,.16); }
+        .nowarfy-auth-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; margin-top: 5px; }
+        .nowarfy-auth-actions button, .nowarfy-auth-magic { border: 0; border-radius: 11px; padding: 11px 12px; color: #fff; background: rgba(255,255,255,.12); font-weight: 700; cursor: pointer; }
+        .nowarfy-auth-actions button.primary, .nowarfy-auth-magic { background: linear-gradient(135deg, #8e7cff, #56c4d8); }
+        .nowarfy-auth-magic { width: 100%; margin-top: 9px; }
+        .nowarfy-auth-status { min-height: 20px; margin-top: 12px; color: #b9e9d5; font-size: .78rem; line-height: 1.45; }
+        .nowarfy-auth-account { display: grid; gap: 10px; }
+        .nowarfy-auth-account strong { color: #fff; word-break: break-word; }
+        .nowarfy-auth-account button { border: 1px solid rgba(255,255,255,.16); border-radius: 10px; padding: 10px; color: #fff; background: rgba(255,255,255,.08); cursor: pointer; }
+        .nowarfy-account-btn { width: 100%; margin-top: 10px; border: 1px solid rgba(190,188,255,.2); border-radius: 10px; padding: 9px 10px; color: #e8e7ff; background: rgba(255,255,255,.06); cursor: pointer; font: inherit; font-size: .72rem; text-align: left; }
+        .auth-modal-open { overflow: hidden; }
         .nowarfy-qr-modal { position: fixed; z-index: 10000; inset: 0; display: grid; place-items: center; padding: 22px; background: rgba(2,3,10,.78); backdrop-filter: blur(10px); }
         .nowarfy-qr-dialog { position: relative; width: min(92vw, 392px); padding: 28px; border: 1px solid rgba(190,188,255,.28); border-radius: 20px; background: linear-gradient(145deg, #20213b, #0f101e); box-shadow: 0 28px 75px rgba(0,0,0,.55); text-align: center; }
         .nowarfy-qr-dialog h2 { margin: 0; color: #fbfaff; font: 800 1.28rem 'Sora', sans-serif; letter-spacing: -.04em; }
@@ -1063,7 +1083,7 @@
                     </ul>
                 </section>
             </div>
-            <div class="nowarfy-side-status"><strong><i class="fas fa-circle"></i> Datos en este dispositivo</strong>La cuenta y sincronización se activarán solo si las elegís.<button type="button" id="pwaInstallBtn" class="nowarfy-install-btn" hidden><i class="fas fa-download"></i> Instalar Nowarfy</button></div>
+            <div class="nowarfy-side-status"><strong><i class="fas fa-circle"></i> Datos en este dispositivo</strong><span id="authDeviceStatus">La cuenta y sincronización se activarán solo si las elegís.</span><button type="button" id="nowarfyAuthButton" class="nowarfy-account-btn" onclick="openNowarfyAuth()"><i class="fas fa-user"></i> Usar cuenta o continuar anónimo</button><button type="button" id="pwaInstallBtn" class="nowarfy-install-btn" hidden><i class="fas fa-download"></i> Instalar Nowarfy</button></div>
             <button type="button" id="nowarfyQrButton" class="nowarfy-qr-launch" onclick="openNowarfyQr()" aria-haspopup="dialog" aria-controls="nowarfyQrModal" aria-label="Mostrar código QR para abrir Nowarfy">
                 <img src="assets/nowarfy-qr.png" alt="">
                 <span class="nowarfy-qr-copy"><strong>Compartí Nowarfy</strong><small>Mostrar código QR</small></span>
@@ -1182,6 +1202,26 @@
         <div class="queue-drop-trash" id="queueTrash"><i class="fas fa-trash"></i> Soltá aquí para quitarla de la Playlist</div>
     </div>
 
+    <div class="nowarfy-auth-modal" id="nowarfyAuthModal" role="dialog" aria-modal="true" aria-labelledby="nowarfyAuthTitle" hidden onclick="if (event.target === this) closeNowarfyAuth()">
+        <div class="nowarfy-auth-dialog">
+            <button type="button" class="nowarfy-auth-close" onclick="closeNowarfyAuth()" aria-label="Cerrar cuenta"><i class="fas fa-xmark"></i></button>
+            <h2 id="nowarfyAuthTitle">Tu cuenta de Nowarfy</h2>
+            <p id="nowarfyAuthIntro">Usá el modo anónimo para mantener todo en este dispositivo, o iniciá sesión para preparar la sincronización entre tus dispositivos.</p>
+            <div id="nowarfyAuthGuestPanel" class="nowarfy-auth-account">
+                <div class="nowarfy-auth-form">
+                    <label for="authEmailInput">Email</label>
+                    <input id="authEmailInput" type="email" autocomplete="email" placeholder="vos@ejemplo.com">
+                    <label for="authPasswordInput">Contraseña</label>
+                    <input id="authPasswordInput" type="password" autocomplete="current-password" placeholder="Mínimo 6 caracteres">
+                    <div class="nowarfy-auth-actions"><button type="button" onclick="submitNowarfyAuth('signin')">Iniciar sesión</button><button type="button" class="primary" onclick="submitNowarfyAuth('signup')">Crear cuenta</button></div>
+                    <button type="button" class="nowarfy-auth-magic" onclick="submitNowarfyAuth('magic')"><i class="fas fa-wand-magic-sparkles"></i> Enviarme un enlace mágico</button>
+                </div>
+            </div>
+            <div id="nowarfyAuthUserPanel" class="nowarfy-auth-account" hidden><strong id="nowarfyAuthUserEmail"></strong><span>Cuenta autenticada. Este dispositivo podrá participar del control remoto cuando esté habilitado.</span><button type="button" onclick="signOutNowarfy()">Cerrar sesión</button></div>
+            <div class="nowarfy-auth-status" id="nowarfyAuthStatus" aria-live="polite"></div>
+        </div>
+    </div>
+
     <div class="nowarfy-qr-modal" id="nowarfyQrModal" role="dialog" aria-modal="true" aria-labelledby="nowarfyQrTitle" hidden onclick="if (event.target === this) closeNowarfyQr()">
         <div class="nowarfy-qr-dialog">
             <button type="button" class="nowarfy-qr-close" onclick="closeNowarfyQr()" aria-label="Cerrar código QR"><i class="fas fa-xmark"></i></button>
@@ -1196,11 +1236,109 @@
     <audio id="audio-element-next" preload="metadata" aria-hidden="true"></audio>
     <div class="toast-container" id="toastContainer"></div>
 
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script>
         // --- CONFIGURACIÓN ---
         const YOUTUBE_API_KEY = '';
         const OPENVERSE_CLIENT_ID = '';
         const OPENVERSE_CLIENT_SECRET = '';
+
+        // --- IDENTIDAD OPCIONAL DE NOWARFY ---
+        const AUTH_CONFIG_ENDPOINT = '/api/auth-config';
+        let nowarfySupabase = null;
+        let nowarfyAuthUser = null;
+        let nowarfyAuthConfigured = false;
+        let nowarfyAuthInitialised = false;
+        function authStatus(message, isError = false) {
+            const target = document.getElementById('nowarfyAuthStatus');
+            if (target) { target.textContent = message || ''; target.style.color = isError ? '#ffb5bd' : '#b9e9d5'; }
+        }
+        function updateNowarfyAuthUI() {
+            const button = document.getElementById('nowarfyAuthButton');
+            const deviceStatus = document.getElementById('authDeviceStatus');
+            const guest = document.getElementById('nowarfyAuthGuestPanel');
+            const userPanel = document.getElementById('nowarfyAuthUserPanel');
+            const email = document.getElementById('nowarfyAuthUserEmail');
+            if (nowarfyAuthUser) {
+                if (button) button.innerHTML = '<i class="fas fa-user-check"></i> Cuenta: ' + escapeHtml(nowarfyAuthUser.email || 'autenticada');
+                if (deviceStatus) deviceStatus.textContent = 'Cuenta autenticada; este dispositivo ya puede sincronizarse cuando se habilite el control remoto.';
+                if (guest) guest.hidden = true;
+                if (userPanel) userPanel.hidden = false;
+                if (email) email.textContent = nowarfyAuthUser.email || 'Usuario autenticado';
+            } else {
+                if (button) button.innerHTML = '<i class="fas fa-user"></i> Usar cuenta o continuar anónimo';
+                if (deviceStatus) deviceStatus.textContent = nowarfyAuthConfigured ? 'Modo anónimo activo en este dispositivo; la cuenta es opcional.' : 'Modo anónimo activo; configurá la clave pública para habilitar cuentas.';
+                if (guest) guest.hidden = false;
+                if (userPanel) userPanel.hidden = true;
+            }
+        }
+        async function initNowarfyAuth() {
+            if (nowarfyAuthInitialised) return;
+            nowarfyAuthInitialised = true;
+            try {
+                const response = await fetch(AUTH_CONFIG_ENDPOINT, { cache: 'no-store' });
+                const config = await response.json().catch(() => ({}));
+                if (!response.ok || !config.configured || !window.supabase?.createClient) {
+                    nowarfyAuthConfigured = false;
+                    updateNowarfyAuthUI();
+                    return;
+                }
+                nowarfySupabase = window.supabase.createClient(config.url, config.anonKey, { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true } });
+                nowarfyAuthConfigured = true;
+                const sessionResult = await nowarfySupabase.auth.getSession();
+                nowarfyAuthUser = sessionResult.data?.session?.user || null;
+                nowarfySupabase.auth.onAuthStateChange((_event, session) => {
+                    nowarfyAuthUser = session?.user || null;
+                    updateNowarfyAuthUI();
+                });
+                updateNowarfyAuthUI();
+            } catch (error) {
+                nowarfyAuthConfigured = false;
+                updateNowarfyAuthUI();
+            }
+        }
+        function openNowarfyAuth() {
+            const modal = document.getElementById('nowarfyAuthModal');
+            if (!modal) return;
+            modal.hidden = false;
+            document.body.classList.add('auth-modal-open');
+            updateNowarfyAuthUI();
+            if (!nowarfyAuthConfigured && !nowarfyAuthUser) authStatus('La autenticación todavía no está configurada en este deployment.', true);
+            modal.querySelector('input:not([disabled])')?.focus();
+        }
+        function closeNowarfyAuth() {
+            const modal = document.getElementById('nowarfyAuthModal');
+            if (!modal || modal.hidden) return;
+            modal.hidden = true;
+            document.body.classList.remove('auth-modal-open');
+            authStatus('');
+        }
+        async function submitNowarfyAuth(mode) {
+            if (!nowarfyAuthConfigured || !nowarfySupabase) { authStatus('Falta configurar SUPABASE_ANON_KEY para activar las cuentas.', true); return; }
+            const email = String(document.getElementById('authEmailInput')?.value || '').trim();
+            const password = String(document.getElementById('authPasswordInput')?.value || '');
+            if (!email) { authStatus('Escribí un email válido.', true); return; }
+            if ((mode === 'signin' || mode === 'signup') && password.length < 6) { authStatus('La contraseña debe tener al menos 6 caracteres.', true); return; }
+            authStatus('Procesando…');
+            let result;
+            if (mode === 'magic') {
+                result = await nowarfySupabase.auth.signInWithOtp({ email, options: { emailRedirectTo: `${window.location.origin}${window.location.pathname}` } });
+            } else if (mode === 'signup') {
+                result = await nowarfySupabase.auth.signUp({ email, password, options: { emailRedirectTo: `${window.location.origin}${window.location.pathname}` } });
+            } else {
+                result = await nowarfySupabase.auth.signInWithPassword({ email, password });
+            }
+            if (result.error) { authStatus(result.error.message || 'No se pudo completar la autenticación.', true); return; }
+            if (mode === 'magic') authStatus('Te enviamos un enlace mágico. Abrilo en este dispositivo para completar el acceso.');
+            else if (mode === 'signup' && !result.data?.session) authStatus('Cuenta creada. Revisá tu correo para confirmar el email antes de iniciar sesión.');
+            else { authStatus('Sesión iniciada correctamente.'); updateNowarfyAuthUI(); }
+        }
+        async function signOutNowarfy() {
+            if (nowarfySupabase) await nowarfySupabase.auth.signOut();
+            nowarfyAuthUser = null;
+            updateNowarfyAuthUI();
+            authStatus('Sesión cerrada. El modo anónimo local continúa disponible.');
+        }
 
         let currentList = [];
         let favorites = JSON.parse(localStorage.getItem('nowarfy_favs')) || [];
@@ -4943,6 +5081,7 @@
                 document.onmousemove = null;
             }
         }
+        void initNowarfyAuth();
     </script>
 </body>
 </html>
