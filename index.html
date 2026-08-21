@@ -1822,6 +1822,8 @@
         const ROCK_METAL_DISCOVERY_QUERY = 'rock metal official music';
         const CONTENT_CATALOG_CACHE_KEY = 'nowarfy_catalog_cache_v1';
         const CONTENT_CATALOG_CACHE_MAX_AGE_MS = 6 * 60 * 60 * 1000;
+        const OPENVERSE_RADIO_CACHE_KEY = 'nowarfy_openverse_radio_cache_v1';
+        const OPENVERSE_RADIO_CACHE_MAX_AGE_MS = 14 * 24 * 60 * 60 * 1000;
         const EMERGENCY_VIDEO_CATALOG = [
             { title: 'Metallica: Nothing Else Matters (Official Music Video)', artist: 'Metallica', channelTitle: 'Metallica', url: 'tAGnKpE4NCI', img: 'https://i.ytimg.com/vi/tAGnKpE4NCI/hqdefault.jpg', type: 'yt', resourceKind: 'youtube#video', description: 'Videoclip oficial de Metallica.' },
             { title: 'Nirvana - Smells Like Teen Spirit (Official Music Video)', artist: 'NirvanaVEVO', channelTitle: 'NirvanaVEVO', url: 'hTWKbfoikeg', img: 'https://i.ytimg.com/vi/hTWKbfoikeg/hqdefault.jpg', type: 'yt', resourceKind: 'youtube#video', description: 'Videoclip oficial de Nirvana.' },
@@ -1939,12 +1941,12 @@
             const data = await response.json();
             if (!response.ok || !data.results?.length) return [];
             const allowedAudioTypes = new Set(['mp3', 'ogg', 'opus', 'm4a', 'aac']);
-            const unwantedAudioTerms = /\b(sound effect|sound-effect|sfx|foley|ambient|ambience|ambiente|noise|ruido|whoosh|impact|explosion|sample|sampling|loop|drum loop|drum circle|water|sonar|test tone|tone generator|field recording|field-recording|white noise|pink noise)\b/i;
+            const unwantedAudioTerms = /\b(sound effect|sound-effect|sfx|foley|ambient|ambience|ambiente|noise|ruido|whoosh|impact|explosion|sample|sampling|loop|drum loop|drum circle|water|sonar|test tone|tone generator|field recording|field-recording|white noise|pink noise|audiobook|audio book|audiolibro|spoken word|narration|narrator|chapter|book reading|story|stories|lecture|podcast|interview|meditation|sleep music|children|bedtime)\b/i;
             return data.results
                 .filter(track => allowedAudioTypes.has(String(track.filetype || '').toLowerCase()))
                 .filter(track => String(track.url || '').trim())
                 .filter(track => String(track.title || '').trim() && String(track.creator || '').trim())
-                .filter(track => (track.category || '').toLowerCase() !== 'sound_effect')
+                .filter(track => !/sound_effect|audiobook|audio_book|spoken|podcast|lecture/i.test(String(track.category || '')))
                 .filter(track => Number(track.duration) >= 60000)
                 .filter(track => {
                     const tags = Array.isArray(track.tags)
@@ -2965,7 +2967,7 @@
                 ...homeVideos,
                 ...homeRecommended,
                 ...EMERGENCY_VIDEO_CATALOG
-            ], 120).filter(song => song?.url);
+            ], 120).filter(song => song?.url && isRadioMusicTrack(song));
             if (!catalogCandidates.length) return;
             const initialSongs = [];
             const initialKeys = new Set();
@@ -3188,13 +3190,29 @@
         async function fetchOpenverseGenreTracks(seedSong, count) {
             const genre = String(seedSong?.genre || '').trim();
             const query = genre && genre.toLowerCase() !== 'unknown'
-                ? `${genre} music`
+                ? `${genre} rock metal music`
                 : 'rock metal music';
+            let cached = [];
             try {
-                return await fetchOpenverseTracks(query, count);
-            } catch (e) {
-                return [];
-            }
+                const store = JSON.parse(localStorage.getItem(OPENVERSE_RADIO_CACHE_KEY) || '{}');
+                const entry = store[query];
+                if (entry && Date.now() - Number(entry.savedAt || 0) < OPENVERSE_RADIO_CACHE_MAX_AGE_MS) {
+                    cached = Array.isArray(entry.tracks) ? entry.tracks : [];
+                }
+            } catch (e) { /* almacenamiento no disponible */ }
+            try {
+                const fresh = (await fetchOpenverseTracks(query, Math.min(Math.max(count, 10), 20)))
+                    .filter(isRadioMusicTrack);
+                if (fresh.length) {
+                    try {
+                        const store = JSON.parse(localStorage.getItem(OPENVERSE_RADIO_CACHE_KEY) || '{}');
+                        store[query] = { savedAt: Date.now(), tracks: fresh.slice(0, 20) };
+                        localStorage.setItem(OPENVERSE_RADIO_CACHE_KEY, JSON.stringify(store));
+                    } catch (e) { /* almacenamiento no disponible */ }
+                    return fresh;
+                }
+            } catch (e) { /* cuota o red agotada: usar caché */ }
+            return [...cached, ...homeMusic].filter(isRadioMusicTrack);
         }
 
         async function fetchSimilarArtistTracks(seedSong, count) {
@@ -3211,9 +3229,16 @@
             } catch (e) { return []; }
         }
 
+        function isRadioMusicTrack(song) {
+            if (!song?.url || !['yt', 'mp3'].includes(song.type)) return false;
+            const text = `${song.title || ''} ${song.artist || ''} ${song.description || ''} ${song.genre || ''}`.toLowerCase();
+            return !/audiobook|audio book|audiolibro|spoken word|narration|narrator|chapter|book reading|story|stories|lecture|podcast|interview|meditation|sleep music|children|bedtime|sound effect|foley|noise|ambient/.test(text);
+        }
+
         function appendUniqueSongs(candidates, target, limit) {
             for (const song of candidates || []) {
                 if (target.length >= limit || !song?.url) break;
+                if (!isRadioMusicTrack(song)) continue;
                 const key = songKey(song);
                 if (queueSeenKeys.has(key)) continue;
                 queueSeenKeys.add(key);
@@ -3322,7 +3347,8 @@
             try {
                 const savedQueue = JSON.parse(localStorage.getItem('nowarfy_queue'));
                 if (!Array.isArray(savedQueue) || !savedQueue.length) return;
-                queue = savedQueue;
+                queue = savedQueue.filter(isRadioMusicTrack);
+                if (!queue.length) return;
                 queueSeenKeys = new Set(queue.map(songKey));
                 queueIdCounter = queue.reduce((max, s) => Math.max(max, s._qid || 0), 0);
                 queueRound = parseInt(localStorage.getItem('nowarfy_queue_round'), 10) || 0;
@@ -3612,7 +3638,7 @@
         function findAutomaticFallback(current) {
             const currentId = String(current?.url || '');
             const candidates = [...currentList, ...homeMusic, ...homeMusicVideos, ...homeVideos]
-                .filter(item => item?.url && String(item.url) !== currentId);
+                .filter(item => item?.url && String(item.url) !== currentId && isRadioMusicTrack(item));
             return candidates.find(item => !queueSeenKeys.has(songKey(item))) || null;
         }
 
