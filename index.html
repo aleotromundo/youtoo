@@ -1322,6 +1322,7 @@
         let nowarfyRemoteStateTimer = null;
         let nowarfyAudioUnlocked = false;
         let nowarfyPendingHandoff = null;
+        let nowarfyPendingRemoteCommands = [];
         const NOWARFY_REMOTE_DEVICE_KEY = 'nowarfy_remote_device_key_v1';
         const nowarfyRemoteDeviceKey = localStorage.getItem(NOWARFY_REMOTE_DEVICE_KEY) || (() => { const key = (crypto.randomUUID?.() || `${Date.now()}-${Math.random()}-${Math.random()}`).replace(/-/g, ''); localStorage.setItem(NOWARFY_REMOTE_DEVICE_KEY, key); return key; })();
         function authStatus(message, isError = false) {
@@ -1570,9 +1571,10 @@
                         if (wasPlayer && !nowarfyRemoteIsPlayer) { stopAll(); isPlaying = false; updateIcon(); setTrackLoading(false); }
                         updateNowarfyAuthUI();
                         if (payload.new.state) updateRemoteControlsFromState(payload.new.state);
+                        if (nowarfyRemoteIsPlayer && nowarfyPendingRemoteCommands.length) { const pending = nowarfyPendingRemoteCommands.splice(0); pending.forEach(command => void executeNowarfyRemoteCommand(command)); }
                         remoteStatus(nowarfyRemoteIsPlayer ? 'Este dispositivo es el reproductor activo.' : 'Control remoto conectado; el reproductor activo está en otro dispositivo.');
                     })
-                    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'youtoo_remote_commands', filter: `user_id=eq.${nowarfyAuthUser.id}` }, payload => { const command = payload.new.command || {}; if (payload.new.device_id !== nowarfyRemoteDeviceId && (!command.targetDeviceId || command.targetDeviceId === nowarfyRemoteDeviceId)) void executeNowarfyRemoteCommand(command); })
+                    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'youtoo_remote_commands', filter: `user_id=eq.${nowarfyAuthUser.id}` }, payload => { const command = payload.new.command || {}; if (payload.new.device_id !== nowarfyRemoteDeviceId && (!command.targetDeviceId || command.targetDeviceId === nowarfyRemoteDeviceId)) { if (nowarfyRemoteIsPlayer) void executeNowarfyRemoteCommand(command); else nowarfyPendingRemoteCommands.push(command); } })
                     .subscribe(status => { if (status === 'SUBSCRIBED') { updateNowarfyAuthUI(); remoteStatus(nowarfyRemoteIsPlayer ? 'Este dispositivo es el reproductor activo.' : 'Control remoto conectado; elegí otro dispositivo como reproductor.'); } });
                 // Un ingreso nuevo debe hidratarse con el estado existente de la cuenta antes de
                 // mostrar su Playlist local. Solo el reproductor activo conserva su estado local.
