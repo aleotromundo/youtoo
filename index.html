@@ -4108,7 +4108,13 @@
         function isRadioMusicTrack(song) {
             if (!song?.url || !['yt', 'mp3'].includes(song.type)) return false;
             const text = `${song.title || ''} ${song.artist || ''} ${song.description || ''} ${song.genre || ''}`.toLowerCase();
-            return !/audiobook|audio book|audiolibro|spoken word|narration|narrator|chapter|book reading|story|stories|lecture|podcast|interview|meditation|sleep music|children|bedtime|sound effect|foley|noise|ambient/.test(text);
+            if (/audiobook|audio book|audiolibro|spoken word|narration|narrator|chapter|book reading|story|stories|lecture|podcast|interview|meditation|sleep music|children|bedtime|sound effect|foley|noise|ambient/.test(text)) return false;
+            // La radio automática debe ser musical: YouTube categoryId 10 es Music.
+            // Las búsquedas manuales siguen pudiendo mostrar cualquier categoría.
+            if (song.type === 'yt' && song.categoryId && String(song.categoryId) !== '10') return false;
+            // Evitar clips, intros y piezas de pocos segundos que rompen la continuidad.
+            if (song.type === 'yt' && Number(song.duration) > 0 && Number(song.duration) < 60) return false;
+            return true;
         }
 
         function appendUniqueSongs(candidates, target, limit) {
