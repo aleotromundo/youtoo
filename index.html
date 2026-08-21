@@ -1903,16 +1903,39 @@
             container.innerHTML = '';
 
             try {
-                // Una búsqueda de video por consulta: evita triplicar el consumo de cuota.
-                // Los resultados siguen llegando desde YouTube y se reproducen igual que antes.
-                const merged = channelFilter
+                const localCandidates = await reserveSearchCandidates(query, { limit: 20 });
+                const knownPool = [...(queue || []), ...(currentList || []), ...(homeVideos || []), ...(homeMusicVideos || []), ...(homeMusic || [])];
+                const queryNeedle = String(query || '').toLowerCase().trim();
+                const sessionCandidates = knownPool.filter(song => {
+                    if (!song?.url || !isRadioMusicTrack(song)) return false;
+                    const text = `${song.title || ''} ${song.artist || ''} ${song.description || ''}`.toLowerCase();
+                    return text.includes(queryNeedle);
+                });
+                const localSongs = [...localCandidates.map(candidate => ({ ...candidate, _fromReserve: true })), ...sessionCandidates].filter((song, index, all) => {
+                    const key = songKey(song);
+                    return all.findIndex(other => songKey(other) === key) === index;
+                });
+                // Primero usamos descubrimientos ya guardados; solo después pedimos una búsqueda nueva.
+                const fresh = channelFilter
                     ? await fetchYouTubeSearch(query, 'video,playlist', { channelId: channelFilter.id, maxResults: 25 })
                     : await fetchYouTubeSearch(query, 'video,playlist,channel', { maxResults: 20 });
+                const merged = [...localSongs, ...fresh].filter((song, index, all) => {
+                    const key = songKey(song);
+                    return all.findIndex(other => songKey(other) === key) === index;
+                });
 
                 if (merged.length > 0) {
                     renderYouTubeSearchResults(merged, query);
+                    if (!channelFilter && fresh.length === 0) showToast(`Usando candidatos guardados de ${inferArtistStyle(query, merged)}`, 'fa-database');
                 } else if (!channelFilter) {
-                    if (!(await recoverWithRockMetal())) renderEmptyState(`Sin resultados para "${query}"`, 'No encontramos coincidencias ni propuestas de rock y metal disponibles ahora.');
+                    const style = inferArtistStyle(query, localSongs);
+                    const musicFallback = await fetchOpenverseTracks(`${style} music`, 20, { radioOnly: true, reserveContext: 'radio', seed: { artist: query, genre: style, title: query } });
+                    if (musicFallback.length) {
+                        renderYouTubeSearchResults(musicFallback, `${query} · ${style}`);
+                        showToast(`YouTube no disponible: mostramos música ${style} de Openverse`, 'fa-music');
+                    } else if (!(await recoverWithRockMetal())) {
+                        renderEmptyState(`Sin resultados para "${query}"`, 'No encontramos coincidencias ni propuestas musicales disponibles ahora.');
+                    }
                 } else {
                     renderEmptyState(`Sin resultados para "${query}" en este canal`);
                 }
@@ -2955,6 +2978,60 @@
                 .sort((a, b) => Number(a.lastUsedAt || 0) - Number(b.lastUsedAt || 0) || Number(b.lastSeenAt || 0) - Number(a.lastSeenAt || 0))
                 .slice(0, limit);
         }
+        const ARTIST_STYLE_HINTS = {
+            'mana': 'latin rock',
+            'maná': 'latin rock',
+            'soda stereo': 'latin rock',
+            'caifanes': 'latin rock',
+            'heroes del silencio': 'latin rock',
+            'héroes del silencio': 'latin rock',
+            'los enanitos verdes': 'latin rock',
+            'enanitos verdes': 'latin rock',
+            'los fabulosos cadillacs': 'latin rock',
+            'la renga': 'latin rock',
+            'rata blanca': 'latin metal',
+            'metallica': 'heavy metal',
+            'iron maiden': 'heavy metal',
+            'black sabbath': 'heavy metal',
+            'slipknot': 'nu metal',
+            'linkin park': 'nu metal',
+            'nirvana': 'grunge',
+            'foo fighters': 'alternative rock'
+        };
+        function inferArtistStyle(query, candidates = []) {
+            const normalized = String(query || '').trim().toLowerCase();
+            const known = Object.entries(ARTIST_STYLE_HINTS).find(([artist]) => normalized.includes(artist));
+            if (known) return known[1];
+            const fromCandidate = candidates.find(candidate => candidate?.genre && candidate.genre !== 'unknown')?.genre;
+            if (fromCandidate) return String(fromCandidate).toLowerCase();
+            const text = candidates.map(candidate => `${candidate.title || ''} ${candidate.artist || ''} ${candidate.description || ''}`).join(' ').toLowerCase();
+            return ['latin rock', 'alternative rock', 'grunge', 'punk rock', 'hard rock', 'heavy metal', 'metal'].find(style => text.includes(style)) || 'rock';
+        }
+        async function reserveSearchCandidates(query, { styleKey = '', limit = 20 } = {}) {
+            const db = await openReserveDb();
+            let items = [];
+            if (db) {
+                items = await new Promise(resolve => {
+                    try {
+                        const request = db.transaction(RESERVE_CANDIDATES_STORE, 'readonly').objectStore(RESERVE_CANDIDATES_STORE).getAll();
+                        request.onsuccess = () => resolve(request.result || []);
+                        request.onerror = () => resolve([]);
+                    } catch (error) { resolve([]); }
+                });
+            }
+            if (!items.length) items = readReserveFallback();
+            const needle = String(query || '').toLowerCase().trim();
+            const style = String(styleKey || '').toLowerCase().trim();
+            return items.filter(item => {
+                if (!item.radioEligible || item.status === 'invalid' || item.status === 'expired') return false;
+                if (item.expiresAt && Number(item.expiresAt) <= Date.now()) return false;
+                const text = `${item.title || ''} ${item.artist || ''} ${item.description || ''}`.toLowerCase();
+                const matchesQuery = !needle || text.includes(needle);
+                const matchesStyle = !style || String(item.styleKey || '').toLowerCase().includes(style);
+                return matchesQuery && matchesStyle;
+            }).sort((a, b) => Number(a.lastUsedAt || 0) - Number(b.lastUsedAt || 0)).slice(0, limit);
+        }
+
         async function reserveMarkUsed(song) {
             const key = reserveCandidateKey(song);
             if (!key) return;
