@@ -1508,6 +1508,7 @@
         let currentMood = null;
         let searchTimeout = null;
         let ytPlayer = null;
+        let ytStartupTimer = null;
         let ytApiReady = false;
         let pendingYTRequest = null;
         let progressInterval = null;
@@ -4711,8 +4712,11 @@
 
         function initYTPlayer(resourceId, isPlaylist = false, resumeSession = null) {
             pendingVideoResumeSession = resumeSession || pendingVideoResumeSession;
+            clearTimeout(ytStartupTimer);
+            ytStartupTimer = null;
             document.getElementById('yt-player-container').innerHTML = '<div id="yt-player"></div>';
             const playerConfig = {
+                host: 'https://www.youtube-nocookie.com',
                 height: '100%',
                 width: '100%',
                 playerVars: { 'autoplay': 1, 'controls': 1, 'playsinline': 1, 'enablejsapi': 1, 'rel': 0, 'modestbranding': 1, 'origin': window.location.origin },
@@ -4753,18 +4757,35 @@
             // explícitamente al recibir onReady para que el primer Play no quede en -1.
             if (song?.type === 'yt' && !playbackStoppedByUser && !(resume?.wasPlaying === false) && ytPlayer.playVideo) {
                 window.setTimeout(() => {
-                    if (ytPlayer && currentQueueSong()?.url === song.url && !playbackStoppedByUser) ytPlayer.playVideo();
+                    if (ytPlayer && currentQueueSong()?.url === song.url && !playbackStoppedByUser) {
+                        ytPlayer.playVideo();
+                        clearTimeout(ytStartupTimer);
+                        ytStartupTimer = setTimeout(() => {
+                            if (currentQueueSong()?.url !== song.url || playbackStoppedByUser || !ytPlayer?.getPlayerState) return;
+                            const state = ytPlayer.getPlayerState();
+                            if (state !== YT.PlayerState.PLAYING && state !== YT.PlayerState.PAUSED) {
+                                setTrackLoading(false);
+                                document.getElementById('videoStage')?.classList.add('is-error');
+                                showToast('YouTube no pudo iniciar este video; continuamos con otra pista', 'fa-forward');
+                                queueAutomaticAdvance('youtube-start-timeout');
+                            }
+                        }, 12000);
+                    }
                 }, 0);
             }
         }
         function onYTStateChange(event) {
             if (event?.target && event.target !== ytPlayer) return;
             if (event.data === YT.PlayerState.PLAYING) {
+                clearTimeout(ytStartupTimer);
+                ytStartupTimer = null;
                 playbackStoppedByUser = false;
                 isPlaying = true;
                 setTrackLoading(false);
                 if (!progressInterval) startProgress(ytPlayer);
             } else if (event.data === YT.PlayerState.PAUSED) {
+                clearTimeout(ytStartupTimer);
+                ytStartupTimer = null;
                 isPlaying = false;
                 persistVideoResumeSession(true);
             } else if (event.data === YT.PlayerState.BUFFERING) {
@@ -4779,6 +4800,8 @@
         }
         function onYTError(event) {
             if (event?.target && event.target !== ytPlayer) return;
+            clearTimeout(ytStartupTimer);
+            ytStartupTimer = null;
             clearVideoResumeSession();
             setTrackLoading(false);
             isPlaying = false;
@@ -4842,6 +4865,8 @@
         }
         function stopAll() {
             clearAutomaticAdvance();
+            clearTimeout(ytStartupTimer);
+            ytStartupTimer = null;
             if (ytPlayer) { ytPlayer.stopVideo(); ytPlayer.destroy(); ytPlayer = null; }
             pendingYTRequest = null;
             freeVideoEl.pause();
