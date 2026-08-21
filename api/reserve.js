@@ -13,8 +13,12 @@ function compactCache(res) {
 }
 
 function envConfig() {
+  const rawUrl = String(process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || '').trim();
+  const url = rawUrl
+    ? (/^https?:\/\//i.test(rawUrl) ? rawUrl : `https://${rawUrl.replace(/\/$/, '')}.supabase.co`).replace(/\/$/, '')
+    : '';
   return {
-    url: String(process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || '').replace(/\/$/, ''),
+    url,
     key: String(process.env.SUPABASE_SERVICE_ROLE_KEY || '').trim()
   };
 }
