@@ -629,6 +629,44 @@
             .btn-control { font-size: 0.8rem; }
             .progress-bar span { display: none; }
         }
+        /* Reproductor mobile: información arriba, controles y progreso abajo, sin apretar botones. */
+        @media (max-width: 768px) {
+            :root { --player-height: 124px; }
+            .content-area { padding-bottom: calc(var(--player-height) + 34px); }
+            .player-bar { height: var(--player-height); min-height: var(--player-height); padding: 9px 12px 10px; display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-rows: 48px 1fr; grid-template-areas: "info utils" "center center"; gap: 4px 10px; align-items: center; }
+            .player-left { grid-area: info; width: auto; min-width: 0; }
+            .player-center { grid-area: center; width: 100%; max-width: none; min-width: 0; align-items: stretch; }
+            .player-utils { grid-area: utils; width: auto; min-width: 0; gap: 6px; justify-content: flex-end; }
+            .player-utils .btn-control, .player-utils .share-btn { width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center; font-size: .92rem; }
+            .player-utils > #shuffleIcon, .player-utils .volume-control, .player-utils > #pipBtn, .player-utils #downloadCurrentBtn { display: none !important; }
+            .controls { justify-content: center; gap: clamp(15px, 6vw, 26px); margin: 0 0 4px; }
+            .btn-control { width: 34px; height: 34px; display: inline-flex; align-items: center; justify-content: center; font-size: 1rem; }
+            .btn-play { width: 38px; height: 38px; font-size: .95rem; }
+            #queueToggleBtn { width: 38px; height: 38px; }
+            .continuous-playback-toggle { width: 34px; height: 34px; flex: 0 0 34px; }
+            .progress-bar { gap: 8px; font-size: .64rem; }
+            .progress-track { height: 18px; }
+            .progress-track-bg { height: 5px; }
+            .queue-panel { bottom: var(--player-height); }
+            .queue-panel-header { padding: 14px 14px 6px; }
+            .queue-panel-sub { padding: 0 14px 10px; }
+            .queue-list { padding: 4px 10px 10px; }
+        }
+        @media (max-width: 480px) {
+            :root { --player-height: 132px; }
+            .player-bar { padding-left: 10px; padding-right: 10px; grid-template-rows: 45px 1fr; }
+            .player-cover { width: 38px; height: 38px; margin-right: 8px; }
+            .track-name { font-size: .75rem; }
+            .artist-name { font-size: .66rem; }
+            .fav-btn { margin-left: 7px; font-size: 1rem; }
+            .player-utils { gap: 3px; }
+            .player-utils .btn-control, .player-utils .share-btn { width: 29px; height: 29px; font-size: .8rem; }
+            .controls { gap: clamp(11px, 5vw, 18px); }
+            .btn-control { width: 31px; height: 31px; font-size: .92rem; }
+            .btn-play, #queueToggleBtn { width: 36px; height: 36px; }
+            .continuous-playback-toggle { width: 32px; height: 32px; flex-basis: 32px; }
+            .progress-bar span { display: block; }
+        }
 
         /* --- MODO YOUTOO: exploración audiovisual original --- */
         body.mode-youtoo { --bg-black: #0a0a12; --bg-dark: #0f1020; --bg-card: #17182b; --bg-hover: #22233b; --accent: #a78bfa; --accent-hover: #c4b5fd; --accent-glow: rgba(167,139,250,.34); --accent-2: #5eead4; --border-soft: rgba(190,188,255,.13); }
@@ -1019,7 +1057,7 @@
                 <section class="nowarfy-nav-group" aria-label="Tu experiencia">
                     <span class="nowarfy-nav-label">Tu experiencia</span>
                     <ul class="nav-links">
-                        <li data-nav="queue" onclick="openQueueFromSidebar()"><i class="fas fa-list-music"></i> <span>Tu cola</span></li>
+                        <li data-nav="queue" onclick="openQueueFromSidebar()"><i class="fas fa-list-music"></i> <span>Playlist</span></li>
                         <li data-nav="player" onclick="showFloatingPlayer()"><i class="fas fa-up-right-and-down-left-from-center"></i> <span>Reproductor</span></li>
                         <li data-nav="taste" onclick="showSection('taste')"><i class="fas fa-shield-halved"></i> <span>Tus datos</span></li>
                     </ul>
@@ -1096,7 +1134,7 @@
                     <div class="orbit-spinner track-spinner on-light" style="--s:16px;--d:3px;"><i></i><i></i><i></i></div>
                 </button>
                 <button class="btn-control" onclick="nextSong(true)" title="Siguiente" aria-label="Siguiente"><i class="fas fa-step-forward"></i></button>
-                <button class="btn-control" id="queueToggleBtn" onclick="toggleQueuePanel()" title="Cola de reproducción" aria-label="Cola de reproducción">
+                <button class="btn-control" id="queueToggleBtn" onclick="toggleQueuePanel()" title="Abrir Playlist" aria-label="Abrir Playlist">
                     <i class="fas fa-list-ul"></i>
                     <span class="queue-count-badge" id="queueCountBadge">0</span>
                 </button>
@@ -1131,17 +1169,17 @@
     <div class="queue-overlay" id="queueOverlay" onclick="closeQueuePanel()"></div>
     <div class="queue-panel" id="queuePanel">
         <div class="queue-panel-header">
-            <div class="queue-panel-title"><i class="fas fa-list-ul"></i> Cola de reproducción</div>
+            <div class="queue-panel-title"><i class="fas fa-list-ul"></i> Playlist</div>
             <div class="queue-panel-actions">
                 <button type="button" class="queue-clear-btn queue-continuous-btn" id="continuousQueueToggle" onclick="toggleContinuousPlayback()" title="Reproducción continua" aria-pressed="true"><i class="fas fa-infinity"></i> Continua</button>
-                <button type="button" class="queue-clear-btn" onclick="clearQueue()" title="Vaciar toda la cola"><i class="fas fa-trash"></i> Vaciar</button>
-                <button type="button" class="queue-close-btn" onclick="closeQueuePanel()" aria-label="Cerrar cola"><i class="fas fa-xmark"></i></button>
+                <button type="button" class="queue-clear-btn" onclick="clearQueue()" title="Vaciar Playlist"><i class="fas fa-trash"></i> Vaciar</button>
+                <button type="button" class="queue-close-btn" onclick="closeQueuePanel()" aria-label="Cerrar Playlist"><i class="fas fa-xmark"></i></button>
             </div>
         </div>
-        <div class="queue-panel-sub" id="queueSub">La cola está vacía</div>
+        <div class="queue-panel-sub" id="queueSub">La Playlist está vacía</div>
         <div class="queue-list" id="queueList"></div>
         <div class="queue-loading-hint" id="queueLoadingHint"><div class="loader-spinner" style="width:16px;height:16px;border-width:2px;"></div> Sumando más canciones...</div>
-        <div class="queue-drop-trash" id="queueTrash"><i class="fas fa-trash"></i> Soltá aquí para quitarla de la cola</div>
+        <div class="queue-drop-trash" id="queueTrash"><i class="fas fa-trash"></i> Soltá aquí para quitarla de la Playlist</div>
     </div>
 
     <div class="nowarfy-qr-modal" id="nowarfyQrModal" role="dialog" aria-modal="true" aria-labelledby="nowarfyQrTitle" hidden onclick="if (event.target === this) closeNowarfyQr()">
@@ -2677,7 +2715,7 @@
                     <span class="song-row-actions">
                         <span class="song-row-duration">${formatContentDuration(song.duration)}</span>
                         <button type="button" class="song-row-addq song-row-favorite${isFavoriteSong(song) ? ' active' : ''}" title="Guardar en favoritos" aria-label="Guardar en favoritos"><i class="${isFavoriteSong(song) ? 'fas' : 'far'} fa-heart"></i></button>
-                        <button type="button" class="song-row-addq" title="Agregar a la cola" aria-label="Agregar a la cola"><i class="fas fa-list"></i></button>
+                        <button type="button" class="song-row-addq" title="Agregar a Playlist" aria-label="Agregar a Playlist"><i class="fas fa-list"></i></button>
                         <i class="fas fa-play song-row-play" aria-hidden="true"></i>
                     </span>`;
                 row.onclick = () => selectSong(song, song.sourceIndex ?? idx);
@@ -2828,7 +2866,7 @@
                     </div>
                 </div>
                 <button type="button" class="card-favorite${isFavoriteSong(song) ? ' active' : ''}" title="Guardar en favoritos" aria-label="Guardar en favoritos"><i class="${isFavoriteSong(song) ? 'fas' : 'far'} fa-heart"></i></button>
-                <button type="button" class="card-addq" title="Agregar a la cola" aria-label="Agregar a la cola"><i class="fas fa-list"></i></button>
+                <button type="button" class="card-addq" title="Agregar a Playlist" aria-label="Agregar a Playlist"><i class="fas fa-list"></i></button>
                 <div class="play-btn"><i class="fas fa-play"></i></div>
                 <div class="card-title" title="${escapeHtml(song.title)}">${escapeHtml(song.title)}</div>
                 <div class="card-desc${artistClickable ? ' artist-link' : ''}">${escapeHtml(song.artist)}</div>
@@ -3304,7 +3342,7 @@
         // Agregar una canción a la cola actual sin interrumpir lo que está sonando.
         function addToQueue(song) {
             const k = songKey(song);
-            if (queueSeenKeys.has(k)) { showToast('Ya está en la cola', 'fa-circle-info'); return; }
+            if (queueSeenKeys.has(k)) { showToast('Ya está en la Playlist', 'fa-circle-info'); return; }
             const q = withQid(song);
             queueSeenKeys.add(k);
             queue.push(q);
@@ -3979,12 +4017,12 @@
 
             if (badge) { badge.textContent = String(queue.length); badge.classList.toggle('show', queue.length > 0); }
             if (sub) sub.textContent = queue.length
-                ? `${queue.length} canción${queue.length === 1 ? '' : 'es'} en la cola · ${continuousPlayback ? 'reproducción continua' : 'se detiene al terminar'}`
-                : `La cola está vacía · ${continuousPlayback ? 'continua lista' : 'una pista por vez'}`;
+                ? `${queue.length} canción${queue.length === 1 ? '' : 'es'} en la Playlist · ${continuousPlayback ? 'reproducción continua' : 'se detiene al terminar'}`
+                : `La Playlist está vacía · ${continuousPlayback ? 'continua lista' : 'una pista por vez'}`;
 
             list.innerHTML = '';
             if (queue.length === 0) {
-                list.innerHTML = `<div class="queue-empty"><i class="fas fa-compact-disc"></i><p>Elegí una canción para armar tu cola automática: 22 del mismo artista y después más de artistas similares.</p></div>`;
+                list.innerHTML = `<div class="queue-empty"><i class="fas fa-compact-disc"></i><p>Elegí una canción para armar tu Playlist automática: 20 del mismo artista y después más de artistas similares.</p></div>`;
                 document.getElementById('queueTrash').classList.remove('show');
                 return;
             }
@@ -4003,7 +4041,7 @@
                         <div class="queue-row-artist">${escapeHtml(song.artist)}</div>
                     </div>
                     ${isPlayingRow ? '<i class="fas fa-volume-up queue-playing-icon" title="Sonando ahora"></i>' : ''}
-                    <button type="button" class="queue-row-remove" title="Quitar de la cola" aria-label="Quitar de la cola"><i class="fas fa-xmark"></i></button>`;
+                    <button type="button" class="queue-row-remove" title="Quitar de Playlist" aria-label="Quitar de Playlist"><i class="fas fa-xmark"></i></button>`;
 
                 row.addEventListener('click', (e) => {
                     if (e.target.closest('.queue-row-remove') || e.target.closest('.queue-drag-handle')) return;
