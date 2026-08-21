@@ -1953,13 +1953,13 @@
         // No se fabrican playlists de emergencia: una lista solo aparece si YouTube o la reserva global/local la devolvieron realmente.
         const EMERGENCY_PLAYLISTS = [];
         const GENRE_CHANNEL_LISTS = [
-            { title: 'Rock', icon: 'fa-guitar', query: 'rock official music channels', description: 'Rock clásico, alternativo y contemporáneo.' },
-            { title: 'Metal', icon: 'fa-hand-fist', query: 'metal official music channels', description: 'Metal clásico, extremo y moderno.' },
-            { title: 'Hardcore', icon: 'fa-bolt', query: 'hardcore punk official music channels', description: 'Hardcore, punk pesado y escenas afines.' },
-            { title: 'Punk', icon: 'fa-skull', query: 'punk rock official music channels', description: 'Punk, post-punk y espíritu independiente.' },
-            { title: 'Grunge', icon: 'fa-cloud', query: 'grunge alternative rock official channels', description: 'Grunge, alternativo y los noventa.' },
-            { title: 'Stoner y Doom', icon: 'fa-mountain-sun', query: 'stoner doom metal official channels', description: 'Riffs lentos, fuzz y peso atmosférico.' },
-            { title: 'Rock latino', icon: 'fa-earth-americas', query: 'rock latino official music channels', description: 'Rock en español y escenas latinoamericanas.' }
+            { title: 'Rock', icon: 'fa-guitar', query: 'rock official music channels', styleKey: 'rock', description: 'Rock clásico, alternativo y contemporáneo.' },
+            { title: 'Metal', icon: 'fa-hand-fist', query: 'metal official music channels', styleKey: 'metal', description: 'Metal clásico, extremo y moderno.' },
+            { title: 'Hardcore', icon: 'fa-bolt', query: 'hardcore punk official music channels', styleKey: 'hardcore', description: 'Hardcore, punk pesado y escenas afines.' },
+            { title: 'Punk', icon: 'fa-skull', query: 'punk rock official music channels', styleKey: 'punk', description: 'Punk, post-punk y espíritu independiente.' },
+            { title: 'Grunge', icon: 'fa-cloud', query: 'grunge alternative rock official channels', styleKey: 'grunge', description: 'Grunge, alternativo y los noventa.' },
+            { title: 'Stoner y Doom', icon: 'fa-mountain-sun', query: 'stoner doom metal official channels', styleKey: 'stoner', description: 'Riffs lentos, fuzz y peso atmosférico.' },
+            { title: 'Rock latino', icon: 'fa-earth-americas', query: 'rock latino official music channels', styleKey: 'latin rock', description: 'Rock en español y escenas latinoamericanas.' }
         ];
         const EXPLORE_COLLECTIONS = [
             { title: 'Conciertos y sesiones', icon: 'fa-tower-broadcast', query: 'rock metal live concert session', description: 'Shows en vivo, sesiones y escenarios.' },
@@ -2448,8 +2448,8 @@
             }
         }
 
-        async function renderSavedChannelsRail() {
-            const localChannels = readTaste().channels.map(channel => ({
+        function channelEntityFromTaste(channel) {
+            return {
                 ...channel,
                 url: channel.id,
                 type: 'yt',
@@ -2457,14 +2457,19 @@
                 channelId: channel.id,
                 channelTitle: channel.title,
                 artist: 'Canal de YouTube'
-            }));
-            const globalChannels = await reserveGetGlobalCandidates({ source: 'youtube', kind: 'youtube#channel', scope: 'search', limit: 50 });
-            const channels = itemsWithArtwork(uniqueMediaByUrl([...globalChannels, ...localChannels], 60));
-            if (!channels.length) return;
+            };
+        }
+        function renderChannelHistoryRail() {
+            const history = readTaste().channels
+                .slice()
+                .sort((a, b) => Number(b.at || 0) - Number(a.at || 0))
+                .map(channelEntityFromTaste);
+            const channels = itemsWithArtwork(uniqueMediaByUrl(history, 30));
+            if (!channels.length) return false;
             const container = document.getElementById('dynamicSections');
             const section = document.createElement('section');
-            section.className = 'library-rail-section saved-entities-rail';
-            section.innerHTML = `<div class="library-rail-title"><i class="fas fa-bookmark"></i><span>Canales abiertos anteriormente</span><span class="library-rail-hint">Reserva global + este dispositivo</span></div>`;
+            section.className = 'library-rail-section channel-history-rail';
+            section.innerHTML = `<div class="library-rail-title"><i class="fas fa-clock-rotate-left"></i><span>Últimos canales abiertos</span><span class="library-rail-hint">Historial · desplazá hacia la izquierda</span></div>`;
             const rail = document.createElement('div');
             rail.className = 'library-rail';
             channels.forEach((channel, index) => {
@@ -2478,8 +2483,15 @@
             });
             section.appendChild(rail);
             container.appendChild(section);
+            return true;
         }
-
+        async function renderGlobalChannelRail(title, hint, { styleKey = '', limit = 24 } = {}) {
+            const channels = await reserveGetGlobalCandidates({ source: 'youtube', kind: 'youtube#channel', styleKey, scope: 'search', limit });
+            const visible = itemsWithArtwork(uniqueMediaByUrl(channels, limit));
+            if (!visible.length) return 0;
+            renderChannelRow(visible, title, hint);
+            return visible.length;
+        }
         async function renderGenreChannels() {
             const container = document.getElementById('dynamicSections');
             const loader = document.getElementById('loader');
@@ -2488,20 +2500,26 @@
             loader.style.display = 'flex';
             try {
                 const heading = document.createElement('div');
-                heading.innerHTML = `<div class="section-title"><i class="fas fa-satellite-dish"></i> Canales</div><p class="discovery-intro">Canales reales de YouTube agrupados por escena. Abrí uno para ver su descripción, estadísticas, listas y videos publicados.</p>`;
+                heading.innerHTML = `<div class="section-title"><i class="fas fa-satellite-dish"></i> Canales</div><p class="discovery-intro">Canales reales organizados por historial, escucha actual y escenas musicales. Abrí uno para ver su descripción, estadísticas, listas y videos publicados.</p>`;
                 container.appendChild(heading);
-                await renderSavedChannelsRail();
-                const settled = await Promise.allSettled(GENRE_CHANNEL_LISTS.map(collection => fetchYouTubeSearch(collection.query, 'channel', { maxResults: 8, reserveContext: 'channels' })));
-                let rendered = 0;
+                const hasHistory = renderChannelHistoryRail();
+                const seed = currentList[0] || queue.find(item => item?._qid === currentPlayingQid) || homeVideos[0] || homeMusicVideos[0] || { title: getTasteSeed(), artist: getTasteSeed(), genre: currentMood || 'rock metal' };
+                const relatedStyle = getRadioStyle(seed);
+                let rendered = hasHistory ? 1 : 0;
+                rendered += await renderGlobalChannelRail(`Canales relacionados · ${relatedStyle}`, 'Según tu escucha actual y la reserva global', { styleKey: relatedStyle, limit: 24 });
+                const settled = await Promise.allSettled(GENRE_CHANNEL_LISTS.map(async collection => {
+                    const saved = await reserveGetGlobalCandidates({ source: 'youtube', kind: 'youtube#channel', styleKey: collection.styleKey, scope: 'search', limit: 24 });
+                    if (saved.length >= 6) return saved;
+                    const fresh = await fetchYouTubeSearch(collection.query, 'channel', { maxResults: 8, reserveContext: 'channels' });
+                    return uniqueMediaByUrl([...saved, ...fresh.filter(item => item?.resourceKind === 'youtube#channel')], 24);
+                }));
                 settled.forEach((result, index) => {
-                    const channels = result.status === 'fulfilled'
-                        ? uniqueMediaByUrl(result.value.filter(item => item?.resourceKind === 'youtube#channel'), 8)
-                        : [];
+                    const channels = result.status === 'fulfilled' ? itemsWithArtwork(uniqueMediaByUrl(result.value, 24)) : [];
                     if (!channels.length) return;
                     rendered += channels.length;
                     renderChannelRow(channels, GENRE_CHANNEL_LISTS[index].title, GENRE_CHANNEL_LISTS[index].description);
                 });
-                if (!rendered && !container.querySelector('.saved-entities-rail')) renderEmptyState('No hay canales disponibles ahora', 'Probá volver a intentarlo cuando YouTube vuelva a responder o buscá un canal por nombre.');
+                if (!rendered) renderEmptyState('No hay canales disponibles ahora', 'Probá volver a intentarlo cuando YouTube vuelva a responder o buscá un canal por nombre.');
             } finally {
                 loader.style.display = 'none';
             }
