@@ -14,13 +14,13 @@ El dispositivo sigue siendo la fuente inmediata de actividad. Cuando una sesión
 
 ## Reserva futura de candidatos
 
-`002_discovery_reserve.sql` define `youtoo_discovery_candidates` y `youtoo_discovery_queries`. La primera tabla conserva identificadores, URLs, estilo, licencia y estado de candidatos descubiertos; no almacena audio ni video. La segunda conserva el estado de consultas, páginas y bloqueos de cuota. La reserva actual funciona en IndexedDB en el dispositivo y debe seguir siendo la fuente inmediata hasta que exista autenticación y una Edge Function para escribir en Supabase.
+`002_discovery_reserve.sql` define `youtoo_discovery_candidates` y `youtoo_discovery_queries`. La primera tabla conserva identificadores, URLs, estilo, licencia y estado de candidatos descubiertos; no almacena audio ni video. La segunda conserva el estado de consultas, páginas y bloqueos de cuota. La reserva funciona primero en IndexedDB en cada dispositivo y se replica best-effort mediante el endpoint serverless `/api/reserve`, sin convertir Supabase en una dependencia de reproducción.
 
-Las lecturas globales pueden habilitarse para usuarios autenticados, pero las escrituras deben pasar por backend con `service_role`; esa clave nunca debe llegar al HTML. Esto permite que la base futura sea única sin mezclar resultados manuales con candidatos aptos para radio.
+Las lecturas y escrituras globales pasan por `/api/reserve`, que usa `SUPABASE_URL` y `SUPABASE_SERVICE_ROLE_KEY` únicamente en Vercel. La clave `service_role` nunca llega al HTML ni al navegador. El endpoint admite búsqueda global, upsert por lotes, marcado de uso y exportación CSV con BOM, compatible con Excel. La migración `003_global_reserve_sync.sql` agrega Jamendo al conjunto de fuentes permitido.
 
 ## Activación posterior
 
-Se debe crear un proyecto Supabase, habilitar un método de inicio de sesión y ejecutar `001_profile_sync.sql` en el SQL Editor o como migración. Luego se agregan a Vercel solo las variables públicas necesarias para el cliente, por ejemplo `SUPABASE_URL` y una clave publicable. Las claves `service_role` nunca van al HTML, al repositorio ni al navegador. La migración `002_discovery_reserve.sql` prepara la reserva global de candidatos y consultas para una segunda etapa; no se ejecuta ni se conecta automáticamente desde el frontend local.
+Para activar la reserva global se agregan a Vercel `SUPABASE_URL` y `SUPABASE_SERVICE_ROLE_KEY`; ambas son variables server-side usadas por `api/reserve.js`, y ninguna se incluye en `index.html`. Primero se ejecuta `002_discovery_reserve.sql` y luego `003_global_reserve_sync.sql` en el SQL Editor. La aplicación conserva IndexedDB como respaldo y no requiere login para la radio pública.
 
 Antes de habilitar la interfaz de sincronización se debe comprobar que las tablas tengan RLS activo y que una persona autenticada solo pueda leer y modificar filas cuyo `user_id` sea su propio `auth.uid()`. Las políticas de la migración se diseñaron con ese criterio.
 

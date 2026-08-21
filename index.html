@@ -2905,12 +2905,14 @@
         const RESERVE_META_STORE = 'reserveMeta';
         const RESERVE_FALLBACK_KEY = 'nowarfy_discovery_reserve_v1';
         const RESERVE_MAX_CANDIDATES = 1000;
+        const GLOBAL_RESERVE_ENDPOINT = '/api/reserve';
         let reserveDbPromise = null;
+        let globalReserveSyncInFlight = false;
 
         function reserveCandidateKey(song) {
             if (!song?.url) return '';
             if (song.type === 'yt') return `yt:${String(song.url).trim()}`;
-            if (song.type === 'mp3') return `openverse:${String(song.sourceUrl || song.url).trim()}`;
+            if (song.type === 'mp3') return `${song.source || 'openverse'}:${String(song.sourceUrl || song.url).trim()}`;
             return `${song.type || 'media'}:${String(song.sourceUrl || song.url).trim()}`;
         }
         function reserveStyleKey(song, seed = null) {
@@ -2975,9 +2977,30 @@
                 localStorage.setItem(RESERVE_FALLBACK_KEY, JSON.stringify(items.slice(-200)));
             } catch (error) { /* almacenamiento lleno o no disponible */ }
         }
+        async function globalReserveRequest(url = GLOBAL_RESERVE_ENDPOINT, options = {}) {
+            try {
+                const response = await fetch(url, { ...options, headers: { 'Content-Type': 'application/json', ...(options.headers || {}) } });
+                const data = await response.json().catch(() => ({}));
+                return response.ok ? data : null;
+            } catch (error) { return null; }
+        }
+        function reserveSyncGlobal(entries) {
+            if (!Array.isArray(entries) || !entries.length || globalReserveSyncInFlight) return;
+            globalReserveSyncInFlight = true;
+            void globalReserveRequest(GLOBAL_RESERVE_ENDPOINT, {
+                method: 'POST',
+                body: JSON.stringify({ action: 'upsert', entries: entries.slice(0, 100) })
+            }).finally(() => { globalReserveSyncInFlight = false; });
+        }
+        async function reserveGetGlobalCandidates({ styleKey = '', artist = '', source = '', limit = 20 } = {}) {
+            const params = new URLSearchParams({ action: 'search', styleKey, artist, source, limit: String(Math.min(Math.max(Number(limit) || 20, 1), 50)) });
+            const data = await globalReserveRequest(`${GLOBAL_RESERVE_ENDPOINT}?${params.toString()}`);
+            return Array.isArray(data?.results) ? data.results : [];
+        }
         async function reserveDiscoveredCandidates(songs, options = {}) {
             const entries = (songs || []).map(song => normalizeReserveCandidate(song, options)).filter(Boolean);
             if (!entries.length) return;
+            reserveSyncGlobal(entries);
             const db = await openReserveDb();
             if (!db) {
                 const merged = new Map(readReserveFallback().map(item => [item.candidateKey, item]));
@@ -3012,17 +3035,19 @@
         }
         async function reserveGetCandidates({ styleKey = '', artist = '', source = '', limit = 20 } = {}) {
             const db = await openReserveDb();
-            let items = [];
+            let items = await reserveGetGlobalCandidates({ styleKey, artist, source, limit });
             if (db) {
-                items = await new Promise(resolve => {
+                const localItems = await new Promise(resolve => {
                     try {
                         const request = db.transaction(RESERVE_CANDIDATES_STORE, 'readonly').objectStore(RESERVE_CANDIDATES_STORE).getAll();
                         request.onsuccess = () => resolve(request.result || []);
                         request.onerror = () => resolve([]);
                     } catch (error) { resolve([]); }
                 });
+                items = [...items, ...localItems];
             }
-            if (!items.length) items = readReserveFallback();
+            items = [...items, ...readReserveFallback()];
+            items = [...new Map(items.map(item => [item.candidateKey || reserveCandidateKey(item), item])).values()];
             const style = String(styleKey || '').toLowerCase();
             const targetArtist = String(artist || '').toLowerCase();
             return items
@@ -3065,17 +3090,19 @@
         }
         async function reserveSearchCandidates(query, { styleKey = '', limit = 20 } = {}) {
             const db = await openReserveDb();
-            let items = [];
+            let items = await reserveGetGlobalCandidates({ styleKey, limit });
             if (db) {
-                items = await new Promise(resolve => {
+                const localItems = await new Promise(resolve => {
                     try {
                         const request = db.transaction(RESERVE_CANDIDATES_STORE, 'readonly').objectStore(RESERVE_CANDIDATES_STORE).getAll();
                         request.onsuccess = () => resolve(request.result || []);
                         request.onerror = () => resolve([]);
                     } catch (error) { resolve([]); }
                 });
+                items = [...items, ...localItems];
             }
-            if (!items.length) items = readReserveFallback();
+            items = [...items, ...readReserveFallback()];
+            items = [...new Map(items.map(item => [item.candidateKey || reserveCandidateKey(item), item])).values()];
             const needle = String(query || '').toLowerCase().trim();
             const style = String(styleKey || '').toLowerCase().trim();
             return items.filter(item => {
@@ -3101,6 +3128,10 @@
                     if (request.result) store.put({ ...request.result, status: 'played', lastUsedAt: Date.now(), useCount: Number(request.result.useCount || 0) + 1 });
                 };
             } catch (error) { /* la reproducción no depende de la reserva */ }
+            void globalReserveRequest(GLOBAL_RESERVE_ENDPOINT, {
+                method: 'POST',
+                body: JSON.stringify({ action: 'mark-used', candidateKey: key })
+            });
         }
         async function reserveTrim() {
             const db = await openReserveDb();
