@@ -1249,6 +1249,7 @@
         let nowarfyAuthUser = null;
         let nowarfyAuthConfigured = false;
         let nowarfyAuthInitialised = false;
+        let nowarfyAuthInitPromise = null;
         let nowarfyRemoteChannel = null;
         let nowarfyRemoteSession = null;
         let nowarfyRemoteShadowSong = null;
@@ -1281,31 +1282,53 @@
             }
         }
         async function initNowarfyAuth() {
-            if (nowarfyAuthInitialised) return;
-            nowarfyAuthInitialised = true;
-            try {
-                const response = await fetch(AUTH_CONFIG_ENDPOINT, { cache: 'no-store' });
-                const config = await response.json().catch(() => ({}));
-                if (!response.ok || !config.configured || !window.supabase?.createClient) {
-                    nowarfyAuthConfigured = false;
-                    updateNowarfyAuthUI();
-                    return;
-                }
-                nowarfySupabase = window.supabase.createClient(config.url, config.anonKey, { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true } });
-                nowarfyAuthConfigured = true;
-                const sessionResult = await nowarfySupabase.auth.getSession();
-                nowarfyAuthUser = sessionResult.data?.session?.user || null;
-                nowarfySupabase.auth.onAuthStateChange((_event, session) => {
-                    nowarfyAuthUser = session?.user || null;
+            if (nowarfySupabase) return nowarfySupabase;
+            if (nowarfyAuthInitPromise) return nowarfyAuthInitPromise;
+            nowarfyAuthInitPromise = (async () => {
+                try {
+                    if (!window.supabase?.createClient) {
+                        await new Promise((resolve, reject) => {
+                            const startedAt = Date.now();
+                            const waitForSdk = () => {
+                                if (window.supabase?.createClient) return resolve();
+                                if (Date.now() - startedAt > 10000) return reject(new Error('El módulo de autenticación no terminó de cargar. Recargá la página e intentá nuevamente.'));
+                                window.setTimeout(waitForSdk, 50);
+                            };
+                            waitForSdk();
+                        });
+                    }
+                    const response = await fetch(AUTH_CONFIG_ENDPOINT, { cache: 'no-store' });
+                    const config = await response.json().catch(() => ({}));
+                    if (!response.ok || !config.configured || !window.supabase?.createClient) {
+                        nowarfyAuthConfigured = false;
+                        nowarfyAuthInitialised = false;
+                        updateNowarfyAuthUI();
+                        return null;
+                    }
+                    nowarfySupabase = window.supabase.createClient(config.url, config.anonKey, { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true } });
+                    nowarfyAuthConfigured = true;
+                    nowarfyAuthInitialised = true;
+                    const sessionResult = await nowarfySupabase.auth.getSession();
+                    nowarfyAuthUser = sessionResult.data?.session?.user || null;
+                    nowarfySupabase.auth.onAuthStateChange((_event, session) => {
+                        nowarfyAuthUser = session?.user || null;
+                        updateNowarfyAuthUI();
+                        void setupNowarfyRemoteControl();
+                    });
                     updateNowarfyAuthUI();
                     void setupNowarfyRemoteControl();
-                });
-                updateNowarfyAuthUI();
-                void setupNowarfyRemoteControl();
-            } catch (error) {
-                nowarfyAuthConfigured = false;
-                updateNowarfyAuthUI();
-            }
+                    return nowarfySupabase;
+                } catch (error) {
+                    nowarfyAuthConfigured = false;
+                    nowarfyAuthInitialised = false;
+                    updateNowarfyAuthUI();
+                    authStatus(error?.message || 'La autenticación no pudo inicializarse.', true);
+                    return null;
+                } finally {
+                    nowarfyAuthInitPromise = null;
+                }
+            })();
+            return nowarfyAuthInitPromise;
         }
         function openNowarfyAuth() {
             const modal = document.getElementById('nowarfyAuthModal');
@@ -1324,7 +1347,8 @@
             authStatus('');
         }
         async function submitNowarfyAuth(mode) {
-            if (!nowarfyAuthConfigured || !nowarfySupabase) { authStatus('Falta configurar SUPABASE_ANON_KEY para activar las cuentas.', true); return; }
+            if (!nowarfySupabase) await initNowarfyAuth();
+            if (!nowarfyAuthConfigured || !nowarfySupabase) { authStatus('La autenticación todavía está cargando. Intentá nuevamente en un instante.', true); return; }
             const email = String(document.getElementById('authEmailInput')?.value || '').trim();
             const password = String(document.getElementById('authPasswordInput')?.value || '');
             if (!email) { authStatus('Escribí un email válido.', true); return; }
