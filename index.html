@@ -1304,7 +1304,11 @@
 
         function hasValidArtwork(item) {
             const source = String(item?.img || item?.thumbnail || '').trim();
-            if (!source || !/^https:\/\//i.test(source)) return false;
+            if (!source) return false;
+            // Las fuentes abiertas no siempre entregan thumbnail. En ese caso se usa
+            // la portada local de Nowarfy, que también es válida para renderizar la tarjeta.
+            if (/^(?:\/?assets\/|\/favicon\.ico$)/i.test(source)) return true;
+            if (!/^https:\/\//i.test(source)) return false;
             try {
                 const parsed = new URL(source);
                 return !!parsed.hostname && !/^(?:data|blob):/i.test(parsed.protocol);
@@ -1713,6 +1717,8 @@
         }
 
         async function loadChannelProfile(channelReference, channelTitle = '') {
+            // Abrir un canal también es una navegación: minimizar el video antes de renderizar el catálogo.
+            minimizeActiveVideoForNavigation();
             const loader = document.getElementById('loader');
             const container = document.getElementById('dynamicSections');
             activeBrowseMode = 'channel';
@@ -1904,6 +1910,9 @@
         }
 
         async function performSmartSearch(query) {
+            // Al iniciar una búsqueda, liberar el área principal para mostrar los nuevos resultados.
+            // El video continúa reproduciéndose y queda accesible desde el indicador flotante.
+            minimizeActiveVideoForNavigation();
             searchQuery = query;
             renderTasteChips(query);
             if (!channelFilter) rememberSearch(query);
@@ -1929,29 +1938,29 @@
                     const key = songKey(song);
                     return all.findIndex(other => songKey(other) === key) === index;
                 });
-                // Primero usamos descubrimientos ya guardados; solo después pedimos una búsqueda nueva.
-                const fresh = channelFilter
-                    ? await fetchYouTubeSearch(query, 'video,playlist', { channelId: channelFilter.id, maxResults: 25 })
-                    : await fetchYouTubeSearch(query, 'video,playlist,channel', { maxResults: 20 });
+                // YouTube conserva la prioridad visual, pero Openverse se consulta siempre y se muestra en su propio rail.
+                const openverseQuery = channelFilter ? query : `${query} music`;
+                const [youtubeResult, openverseResult] = await Promise.allSettled([
+                    channelFilter
+                        ? fetchYouTubeSearch(query, 'video,playlist', { channelId: channelFilter.id, maxResults: 25 })
+                        : fetchYouTubeSearch(query, 'video,playlist,channel', { maxResults: 20 }),
+                    fetchOpenverseTracks(openverseQuery, 20, { reserveContext: 'manual', seed: { artist: query, title: query } })
+                ]);
+                const fresh = youtubeResult.status === 'fulfilled' ? youtubeResult.value || [] : [];
+                const openverseTracks = openverseResult.status === 'fulfilled' ? openverseResult.value || [] : [];
                 const merged = [...localSongs, ...fresh].filter((song, index, all) => {
                     const key = songKey(song);
                     return all.findIndex(other => songKey(other) === key) === index;
                 });
 
-                if (merged.length > 0) {
-                    renderYouTubeSearchResults(merged, query);
-                    if (!channelFilter && fresh.length === 0) showToast(`Usando candidatos guardados de ${inferArtistStyle(query, merged)}`, 'fa-database');
-                } else if (!channelFilter) {
-                    const style = inferArtistStyle(query, localSongs);
-                    const musicFallback = await fetchOpenverseTracks(`${style} music`, 20, { radioOnly: true, reserveContext: 'radio', seed: { artist: query, genre: style, title: query } });
-                    if (musicFallback.length) {
-                        renderYouTubeSearchResults(musicFallback, `${query} · ${style}`);
-                        showToast(`YouTube no disponible: mostramos música ${style} de Openverse`, 'fa-music');
-                    } else if (!(await recoverWithRockMetal())) {
-                        renderEmptyState(`Sin resultados para "${query}"`, 'No encontramos coincidencias ni propuestas musicales disponibles ahora.');
-                    }
-                } else {
-                    renderEmptyState(`Sin resultados para "${query}" en este canal`);
+                if (merged.length > 0) renderYouTubeSearchResults(merged, query);
+                if (openverseTracks.length > 0) renderOpenverseSearchResults(openverseTracks, query);
+                if (!channelFilter && fresh.length === 0 && localSongs.length > 0) {
+                    showToast(`YouTube sin resultados nuevos: usando candidatos guardados de ${inferArtistStyle(query, localSongs)}`, 'fa-database');
+                }
+                if (!merged.length && !openverseTracks.length) {
+                    if (channelFilter) renderEmptyState(`Sin resultados para "${query}" en este canal`);
+                    else if (!(await recoverWithRockMetal())) renderEmptyState(`Sin resultados para "${query}"`, 'No encontramos coincidencias ni propuestas musicales disponibles ahora.');
                 }
             } catch (e) {
                 console.warn('No se pudo completar la búsqueda solicitada', e);
@@ -1979,7 +1988,9 @@
             const response = await fetch(`/api/search?type=openverse&query=${encodeURIComponent(query)}&maxResults=${Math.min(Math.max(limit, 1), 20)}`);
             const data = await response.json();
             if (!response.ok || !data.results?.length) return [];
-            const allowedAudioTypes = new Set(['mp3', 'ogg', 'opus', 'm4a', 'aac']);
+            // Openverse devuelve también `mp32` para streams de Jamendo y otros proveedores.
+            // No aceptarlo hacía que la API respondiera correctamente pero la interfaz descartara todo.
+            const allowedAudioTypes = new Set(['mp3', 'mp32', 'ogg', 'opus', 'm4a', 'aac', 'wav', 'flac']);
             const unwantedAudioTerms = /\b(sound effect|sound-effect|sfx|foley|ambient|ambience|ambiente|noise|ruido|whoosh|impact|explosion|sample|sampling|loop|drum loop|drum circle|water|sonar|test tone|tone generator|field recording|field-recording|white noise|pink noise|audiobook|audio book|audiolibro|spoken word|narration|narrator|chapter|book reading|story|stories|lecture|podcast|interview|meditation|sleep music|children|bedtime)\b/i;
             const mappedTracks = data.results
                 .filter(track => allowedAudioTypes.has(String(track.filetype || '').toLowerCase()))
@@ -2037,6 +2048,14 @@
             return tracks;
         }
 
+        function renderOpenverseSearchResults(tracks, query) {
+            if (!Array.isArray(tracks) || !tracks.length) return;
+            renderLibraryRail(tracks.slice(0, 20), `Openverse · música de "${query}"`, "<i class='fas fa-headphones'></i>", false, {
+                hint: 'Fuente abierta · resultados visibles siempre',
+                showControls: true,
+                className: 'free-music-rail openverse-search-rail'
+            });
+        }
         async function searchOpenverse(query) {
             const mappedResults = await fetchOpenverseTracks(query, 20);
             if (!mappedResults.length) throw new Error('No results');
