@@ -1484,8 +1484,12 @@
                 // mostrar su Playlist local. Solo el reproductor activo conserva su estado local.
                 if (!nowarfyRemoteIsPlayer && nowarfyRemoteSession?.state) updateRemoteControlsFromState(nowarfyRemoteSession.state);
                 if (nowarfyRemoteStateTimer) clearInterval(nowarfyRemoteStateTimer);
-                nowarfyRemoteStateTimer = setInterval(() => { if (nowarfyRemoteIsPlayer) void publishNowarfyRemoteState(); }, 3000);
+                nowarfyRemoteStateTimer = setInterval(() => { void touchNowarfyRemoteDevice(); if (nowarfyRemoteIsPlayer) void publishNowarfyRemoteState(); }, 3000);
             } catch (error) { remoteStatus('Control remoto no disponible todavía; la reproducción local sigue funcionando.'); }
+        }
+        async function touchNowarfyRemoteDevice() {
+            if (!nowarfySupabase || !nowarfyAuthUser || !nowarfyRemoteDeviceId) return;
+            await nowarfySupabase.from('youtoo_remote_devices').update({ last_seen_at: new Date().toISOString(), role: nowarfyRemoteIsPlayer ? 'player' : 'controller' }).eq('id', nowarfyRemoteDeviceId).eq('user_id', nowarfyAuthUser.id);
         }
         async function teardownNowarfyRemoteControl() { if (nowarfyRemoteStateTimer) clearInterval(nowarfyRemoteStateTimer); nowarfyRemoteStateTimer = null; if (nowarfyRemoteChannel && nowarfySupabase) await nowarfySupabase.removeChannel(nowarfyRemoteChannel); nowarfyRemoteChannel = null; nowarfyRemoteSession = null; nowarfyRemoteShadowSong = null; nowarfyRemoteDeviceId = null; nowarfyRemoteIsPlayer = false; }
         async function claimNowarfyPlayer() {
@@ -1510,6 +1514,7 @@
                 if (!result.data || result.data.active_device_id !== nowarfyRemoteDeviceId) throw new Error('Supabase no confirmó este dispositivo como reproductor.');
                 nowarfyRemoteSession = result.data;
                 nowarfyRemoteIsPlayer = true;
+                await touchNowarfyRemoteDevice();
                 remoteStatus('Este dispositivo es el reproductor activo.');
                 updateNowarfyAuthUI();
                 await publishNowarfyRemoteState();
