@@ -862,13 +862,6 @@
         .nowarfy-auth-account button { border: 1px solid rgba(255,255,255,.16); border-radius: 10px; padding: 10px; color: #fff; background: rgba(255,255,255,.08); cursor: pointer; }
         .nowarfy-account-btn { width: 100%; margin-top: 10px; border: 1px solid rgba(190,188,255,.2); border-radius: 10px; padding: 9px 10px; color: #e8e7ff; background: rgba(255,255,255,.06); cursor: pointer; font: inherit; font-size: .72rem; text-align: left; }
         .auth-modal-open { overflow: hidden; }
-        .nowarfy-remote-controls { display: grid; gap: 8px; margin-top: 6px; padding-top: 10px; border-top: 1px solid rgba(255,255,255,.12); }
-        .nowarfy-remote-controls small { color: #9fded3; line-height: 1.35; }
-        .nowarfy-remote-actions, .nowarfy-remote-transport { display: flex; gap: 7px; flex-wrap: wrap; }
-        .nowarfy-remote-controls button { flex: 1 1 auto; border: 1px solid rgba(255,255,255,.14); border-radius: 9px; padding: 8px; color: #f7f5ff; background: rgba(255,255,255,.08); cursor: pointer; font-size: .69rem; }
-        .nowarfy-remote-transport button { min-width: 42px; }
-        .nowarfy-remote-range { display: grid; grid-template-columns: 62px 1fr; align-items: center; gap: 8px; color: #c6c5da; font-size: .7rem; }
-        .nowarfy-remote-range input { width: 100%; accent-color: var(--accent, #9d8cff); }
         .nowarfy-qr-modal { position: fixed; z-index: 10000; inset: 0; display: grid; place-items: center; padding: 22px; background: rgba(2,3,10,.78); backdrop-filter: blur(10px); }
         .nowarfy-qr-dialog { position: relative; width: min(92vw, 392px); padding: 28px; border: 1px solid rgba(190,188,255,.28); border-radius: 20px; background: linear-gradient(145deg, #20213b, #0f101e); box-shadow: 0 28px 75px rgba(0,0,0,.55); text-align: center; }
         .nowarfy-qr-dialog h2 { margin: 0; color: #fbfaff; font: 800 1.28rem 'Sora', sans-serif; letter-spacing: -.04em; }
@@ -1224,7 +1217,7 @@
                     <button type="button" class="nowarfy-auth-magic" onclick="submitNowarfyAuth('magic')"><i class="fas fa-wand-magic-sparkles"></i> Enviarme un enlace mágico</button>
                 </div>
             </div>
-            <div id="nowarfyAuthUserPanel" class="nowarfy-auth-account" hidden><strong id="nowarfyAuthUserEmail"></strong><span>Cuenta autenticada. Este dispositivo puede compartir el reproductor con tus otros dispositivos.</span><div class="nowarfy-remote-controls" id="nowarfyRemoteControls"><small id="nowarfyRemoteStatus">Conectando dispositivos…</small><div class="nowarfy-remote-actions"><button type="button" onclick="claimNowarfyPlayer()"><i class="fas fa-broadcast-tower"></i> Usar este dispositivo como reproductor</button><button type="button" onclick="releaseNowarfyPlayer()"><i class="fas fa-link-slash"></i> Liberar reproductor</button></div><div class="nowarfy-remote-transport"><button type="button" onclick="sendNowarfyCommand('prev')" aria-label="Anterior"><i class="fas fa-step-backward"></i></button><button type="button" onclick="sendNowarfyCommand('toggle')" aria-label="Reproducir o pausar"><i class="fas fa-play"></i>/<i class="fas fa-pause"></i></button><button type="button" onclick="sendNowarfyCommand('next')" aria-label="Siguiente"><i class="fas fa-step-forward"></i></button></div><label class="nowarfy-remote-range">Volumen <input id="nowarfyRemoteVolume" type="range" min="0" max="100" value="80" oninput="sendNowarfyCommand('volume', Number(this.value))"></label><label class="nowarfy-remote-range">Posición <input id="nowarfyRemoteSeek" type="range" min="0" max="100" value="0" oninput="sendNowarfyCommand('seekPercent', Number(this.value))"></label></div><button type="button" onclick="signOutNowarfy()">Cerrar sesión</button></div>
+            <div id="nowarfyAuthUserPanel" class="nowarfy-auth-account" hidden><strong id="nowarfyAuthUserEmail"></strong><span>Sesión iniciada en este dispositivo. El reproductor y sus controles se sincronizan con los demás dispositivos de la misma cuenta.</span><small id="nowarfyRemoteStatus">Conectando dispositivos…</small><button type="button" onclick="claimNowarfyPlayer()"><i class="fas fa-broadcast-tower"></i> Usar este dispositivo como reproductor</button><button type="button" onclick="switchNowarfyUser()"><i class="fas fa-user-gear"></i> Cambiar de usuario</button><button type="button" onclick="signOutNowarfy()"><i class="fas fa-right-from-bracket"></i> Cerrar sesión</button></div>
             <div class="nowarfy-auth-status" id="nowarfyAuthStatus" aria-live="polite"></div>
         </div>
     </div>
@@ -1258,6 +1251,7 @@
         let nowarfyAuthInitialised = false;
         let nowarfyRemoteChannel = null;
         let nowarfyRemoteSession = null;
+        let nowarfyRemoteShadowSong = null;
         let nowarfyRemoteDeviceId = null;
         let nowarfyRemoteIsPlayer = false;
         let nowarfyRemoteStateTimer = null;
@@ -1369,6 +1363,10 @@
             updateNowarfyAuthUI();
             authStatus('Sesión cerrada. El modo anónimo local continúa disponible.');
         }
+        async function switchNowarfyUser() {
+            await signOutNowarfy();
+            openNowarfyAuth();
+        }
 
         function remoteStatus(message) { const el = document.getElementById('nowarfyRemoteStatus'); if (el) el.textContent = message; }
         function currentRemotePosition() {
@@ -1383,7 +1381,7 @@
         }
         function remoteStateSnapshot() {
             const { song, position, duration } = currentRemotePosition();
-            return { resourceId: song?.url || null, title: song?.title || '', artist: song?.artist || '', type: song?.type || null, isPlaying: !!isPlaying, volume: Math.round(lastVolume * 100), position: Math.round(position * 10) / 10, duration: Math.round(duration * 10) / 10, updatedAt: new Date().toISOString() };
+            return { resourceId: song?.url || null, title: song?.title || '', artist: song?.artist || '', type: song?.type || null, img: song?.img || '', channelId: song?.channelId || '', isPlaying: !!isPlaying, volume: Math.round(lastVolume * 100), position: Math.round(position * 10) / 10, duration: Math.round(duration * 10) / 10, updatedAt: new Date().toISOString() };
         }
         async function ensureNowarfyRemoteSession() {
             if (!nowarfySupabase || !nowarfyAuthUser) return null;
@@ -1418,11 +1416,23 @@
                 nowarfyRemoteStateTimer = setInterval(() => { if (nowarfyRemoteIsPlayer) void publishNowarfyRemoteState(); }, 3000);
             } catch (error) { remoteStatus('Control remoto no disponible todavía; la reproducción local sigue funcionando.'); }
         }
-        async function teardownNowarfyRemoteControl() { if (nowarfyRemoteStateTimer) clearInterval(nowarfyRemoteStateTimer); nowarfyRemoteStateTimer = null; if (nowarfyRemoteChannel && nowarfySupabase) await nowarfySupabase.removeChannel(nowarfyRemoteChannel); nowarfyRemoteChannel = null; nowarfyRemoteSession = null; nowarfyRemoteDeviceId = null; nowarfyRemoteIsPlayer = false; }
+        async function teardownNowarfyRemoteControl() { if (nowarfyRemoteStateTimer) clearInterval(nowarfyRemoteStateTimer); nowarfyRemoteStateTimer = null; if (nowarfyRemoteChannel && nowarfySupabase) await nowarfySupabase.removeChannel(nowarfyRemoteChannel); nowarfyRemoteChannel = null; nowarfyRemoteSession = null; nowarfyRemoteShadowSong = null; nowarfyRemoteDeviceId = null; nowarfyRemoteIsPlayer = false; }
         async function claimNowarfyPlayer() { if (!nowarfySupabase || !nowarfyAuthUser || !nowarfyRemoteSession) return; const result = await nowarfySupabase.from('youtoo_remote_sessions').update({ active_device_id: nowarfyRemoteDeviceId, state: remoteStateSnapshot(), version: Number(nowarfyRemoteSession.version || 0) + 1, updated_at: new Date().toISOString(), expires_at: new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString() }).eq('id', nowarfyRemoteSession.id); if (result.error) remoteStatus('No se pudo tomar el reproductor.'); else { nowarfyRemoteIsPlayer = true; remoteStatus('Este dispositivo es el reproductor activo.'); await publishNowarfyRemoteState(); } }
         async function releaseNowarfyPlayer() { if (!nowarfySupabase || !nowarfyRemoteSession || !nowarfyRemoteIsPlayer) return; await nowarfySupabase.from('youtoo_remote_sessions').update({ active_device_id: null, state: remoteStateSnapshot(), version: Number(nowarfyRemoteSession.version || 0) + 1, updated_at: new Date().toISOString() }).eq('id', nowarfyRemoteSession.id); nowarfyRemoteIsPlayer = false; remoteStatus('Reproductor liberado; este dispositivo queda como control.'); }
         async function publishNowarfyRemoteState() { if (!nowarfySupabase || !nowarfyRemoteSession || !nowarfyRemoteIsPlayer) return; const state = remoteStateSnapshot(); const result = await nowarfySupabase.from('youtoo_remote_sessions').update({ state, version: Number(nowarfyRemoteSession.version || 0) + 1, updated_at: new Date().toISOString() }).eq('id', nowarfyRemoteSession.id).eq('active_device_id', nowarfyRemoteDeviceId); if (!result.error) nowarfyRemoteSession.state = state; }
-        function updateRemoteControlsFromState(state) { const volume = document.getElementById('nowarfyRemoteVolume'); const seek = document.getElementById('nowarfyRemoteSeek'); if (volume && document.activeElement !== volume && Number.isFinite(Number(state.volume))) volume.value = Number(state.volume); if (seek && document.activeElement !== seek && state.duration) seek.value = Math.max(0, Math.min(100, Number(state.position || 0) / Number(state.duration) * 100)); }
+        function updateRemoteControlsFromState(state) {
+            if (!state) return;
+            if (!nowarfyRemoteIsPlayer && state.resourceId) {
+                const nextShadow = { type: state.type || 'yt', url: state.resourceId, title: state.title || 'Reproduciendo en otro dispositivo', artist: state.artist || '', img: state.img || '', channelId: state.channelId || '' };
+                if (!nowarfyRemoteShadowSong || nowarfyRemoteShadowSong.url !== nextShadow.url || nowarfyRemoteShadowSong.title !== nextShadow.title) { nowarfyRemoteShadowSong = nextShadow; updateNowPlaying(nextShadow); }
+                isPlaying = !!state.isPlaying;
+                updateIcon();
+                const duration = Number(state.duration || 0), position = Number(state.position || 0);
+                if (duration) { const pct = Math.max(0, Math.min(100, position / duration * 100)); progFill.style.width = `${pct}%`; progThumb.style.left = `${pct}%`; currTimeEl.innerText = format(position); totalTimeEl.innerText = format(duration); }
+            }
+            const volume = document.getElementById('volumeSlider');
+            if (volume && document.activeElement !== volume && Number.isFinite(Number(state.volume))) { volume.value = Number(state.volume) / 100; volume.style.background = `linear-gradient(to right, var(--accent) ${Number(state.volume)}%, #535353 ${Number(state.volume)}%)`; }
+        }
         async function sendNowarfyCommand(type, value = null) { if (!nowarfySupabase || !nowarfyAuthUser || !nowarfyRemoteSession) return; if (nowarfyRemoteIsPlayer) { await executeNowarfyRemoteCommand({ type, value }); return; } const result = await nowarfySupabase.from('youtoo_remote_commands').insert({ session_id: nowarfyRemoteSession.id, user_id: nowarfyAuthUser.id, device_id: nowarfyRemoteDeviceId, command: { type, value } }); if (result.error) remoteStatus('No se pudo enviar el comando remoto.'); }
         async function executeNowarfyRemoteCommand(command) { if (!nowarfyRemoteIsPlayer) return; const type = command.type; if (type === 'toggle') togglePlay(); else if (type === 'next') nextSong(true); else if (type === 'prev') prevSong(); else if (type === 'volume') setVolume(Math.max(0, Math.min(100, Number(command.value))) / 100); else if (type === 'seekPercent') commitSeek(Math.max(0, Math.min(100, Number(command.value))) / 100); else if (type === 'pause' && isPlaying) togglePlay(); else if (type === 'play' && !isPlaying) togglePlay(); await publishNowarfyRemoteState(); }
 
@@ -3616,7 +3626,8 @@
         }
 
         function currentQueueSong() {
-            return currentIndex >= 0 ? queue[currentIndex] || null : null;
+            if (nowarfyAuthUser && nowarfyRemoteSession && !nowarfyRemoteIsPlayer && nowarfyRemoteShadowSong) return nowarfyRemoteShadowSong;
+            return currentIndex >= 0 ? queue[currentIndex] || nowarfyRemoteShadowSong : nowarfyRemoteShadowSong;
         }
 
         function updateCurrentActionControls(song) {
@@ -4713,6 +4724,7 @@
         }
 
         function togglePlay() {
+            if (nowarfyAuthUser && nowarfyRemoteSession && !nowarfyRemoteIsPlayer) { void sendNowarfyCommand('toggle'); return; }
             if (currentIndex === -1 || !queue[currentIndex]) return;
             // Si venimos de restaurar la cola guardada y todavía no se cargó nada en el reproductor, arrancarla.
             if (!ytPlayer && !audioEl.src && !freeVideoEl.src) {
@@ -4738,6 +4750,7 @@
         }
 
         function nextSong(manual = false) {
+            if (manual && nowarfyAuthUser && nowarfyRemoteSession && !nowarfyRemoteIsPlayer) { void sendNowarfyCommand('next'); return true; }
             if (queue.length === 0) return false;
             if (manual && shuffleMode) {
                 playQueueAt(Math.floor(Math.random() * queue.length));
@@ -4754,6 +4767,7 @@
             return true;
         }
         function prevSong() {
+            if (nowarfyAuthUser && nowarfyRemoteSession && !nowarfyRemoteIsPlayer) { void sendNowarfyCommand('prev'); return; }
             if (queue.length === 0) return;
             const idx = queue.findIndex(s => s._qid === currentPlayingQid);
             let prev = idx - 1;
@@ -4823,6 +4837,7 @@
         }
 
         function commitSeek(pct) {
+            if (nowarfyAuthUser && nowarfyRemoteSession && !nowarfyRemoteIsPlayer) { void sendNowarfyCommand('seekPercent', Math.max(0, Math.min(1, Number(pct))) * 100); return; }
             if (currentIndex === -1 || !queue[currentIndex]) return;
             const song = queue[currentIndex];
             if (song.type === 'yt' && ytPlayer) { const d = ytPlayer.getDuration(); if (d) ytPlayer.seekTo(d * pct, true); }
@@ -4943,6 +4958,13 @@
         function setVolume(v) {
             v = Math.max(0, Math.min(1, parseFloat(v)));
             lastVolume = v;
+            if (nowarfyAuthUser && nowarfyRemoteSession && !nowarfyRemoteIsPlayer) {
+                const slider = document.getElementById('volumeSlider');
+                if (slider) { slider.value = v; slider.style.background = `linear-gradient(to right, var(--accent) ${v * 100}%, #535353 ${v * 100}%)`; }
+                localStorage.setItem('nowarfy_vol', v);
+                void sendNowarfyCommand('volume', Math.round(v * 100));
+                return;
+            }
             applyVolume(v);
             localStorage.setItem('nowarfy_vol', v);
         }
