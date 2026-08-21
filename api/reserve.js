@@ -210,7 +210,8 @@ export default async function handler(req, res) {
   if (!config.url || !config.key) return json(res, 503, { error: { source: 'supabase', code: 'not_configured', message: 'La reserva global todavía no está configurada en Vercel' } });
 
   try {
-    const action = text(req.query.action || (req.method === 'GET' ? 'search' : 'upsert'), 40);
+    const body = req.body || {};
+    const action = text(req.query.action || (req.method === 'GET' ? 'search' : body.action || 'upsert'), 40);
     if (req.method === 'GET' && action === 'query') {
       const lookup = queryLookupUrl(req);
       if (!lookup) return json(res, 400, { error: { source: 'supabase', message: 'Faltan queryKey o source, query y styleKey válidos' } });
@@ -237,8 +238,6 @@ export default async function handler(req, res) {
     }
 
     if (req.method !== 'POST') return json(res, 405, { error: { source: 'supabase', message: 'Método no permitido' } });
-    const body = req.body || {};
-
     if (action === 'query-upsert') {
       const row = asQueryRow(body);
       if (!row) return json(res, 400, { error: { source: 'supabase', message: 'Estado de consulta inválido' } });
