@@ -3376,6 +3376,11 @@
         async function fetchOpenverseGenreTracks(seedSong, count) {
             const style = getRadioStyle(seedSong);
             const query = `${style} music`;
+            const queryVariants = [...new Set([
+                `${style} music`,
+                `${style} song`,
+                `${style} instrumental music`
+            ])];
             let cached = [];
             try {
                 const store = JSON.parse(localStorage.getItem(OPENVERSE_RADIO_CACHE_KEY) || '{}');
@@ -3385,12 +3390,22 @@
                 }
             } catch (e) { /* almacenamiento no disponible */ }
             try {
-                const fresh = (await fetchOpenverseTracks(query, Math.min(Math.max(count, 10), 20), { radioOnly: true, reserveContext: 'radio', seed: seedSong }))
-                    .filter(isRadioMusicTrack);
+                const freshResults = await Promise.allSettled(queryVariants.map(variant =>
+                    fetchOpenverseTracks(variant, Math.min(Math.max(count, 10), 20), { radioOnly: true, reserveContext: 'radio', seed: seedSong })
+                ));
+                const fresh = [];
+                const freshKeys = new Set();
+                freshResults.forEach(result => {
+                    if (result.status !== 'fulfilled') return;
+                    result.value.filter(isRadioMusicTrack).forEach(track => {
+                        const key = reserveCandidateKey(track) || songKey(track);
+                        if (!freshKeys.has(key)) { freshKeys.add(key); fresh.push(track); }
+                    });
+                });
                 if (fresh.length) {
                     try {
                         const store = JSON.parse(localStorage.getItem(OPENVERSE_RADIO_CACHE_KEY) || '{}');
-                        store[query] = { savedAt: Date.now(), tracks: fresh.slice(0, 20) };
+                        store[query] = { savedAt: Date.now(), tracks: fresh.slice(0, 40) };
                         localStorage.setItem(OPENVERSE_RADIO_CACHE_KEY, JSON.stringify(store));
                     } catch (e) { /* almacenamiento no disponible */ }
                     return fresh;
