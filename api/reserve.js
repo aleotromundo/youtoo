@@ -214,7 +214,7 @@ export default async function handler(req, res) {
       if (!lookup) return json(res, 400, { error: { source: 'supabase', message: 'Faltan queryKey o source, query y styleKey válidos' } });
       const result = await supabaseRequest(`youtoo_discovery_queries?${lookup}`);
       if (!result.response?.ok) return json(res, result.response?.status || 502, { error: { source: 'supabase', message: result.data?.message || 'No se pudo leer el estado de la consulta' } });
-      compactCache(res);
+      res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
       return json(res, 200, { query: Array.isArray(result.data) ? result.data[0] || null : null });
     }
 
