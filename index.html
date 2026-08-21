@@ -3386,18 +3386,19 @@
 
         function clearQueue() {
             if (queue.length === 0) return;
-            clearVideoResumeSession();
-            stopAll();
-            queue = [];
-            queueSeenKeys = new Set();
-            currentPlayingQid = null;
-            currentIndex = -1;
+            const current = currentQueueSong() || queue[currentIndex];
+            if (!current) return;
+            // "Vaciar" solo elimina lo que viene después; la canción actual sigue sonando.
+            queue = [current];
+            queueSeenKeys = new Set([songKey(current)]);
+            currentIndex = 0;
+            currentPlayingQid = current._qid;
             currentSourceIdx = null;
-            queueRound = 0;
+            queueRound = 1;
             persistQueue();
             renderQueue();
-            updateNowPlaying({ title: 'Selecciona una canción', artist: '', img: '' });
-            showToast('Cola vaciada', 'fa-trash');
+            showToast('Se quitaron las canciones siguientes; continúa la actual', 'fa-trash');
+            // La radio volverá a cargar canciones cuando el tema actual termine o quede poco por delante.
         }
 
         function removeFromQueue(qid) {
