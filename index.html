@@ -906,8 +906,22 @@
         }
         body.mode-youtoo .search-input {
             background: rgba(245,244,255,.94);
+            color: #111827;
+            -webkit-text-fill-color: #111827;
+            caret-color: #111827;
             box-shadow: 0 12px 30px rgba(0,0,0,.18), inset 0 1px 0 rgba(255,255,255,.9);
         }
+        body.mode-youtoo .search-input::placeholder {
+            color: #4b5563;
+            opacity: 1;
+        }
+        body.mode-youtoo .search-input:-webkit-autofill,
+        body.mode-youtoo .search-input:-webkit-autofill:hover,
+        body.mode-youtoo .search-input:-webkit-autofill:focus {
+            -webkit-text-fill-color: #111827;
+            box-shadow: 0 0 0 1000px #f5f4ff inset, 0 12px 30px rgba(0,0,0,.18);
+        }
+        body.mode-youtoo .search-input::selection { background: rgba(94,234,212,.42); color: #111827; }
         body.mode-youtoo .search-input:focus { box-shadow: 0 0 0 4px rgba(94,234,212,.14), 0 16px 34px rgba(0,0,0,.24); }
         body.mode-youtoo .nav-links li { border: 1px solid transparent; }
         body.mode-youtoo .nav-links li:hover { background: rgba(255,255,255,.055); border-color: rgba(190,188,255,.10); box-shadow: 0 8px 18px rgba(0,0,0,.16); }
