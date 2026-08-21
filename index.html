@@ -3168,14 +3168,23 @@
         // --- AUTOGENERACIÓN DE LA COLA ---
         // Ronda 0: hasta 20 canciones del mismo artista (sin repetir).
         // Ronda 1+: hasta 20 canciones de artistas similares, y así sucesivamente sin fin.
+        function getRadioStyle(seedSong) {
+            const explicit = String(seedSong?.genre || '').trim().toLowerCase();
+            if (explicit && explicit !== 'unknown') return explicit;
+            const text = `${seedSong?.title || ''} ${seedSong?.description || ''} ${seedSong?.artist || ''} ${currentMood || ''}`.toLowerCase();
+            const styles = ['heavy metal', 'metalcore', 'nu metal', 'hard rock', 'alternative rock', 'punk rock', 'grunge', 'industrial metal', 'rock', 'metal'];
+            return styles.find(style => text.includes(style)) || (currentMood ? String(currentMood).toLowerCase() : 'rock metal');
+        }
+
         async function fetchSameArtistTracks(seedSong, count) {
             if (!seedSong || seedSong.type !== 'yt' || !seedSong.artist) return [];
+            const style = getRadioStyle(seedSong);
             let raw = [];
             if (seedSong.channelId) {
                 raw = await fetchYouTubeSearch(seedSong.artist, 'video', { channelId: seedSong.channelId, maxResults: Math.min(count, 20) });
             }
             if (raw.length < count) {
-                const extra = await fetchYouTubeSearch(seedSong.artist, 'video', { maxResults: count });
+                const extra = await fetchYouTubeSearch(`${seedSong.artist} ${style} official music`, 'video', { maxResults: count });
                 const artistLower = seedSong.artist.toLowerCase();
                 const filtered = extra.filter(s => (s.artist || '').toLowerCase().includes(artistLower) || artistLower.includes((s.artist || '').toLowerCase()));
                 raw = raw.concat(filtered);
@@ -3183,15 +3192,13 @@
             return raw.slice(0, count);
         }
 
-        async function fetchRockMetalTracks(count) {
-            return fetchYouTubeSearch(ROCK_METAL_DISCOVERY_QUERY, 'video', { maxResults: Math.min(Math.max(count, 6), 20) });
+        async function fetchRockMetalTracks(count, style = 'rock metal') {
+            return fetchYouTubeSearch(`${style} official music`, 'video', { maxResults: Math.min(Math.max(count, 6), 20) });
         }
 
         async function fetchOpenverseGenreTracks(seedSong, count) {
-            const genre = String(seedSong?.genre || '').trim();
-            const query = genre && genre.toLowerCase() !== 'unknown'
-                ? `${genre} rock metal music`
-                : 'rock metal music';
+            const style = getRadioStyle(seedSong);
+            const query = `${style} music`;
             let cached = [];
             try {
                 const store = JSON.parse(localStorage.getItem(OPENVERSE_RADIO_CACHE_KEY) || '{}');
@@ -3216,12 +3223,13 @@
         }
 
         async function fetchSimilarArtistTracks(seedSong, count) {
-            if (!seedSong || !seedSong.artist) return fetchRockMetalTracks(count);
+            if (!seedSong || !seedSong.artist) return fetchRockMetalTracks(count, getRadioStyle(seedSong));
             const artist = seedSong.artist;
+            const style = getRadioStyle(seedSong);
             try {
                 const [radio, related] = await Promise.all([
-                    fetchYouTubeSearch(`${artist} radio mix`, 'video', { maxResults: Math.max(6, Math.ceil(count * 0.7)) }),
-                    fetchYouTubeSearch(`artistas similares a ${artist}`, 'video', { maxResults: Math.max(6, Math.ceil(count * 0.6)) })
+                    fetchYouTubeSearch(`${artist} ${style} radio mix`, 'video', { maxResults: Math.max(6, Math.ceil(count * 0.7)) }),
+                    fetchYouTubeSearch(`${style} artists similar to ${artist}`, 'video', { maxResults: Math.max(6, Math.ceil(count * 0.6)) })
                 ]);
                 const artistLower = artist.toLowerCase();
                 const merged = shuffleArray([...radio, ...related]).filter(s => (s.artist || '').toLowerCase() !== artistLower);
