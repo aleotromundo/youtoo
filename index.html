@@ -4742,6 +4742,14 @@
                     window.setTimeout(() => setVideoStageMinimized(true), 0);
                 }
             }
+            // El parámetro autoplay no alcanza cuando el navegador bloquea autoplay.
+            // La acción original del usuario ya habilitó reproducción: reintentamos
+            // explícitamente al recibir onReady para que el primer Play no quede en -1.
+            if (song?.type === 'yt' && !playbackStoppedByUser && !(resume?.wasPlaying === false) && ytPlayer.playVideo) {
+                window.setTimeout(() => {
+                    if (ytPlayer && currentQueueSong()?.url === song.url && !playbackStoppedByUser) ytPlayer.playVideo();
+                }, 0);
+            }
         }
         function onYTStateChange(event) {
             if (event?.target && event.target !== ytPlayer) return;
