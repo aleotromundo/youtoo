@@ -1486,7 +1486,23 @@
             if (volume && document.activeElement !== volume && Number.isFinite(Number(state.volume))) { volume.value = Number(state.volume) / 100; volume.style.background = `linear-gradient(to right, var(--accent) ${Number(state.volume)}%, #535353 ${Number(state.volume)}%)`; }
         }
         async function sendNowarfyCommand(type, value = null) { if (!nowarfySupabase || !nowarfyAuthUser || !nowarfyRemoteSession) return; if (nowarfyRemoteIsPlayer) { await executeNowarfyRemoteCommand({ type, value }); return; } const result = await nowarfySupabase.from('youtoo_remote_commands').insert({ session_id: nowarfyRemoteSession.id, user_id: nowarfyAuthUser.id, device_id: nowarfyRemoteDeviceId, command: { type, value } }); if (result.error) remoteStatus('No se pudo enviar el comando remoto.'); }
-        async function executeNowarfyRemoteCommand(command) { if (!nowarfyRemoteIsPlayer) return; const type = command.type; if (type === 'toggle') togglePlay(); else if (type === 'next') nextSong(true); else if (type === 'prev') prevSong(); else if (type === 'volume') setVolume(Math.max(0, Math.min(100, Number(command.value))) / 100); else if (type === 'seekPercent') commitSeek(Math.max(0, Math.min(100, Number(command.value))) / 100); else if (type === 'pause' && isPlaying) togglePlay(); else if (type === 'play' && !isPlaying) togglePlay(); await publishNowarfyRemoteState(); }
+        async function executeNowarfyRemoteCommand(command) {
+            if (!nowarfyRemoteIsPlayer) return;
+            const type = command.type;
+            if (type === 'toggle') togglePlay();
+            else if (type === 'next') nextSong(true);
+            else if (type === 'prev') prevSong();
+            else if (type === 'volume') setVolume(Math.max(0, Math.min(100, Number(command.value))) / 100);
+            else if (type === 'seekPercent') commitSeek(Math.max(0, Math.min(100, Number(command.value))) / 100);
+            else if (type === 'seekDelta') {
+                const delta = Number(command.value) || 0;
+                const song = currentQueueSong();
+                if (song?.type === 'yt' && ytPlayer?.getCurrentTime) ytPlayer.seekTo(Math.max(0, ytPlayer.getCurrentTime() + delta), true);
+                else if (activeAudioEl) activeAudioEl.currentTime = Math.max(0, Math.min(activeAudioEl.duration || 0, activeAudioEl.currentTime + delta));
+            } else if (type === 'pause' && isPlaying) togglePlay();
+            else if (type === 'play' && !isPlaying) togglePlay();
+            await publishNowarfyRemoteState();
+        }
 
         let currentList = [];
         let favorites = JSON.parse(localStorage.getItem('nowarfy_favs')) || [];
@@ -4936,6 +4952,7 @@
         }
 
         function seekBy(deltaSeconds) {
+            if (nowarfyAuthUser && nowarfyRemoteSession && !nowarfyRemoteIsPlayer) { void sendNowarfyCommand('seekDelta', Number(deltaSeconds) || 0); return; }
             if (currentIndex === -1 || !queue[currentIndex]) return;
             const song = queue[currentIndex];
             if (song.type === 'yt' && ytPlayer) {
