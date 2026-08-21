@@ -70,3 +70,8 @@ comment on table public.youtoo_remote_sessions is
   'Estado compartido del reproductor para una cuenta autenticada; el iFrame activo es el único ejecutor.';
 comment on table public.youtoo_remote_commands is
   'Comandos remotos de reproducción; el dispositivo jugador los consume y publica el estado resultante.';
+
+-- Habilita los cambios de estas tablas en Supabase Realtime sin fallar si ya fueron agregadas.
+do $$ begin alter publication supabase_realtime add table public.youtoo_remote_devices; exception when duplicate_object then null; end $$;
+do $$ begin alter publication supabase_realtime add table public.youtoo_remote_sessions; exception when duplicate_object then null; end $$;
+do $$ begin alter publication supabase_realtime add table public.youtoo_remote_commands; exception when duplicate_object then null; end $$;
