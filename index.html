@@ -1077,6 +1077,8 @@
             body.mode-youtoo .nav-links { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 4px; }
             body.mode-youtoo .nav-links li { display: flex; align-items: center; gap: 9px; min-height: 42px; padding: 9px 10px; font-size: .78rem; }
             body.mode-youtoo .nav-links li span { display: inline; }
+            /* Gana a la regla heredada del layout horizontal móvil que ocultaba estos textos. */
+            body.mode-youtoo .nowarfy-nav-group .nav-links li span { display: inline; }
             body.mode-youtoo .nav-links li i { width: 18px; font-size: .9rem; }
             body.mode-youtoo .nowarfy-side-status, body.mode-youtoo .nowarfy-qr-launch { display: none; }
             body.mode-youtoo .content-area { padding: 14px 12px calc(var(--player-height) + 28px); min-width: 0; }
