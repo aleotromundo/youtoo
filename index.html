@@ -1079,6 +1079,8 @@
             body.mode-youtoo .nav-links li span { display: inline; }
             /* Gana a la regla heredada del layout horizontal móvil que ocultaba estos textos. */
             body.mode-youtoo .nowarfy-nav-group .nav-links li span { display: inline; }
+            /* La regla horizontal anterior tiene mayor especificidad; esta la vence dentro del panel. */
+            body.mode-youtoo .nowarfy-nav-group .nav-links { display: grid; grid-template-columns: 1fr; flex-direction: column; width: 100%; }
             body.mode-youtoo .nav-links li i { width: 18px; font-size: .9rem; }
             body.mode-youtoo .nowarfy-side-status, body.mode-youtoo .nowarfy-qr-launch { display: none; }
             body.mode-youtoo .content-area { padding: 14px 12px calc(var(--player-height) + 28px); min-width: 0; }
