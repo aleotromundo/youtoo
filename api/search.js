@@ -334,7 +334,8 @@ export default async function handler(req, res) {
       if (!query || typeof query !== 'string') return res.status(400).json({ error: { source: 'openverse', message: 'Falta el término de búsqueda' } });
 
       const pageSize = Math.min(boundedMax(req.query.maxResults, 20), 20);
-      const searchUrl = `https://api.openverse.org/v1/audio/?q=${encodeURIComponent(query)}&page_size=${pageSize}`;
+      const page = Math.max(1, Number(req.query.page || 1));
+      const searchUrl = `https://api.openverse.org/v1/audio/?q=${encodeURIComponent(query)}&page_size=${pageSize}&page=${page}`;
       const headers = {};
       // Openverse permite consultas públicas sin token. Si Vercel tiene credenciales,
       // las usamos para aumentar el margen de cuota sin hacerlas obligatorias.
