@@ -1160,7 +1160,7 @@
             <div class="search-container">
                 <div class="search-wrap">
                     <i class="fas fa-magnifying-glass"></i>
-                    <input type="text" class="search-input" id="searchInput" placeholder="Buscá videos, artistas o canciones..." onkeyup="handleSearchDebounced()">
+                    <input type="text" class="search-input" id="searchInput" placeholder="Buscá videos, artistas o canciones..." oninput="handleSearchInput()" onkeydown="handleSearchKeydown(event)">
                     <button class="search-clear" id="searchClear" onclick="clearSearch()" aria-label="Limpiar búsqueda"><i class="fas fa-xmark"></i></button>
                 </div>
             </div>
@@ -2151,14 +2151,21 @@
         }
 
         // --- LÓGICA DE BÚSQUEDA ---
-        function handleSearchDebounced() {
+        function handleSearchInput() {
+            // Escribir no consulta nada: solo actualiza el estado visual del botón de limpiar.
             clearTimeout(searchTimeout);
+            searchClearBtn.classList.toggle('show', searchInput.value.trim().length > 0);
+        }
+        function handleSearchKeydown(event) {
+            if (event.key !== 'Enter' || event.isComposing) return;
+            event.preventDefault();
             const query = searchInput.value.trim();
-            searchClearBtn.classList.toggle('show', query.length > 0);
             if (!query) { resetView(); return; }
             channelFilter = null;
-            searchTimeout = setTimeout(() => performSmartSearch(query), 600);
+            performSmartSearch(query);
         }
+        // Compatibilidad con accesos antiguos: nunca ejecuta una búsqueda por sí mismo.
+        function handleSearchDebounced() { handleSearchInput(); }
 
         function clearSearch() {
             searchInput.value = '';
@@ -2750,20 +2757,17 @@
         }
 
         async function loadHomeCatalogSources() {
-            // Primero se reutiliza la biblioteca de este dispositivo: evita búsquedas repetidas y mantiene la portada visible.
+            // La portada nunca realiza una búsqueda nueva: reutiliza caché, reserva local y catálogo de emergencia.
+            // Las APIs se consultan únicamente desde performSmartSearch después de confirmar con Enter.
             const fromCache = restoreCatalogCache();
             if (!fromCache) {
-                const results = await Promise.allSettled([
-                    fetchYouTubeSearch('rock metal official music videos', 'video', { maxResults: 24 }),
-                    fetchOpenverseTracks('rock metal music', 20),
-                    fetchOpenverseTracks('rock instrumental metal', 20)
-                ]);
-                const value = index => results[index]?.status === 'fulfilled' ? results[index].value || [] : [];
-                const discoveredVideos = uniqueMediaByUrl(value(0), 24);
-                homeVideos = discoveredVideos.length ? discoveredVideos : uniqueMediaByUrl(EMERGENCY_VIDEO_CATALOG, 24);
-                homeMusicVideos = uniqueMediaByUrl([...discoveredVideos, ...EMERGENCY_VIDEO_CATALOG], 24);
+                const localReserve = await readLocalReserveCandidates(120);
+                const reservedVideos = localReserve.filter(item => item.type === 'yt' || item.resourceKind === 'youtube#video');
+                const reservedAudio = localReserve.filter(item => item.type === 'mp3');
+                homeVideos = uniqueMediaByUrl([...reservedVideos, ...EMERGENCY_VIDEO_CATALOG], 24);
+                homeMusicVideos = uniqueMediaByUrl([...reservedVideos, ...EMERGENCY_VIDEO_CATALOG], 24);
                 homePlaylists = [];
-                homeMusic = uniqueMediaByUrl([...value(1), ...value(2)], 24);
+                homeMusic = uniqueMediaByUrl(reservedAudio, 24);
                 persistCatalogCache();
             }
             if (!homeVideos.length) homeVideos = uniqueMediaByUrl(EMERGENCY_VIDEO_CATALOG, 24);
@@ -2775,7 +2779,7 @@
             return homeVideos.length + homeMusicVideos.length + homePlaylists.length + homeMusic.length + homeRecommended.length > 0;
         }
 
-        // La portada carga YouTube y Openverse en paralelo; una fuente no bloquea ni vacía a la otra.
+        // La portada reutiliza caché/reserva local; las fuentes externas solo se consultan tras confirmar una búsqueda.
         async function resetView() {
             minimizeActiveVideoForNavigation();
             searchQuery = ""; currentMood = null; channelFilter = null; activeBrowseMode = 'home';
@@ -3680,6 +3684,22 @@
                 const value = JSON.parse(localStorage.getItem(RESERVE_FALLBACK_KEY) || '[]');
                 return Array.isArray(value) ? value : [];
             } catch (error) { return []; }
+        }
+        async function readLocalReserveCandidates(limit = 120) {
+            const localFallback = readReserveFallback();
+            const db = await openReserveDb();
+            if (!db) return localFallback.slice(0, limit);
+            const localItems = await new Promise(resolve => {
+                try {
+                    const request = db.transaction(RESERVE_CANDIDATES_STORE, 'readonly').objectStore(RESERVE_CANDIDATES_STORE).getAll();
+                    request.onsuccess = () => resolve(request.result || []);
+                    request.onerror = () => resolve([]);
+                } catch (error) { resolve([]); }
+            });
+            return [...localItems, ...localFallback]
+                .filter(item => item?.url && item.status !== 'invalid' && item.status !== 'expired' && (!item.expiresAt || Number(item.expiresAt) > Date.now()))
+                .sort((a, b) => Number(a.lastUsedAt || 0) - Number(b.lastUsedAt || 0))
+                .slice(0, limit);
         }
         function writeReserveFallback(items) {
             try {
