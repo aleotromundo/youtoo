@@ -2862,6 +2862,7 @@
 
         // La portada reutiliza caché/reserva local; las fuentes externas solo se consultan tras confirmar una búsqueda.
         async function resetView() {
+            closeNowarfyMobileNav();
             minimizeActiveVideoForNavigation();
             searchQuery = ""; currentMood = null; channelFilter = null; activeBrowseMode = 'home';
             renderTasteChips();
@@ -2980,6 +2981,7 @@
         }
 
         function activateNavigation(section) {
+            closeNowarfyMobileNav();
             document.querySelectorAll('.nav-links li').forEach(item => item.classList.remove('active'));
             document.querySelector(`[data-nav="${section}"]`)?.classList.add('active');
         }
