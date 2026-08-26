@@ -121,6 +121,7 @@ function queryLookupUrl(req) {
 }
 
 function fromRow(row) {
+  const attribution = Array.isArray(row.youtoo_discovery_attributions) ? row.youtoo_discovery_attributions[0] : null;
   return {
     ...row.metadata,
     candidateKey: row.candidate_key,
@@ -156,6 +157,7 @@ function fromRow(row) {
     useCount: row.use_count,
     discoveredAt: row.discovered_at,
     lastSeenAt: row.last_seen_at,
+    discoveredBy: row.discovered_by || attribution?.discovered_by || '',
     lastUsedAt: row.last_used_at,
     expiresAt: row.expires_at
   };
@@ -179,13 +181,14 @@ async function supabaseRequest(path, options = {}) {
   return { configured: true, response, data };
 }
 
-function queryUrl(req) {
+function queryUrl(req, options = {}) {
   const params = new URLSearchParams();
-  params.set('select', '*');
+  const discoveredBy = text(req.query.discoveredBy || req.query.discovered_by, 128);
+  params.set('select', options.useAttribution === false || !discoveredBy ? '*' : '*,youtoo_discovery_attributions!inner(discovered_by)');
   const style = text(req.query.styleKey, 200);
   const artist = text(req.query.artist, 300);
   const source = text(req.query.source, 32);
-  const kind = text(req.query.kind, 80);
+  const kind = text(req.query.kind, 80).toLowerCase();
   const healthStatus = text(req.query.healthStatus || req.query.health_status, 32).toLowerCase();
   const status = text(req.query.status, 32).toLowerCase();
   const query = text(req.query.query, 300).toLowerCase();
@@ -193,7 +196,17 @@ function queryUrl(req) {
   if (style) params.set('style_key', `ilike.*${style.replace(/[*,()]/g, '')}*`);
   if (artist) params.set('artist', `ilike.*${artist.replace(/[*,()]/g, '')}*`);
   if (source && ALLOWED_SOURCES.has(source)) params.set('source', `eq.${source}`);
-  if (kind) params.set('metadata->>resourceKind', `eq.${kind}`);
+  if (kind === 'playlist') params.set('metadata->>resourceKind', 'eq.youtube#playlist');
+  else if (kind === 'channel') params.set('metadata->>resourceKind', 'eq.youtube#channel');
+  else if (kind === 'video') params.set('metadata->>resourceKind', 'eq.youtube#video');
+  else if (kind === 'audio') params.set('media_type', 'eq.mp3');
+  else if (kind === 'freevideo') params.set('media_type', 'eq.freevideo');
+  else if (/^youtube#(?:video|playlist|channel)$/.test(kind)) params.set('metadata->>resourceKind', `eq.${kind}`);
+  const safeDiscoveredBy = discoveredBy.replace(/[^a-zA-Z0-9_.:@-]/g, '');
+  if (safeDiscoveredBy) {
+    if (options.useAttribution === false) params.set('discovered_by', `eq.${safeDiscoveredBy}`);
+    else params.set('youtoo_discovery_attributions.discovered_by', `eq.${safeDiscoveredBy}`);
+  }
   if (query) {
     const safeQuery = query.replace(/[*,()]/g, ' ').replace(/\s+/g, ' ').trim();
     if (safeQuery) params.set('or', `(query_context.ilike.*${safeQuery}*,title.ilike.*${safeQuery}*,artist.ilike.*${safeQuery}*,description.ilike.*${safeQuery}*)`);
@@ -216,7 +229,7 @@ function quoteCsv(value) {
 }
 
 function exportCsv(rows) {
-  const columns = ['candidate_key', 'source', 'source_id', 'media_type', 'url', 'title', 'artist', 'style_key', 'radio_eligible', 'license', 'source_url', 'duration_seconds', 'status', 'use_count', 'discovered_at', 'last_used_at'];
+  const columns = ['candidate_key', 'source', 'source_id', 'media_type', 'url', 'title', 'artist', 'style_key', 'radio_eligible', 'license', 'source_url', 'duration_seconds', 'status', 'use_count', 'discovered_at', 'last_used_at', 'discovered_by'];
   return [columns.join(','), ...rows.map(row => columns.map(column => quoteCsv(row[column])).join(','))].join('\r\n');
 }
 
@@ -237,11 +250,19 @@ export default async function handler(req, res) {
     }
 
     if (req.method === 'GET' && action === 'search') {
-      const result = await supabaseRequest(`youtoo_discovery_candidates?${queryUrl(req)}`, { headers: { Prefer: 'count=exact' } });
+      const resultOptions = { headers: { Prefer: 'count=exact' } };
+      let result = await supabaseRequest(`youtoo_discovery_candidates?${queryUrl(req)}`, resultOptions);
+      // Durante una actualización gradual puede existir todavía la columna singular
+      // discovered_by pero no la tabla de atribuciones. En ese caso el catálogo global
+      // sigue funcionando y el filtro propio usa el dato legado como respaldo.
+      if (!result.response?.ok && text(req.query.discoveredBy || req.query.discovered_by, 128)) {
+        result = await supabaseRequest(`youtoo_discovery_candidates?${queryUrl(req, { useAttribution: false })}`, resultOptions);
+      }
       if (!result.response?.ok) return json(res, result.response?.status || 502, { error: { source: 'supabase', message: result.data?.message || 'No se pudo leer la reserva global' } });
       const contentRange = result.response.headers.get('content-range') || '';
       const totalMatch = contentRange.match(/\/(\d+)$/);
-      compactCache(res);
+      if (text(req.query.discoveredBy || req.query.discovered_by, 128)) res.setHeader('Cache-Control', 'private, no-store');
+      else compactCache(res);
       return json(res, 200, { results: (result.data || []).map(fromRow), total: totalMatch ? Number(totalMatch[1]) : null });
     }
 
@@ -254,17 +275,27 @@ export default async function handler(req, res) {
       return res.status(200).send(`\ufeff${exportCsv(result.data || [])}`);
     }
     if (req.method === 'GET' && action === 'stats') {
-      const [candidates, queries, sourceResults] = await Promise.all([
+      const kindDefinitions = [
+        ['videos', 'metadata->>resourceKind', 'youtube#video'],
+        ['playlists', 'metadata->>resourceKind', 'youtube#playlist'],
+        ['channels', 'metadata->>resourceKind', 'youtube#channel'],
+        ['audio', 'media_type', 'mp3'],
+        ['freeVideos', 'media_type', 'freevideo']
+      ];
+      const [candidates, queries, sourceResults, kindResults] = await Promise.all([
         supabaseRequest('youtoo_discovery_candidates?select=count', { headers: { Prefer: 'count=exact' } }),
         supabaseRequest('youtoo_discovery_queries?select=count', { headers: { Prefer: 'count=exact' } }),
-        Promise.all(['youtube', 'openverse', 'commons', 'jamendo'].map(source => supabaseRequest(`youtoo_discovery_candidates?select=count&source=eq.${source}`, { headers: { Prefer: 'count=exact' } })))
+        Promise.all(['youtube', 'openverse', 'commons', 'jamendo'].map(source => supabaseRequest(`youtoo_discovery_candidates?select=count&source=eq.${source}`, { headers: { Prefer: 'count=exact' } }))),
+        Promise.all(kindDefinitions.map(([, column, value]) => supabaseRequest(`youtoo_discovery_candidates?select=count&${column}=eq.${encodeURIComponent(value)}`, { headers: { Prefer: 'count=exact' } })))
       ]);
       const recent = await supabaseRequest('youtoo_discovery_candidates?select=*&order=discovered_at.desc&limit=10');
       const sourceCounts = Object.fromEntries(['youtube', 'openverse', 'commons', 'jamendo'].map((source, index) => [source, Number(sourceResults[index]?.response?.headers.get('content-range')?.split('/')[1] || 0)]));
+      const kindCounts = Object.fromEntries(kindDefinitions.map(([label], index) => [label, Number(kindResults[index]?.response?.headers.get('content-range')?.split('/')[1] || 0)]));
       return json(res, 200, {
-        totalCandidates: candidates.response?.headers.get('content-range')?.split('/')[1] || 0,
-        totalQueries: queries.response?.headers.get('content-range')?.split('/')[1] || 0,
+        totalCandidates: Number(candidates.response?.headers.get('content-range')?.split('/')[1] || 0),
+        totalQueries: Number(queries.response?.headers.get('content-range')?.split('/')[1] || 0),
         sourceCounts,
+        kindCounts,
         recent: (recent.data || []).map(fromRow)
       });
     }
@@ -289,6 +320,15 @@ export default async function handler(req, res) {
       if (!entries.length) return json(res, 400, { error: { source: 'supabase', message: 'No hay candidatos válidos para guardar' } });
       const result = await supabaseRequest('youtoo_discovery_candidates?on_conflict=candidate_key', { method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' }, body: JSON.stringify(entries) });
       if (!result.response?.ok) return json(res, result.response?.status || 502, { error: { source: 'supabase', message: result.data?.message || 'No se pudo guardar la reserva global' } });
+      if (discoveredBy) {
+        const attributionRows = entries.map(entry => ({ candidate_key: entry.candidate_key, discovered_by: discoveredBy }));
+        const attributionResult = await supabaseRequest('youtoo_discovery_attributions?on_conflict=candidate_key,discovered_by', {
+          method: 'POST',
+          headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
+          body: JSON.stringify(attributionRows)
+        });
+        if (!attributionResult.response?.ok) console.warn('No se pudieron guardar atribuciones detalladas; se conserva discovered_by legado.', attributionResult.data);
+      }
       return json(res, 200, { saved: entries.length });
     }
 

@@ -839,7 +839,11 @@
         .time-tag { font-size: .7rem; opacity: .5; }
         .taste-actions { display: flex; flex-wrap: wrap; gap: 9px; }
         .taste-action { border: 1px solid rgba(190,188,255,.2); border-radius: 9px; padding: 9px 12px; color: #e9e7ff; background: rgba(255,255,255,.04); font: 800 .74rem 'Manrope', sans-serif; cursor: pointer; }
-        .knowledge-toolbar { display: grid; grid-template-columns: minmax(0, 1fr) 150px 150px auto; gap: 9px; align-items: center; margin: 20px 0 15px; }
+        .knowledge-toolbar { display: grid; grid-template-columns: minmax(0, 1fr) 145px 145px 145px auto; gap: 9px; align-items: center; margin: 20px 0 15px; }
+        .knowledge-scope-toggle { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 39px; padding: 8px 11px; border: 1px solid rgba(190,188,255,.17); border-radius: 10px; color: #bbb9d1; background: rgba(7,8,18,.55); font: 800 .7rem 'Manrope', sans-serif; cursor: pointer; user-select: none; }
+        .knowledge-scope-toggle input { width: 16px; height: 16px; accent-color: #5eead4; }
+        .knowledge-scope-toggle:has(input:checked) { color: #07151a; border-color: #5eead4; background: #5eead4; }
+        .knowledge-scope-note { margin: -4px 0 12px; color: #8e90aa; font-size: .7rem; line-height: 1.45; }
         .knowledge-filter { min-width: 0; min-height: 39px; border: 1px solid rgba(190,188,255,.17); border-radius: 10px; padding: 8px 10px; color: #f3f1ff; background: rgba(7,8,18,.55); font: 700 .74rem 'Manrope', sans-serif; }
         .knowledge-filter::placeholder { color: #9293aa; }
         .knowledge-filter:focus { outline: 2px solid rgba(94,234,212,.35); outline-offset: 1px; border-color: rgba(94,234,212,.55); }
@@ -868,7 +872,8 @@
         .knowledge-panel-status { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 24px; margin: 0 0 13px; color: #aeadc4; font-size: .7rem; }
         .knowledge-panel-status strong { color: #5eead4; }
         .knowledge-panel-empty { grid-column: 1 / -1; padding: 35px 14px; border: 1px dashed rgba(190,188,255,.18); border-radius: 13px; color: #999ab2; text-align: center; font-size: .78rem; }
-        @media (max-width: 720px) { .knowledge-toolbar { grid-template-columns: 1fr 1fr; } .knowledge-toolbar .knowledge-filter:first-child { grid-column: 1 / -1; } .knowledge-toolbar .taste-action { width: 100%; } }
+        @media (max-width: 720px) { .knowledge-toolbar { grid-template-columns: 1fr 1fr; } .knowledge-toolbar .knowledge-filter:first-child { grid-column: 1 / -1; } .knowledge-toolbar .taste-action, .knowledge-toolbar .knowledge-scope-toggle { width: 100%; } }
+        @media (max-width: 430px) { .knowledge-scope-toggle { justify-content: flex-start; font-size: .66rem; } }
         @media (max-width: 430px) { .knowledge-catalog-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; } .knowledge-candidate-card { padding: 6px 6px 9px; border-radius: 11px; } .knowledge-candidate-badge { font-size: .5rem; } .knowledge-candidate-title { font-size: .67rem; } .knowledge-candidate-artist { font-size: .61rem; } .knowledge-candidate-meta { font-size: .54rem; } .knowledge-candidate-key { font-size: .49rem; } }
         .taste-action.primary { border-color: rgba(94,234,212,.4); color: #09111a; background: #5eead4; }
         .taste-action.danger { border-color: rgba(255,123,144,.35); color: #ffc2cd; }
@@ -1493,6 +1498,7 @@
                     nowarfySupabase.auth.onAuthStateChange((_event, session) => {
                         nowarfyAuthUser = session?.user || null;
                         updateNowarfyAuthUI();
+                        if (document.getElementById('knowledgeCatalogGrid')) void renderKnowledgeBase();
                         void setupNowarfyRemoteControl();
                     });
                     updateNowarfyAuthUI();
@@ -1977,6 +1983,9 @@
         const PLAYBACK_CONTINUITY_CHECK_MS = 9000;
         let channelFilter = null; // { id, title } cuando el usuario entra a ver el contenido de un canal
         let activeBrowseMode = 'home';
+        let globalPlaylistCatalogState = null;
+        let globalChannelCatalogState = null;
+        let globalCatalogMineOnly = false;
         let homeFeedLoaded = false;
         let homeFeedLoading = false;
         let initialRadioQueueReady = false;
@@ -2309,7 +2318,7 @@
             container.innerHTML = `
                 <section class="taste-data-panel" aria-label="Datos de descubrimiento">
                     <h2>Tus datos de descubrimiento</h2>
-                    <p>Esta primera versión guarda actividad de búsqueda, reproducción, canales y listas abiertas únicamente en el almacenamiento de este navegador. No se envía a un servidor y podés pausar la personalización o borrar la información cuando quieras.</p>
+                    <p>Tu historial, favoritos y personalización se conservan localmente en este dispositivo. En paralelo, las URLs y metadatos descubiertos alimentan una base global compartida; podés auditarla desde el botón de abajo sin borrar tu actividad personal.</p>
                     <div class="taste-data-status">
                         <div><strong>${taste.personalization ? 'Personalización local activada' : 'Personalización local pausada'}</strong><span>${taste.personalization ? 'La portada y las categorías pueden usar tus señales guardadas.' : 'Se conserva el historial, pero no se usa ni se agregan nuevas señales.'}</span></div>
                         <button class="taste-action primary" type="button" id="tasteToggle">${taste.personalization ? 'Pausar' : 'Activar'}</button>
@@ -2376,9 +2385,10 @@
             const more = document.getElementById('knowledgeMoreWrap');
             if (!state || !grid || !status || !more) return;
             const totalLabel = Number.isFinite(state.total) ? ` de ${formatCompactNumber(state.total)}` : '';
+            const scopeLabel = state.filters.mine ? ' · Solo tus descubrimientos' : ' · Catálogo global';
             status.innerHTML = state.loading
-                ? `<span>Mostrando <strong>${state.items.length}</strong>${totalLabel}</span><span><i class="fas fa-spinner fa-spin"></i> Cargando...</span>`
-                : `<span>Mostrando <strong>${state.items.length}</strong>${totalLabel}</span><span>${state.done ? 'Catálogo completo para estos filtros' : 'Desplazate para cargar más'}</span>`;
+                ? `<span>Mostrando <strong>${state.items.length}</strong>${totalLabel}${escapeHtml(scopeLabel)}</span><span><i class="fas fa-spinner fa-spin"></i> Cargando...</span>`
+                : `<span>Mostrando <strong>${state.items.length}</strong>${totalLabel}${escapeHtml(scopeLabel)}</span><span>${state.done ? 'Catálogo completo para estos filtros' : 'Desplazate para cargar más'}</span>`;
             grid.innerHTML = state.items.length ? state.items.map(knowledgeCandidateCard).join('') : (state.loading ? '' : '<div class="knowledge-panel-empty">No hay candidatos que coincidan con estos filtros.</div>');
             more.innerHTML = state.done ? '' : '<button type="button" class="catalog-more" id="knowledgeMoreButton"><i class="fas fa-plus"></i> Cargar más candidatos</button>';
             document.querySelectorAll('#knowledgeCatalogGrid .knowledge-candidate-card').forEach(card => {
@@ -2412,6 +2422,8 @@
                 if (state.filters.artist) params.set('artist', state.filters.artist);
                 if (state.filters.source) params.set('source', state.filters.source);
                 if (state.filters.health) params.set('healthStatus', state.filters.health);
+                if (state.filters.kind) params.set('kind', state.filters.kind);
+                if (state.filters.mine && nowarfyAuthUser?.id) params.set('discoveredBy', nowarfyAuthUser.id);
                 const data = await globalReserveRequest(`${GLOBAL_RESERVE_ENDPOINT}?${params.toString()}`);
                 if (requestId !== state.requestId || !data) return;
                 const next = Array.isArray(data.results) ? data.results : [];
@@ -2430,14 +2442,20 @@
             const artistInput = document.getElementById('knowledgeArtistFilter');
             const sourceSelect = document.getElementById('knowledgeSourceFilter');
             const healthSelect = document.getElementById('knowledgeHealthFilter');
+            const kindSelect = document.getElementById('knowledgeKindFilter');
+            const mineToggle = document.getElementById('knowledgeMineToggle');
             const apply = () => {
-                knowledgeBaseState.filters = { artist: artistInput?.value.trim() || '', source: sourceSelect?.value || '', health: healthSelect?.value || '' };
+                const mine = Boolean(mineToggle?.checked && nowarfyAuthUser?.id);
+                globalCatalogMineOnly = mine;
+                knowledgeBaseState.filters = { artist: artistInput?.value.trim() || '', source: sourceSelect?.value || '', health: healthSelect?.value || '', kind: kindSelect?.value || '', mine };
                 clearTimeout(knowledgeBaseSearchTimer);
                 knowledgeBaseSearchTimer = setTimeout(() => void loadKnowledgeBasePage({ reset: true }), 250);
             };
             artistInput?.addEventListener('input', apply);
             sourceSelect?.addEventListener('change', apply);
             healthSelect?.addEventListener('change', apply);
+            kindSelect?.addEventListener('change', apply);
+            mineToggle?.addEventListener('change', apply);
             document.getElementById('knowledgeRefresh')?.addEventListener('click', () => void loadKnowledgeBasePage({ reset: true }));
         }
         async function renderKnowledgeBase() {
@@ -2450,29 +2468,40 @@
                 const data = await globalReserveRequest(`${GLOBAL_RESERVE_ENDPOINT}?action=stats`);
                 if (!data) throw new Error('stats_unavailable');
                 const counts = data.sourceCounts || {};
+                const kinds = data.kindCounts || {};
+                const mineToggle = nowarfyAuthUser
+                    ? `<label class="knowledge-scope-toggle"><input type="checkbox" id="knowledgeMineToggle" ${globalCatalogMineOnly ? 'checked' : ''}> <span>Solo mis descubrimientos</span></label>`
+                    : '';
+                const scopeNote = nowarfyAuthUser
+                    ? 'La vista global está activa. El interruptor filtra únicamente los recursos atribuidos a tu cuenta registrada.'
+                    : 'Modo anónimo: se muestra el total global recuperado por todas las sesiones. Para filtrar tus propios descubrimientos, iniciá sesión.';
                 container.innerHTML = `
                     <section class="taste-data-panel knowledge-panel" aria-label="Base de conocimiento global">
                         <div class="section-header-back"><button type="button" class="video-stage-close" onclick="renderTasteData()"><i class="fas fa-arrow-left"></i> Volver a Tus datos</button></div>
                         <h2>Base de conocimiento de Nowarfy</h2>
                         <p>Catálogo colectivo de URLs y metadatos descubiertos por todos los usuarios. Esta vista muestra la base completa; tus gustos solo cambian el orden y los filtros de las secciones personalizadas.</p>
                         <div class="taste-stats knowledge-summary">
-                            <div class="taste-stat"><b>${formatCompactNumber(data.totalCandidates)}</b><span>Total de candidatos</span></div>
-                            <div class="taste-stat"><b>${formatCompactNumber(counts.youtube || 0)}</b><span>Videos y recursos YouTube</span></div>
-                            <div class="taste-stat"><b>${formatCompactNumber(Number(counts.openverse || 0) + Number(counts.jamendo || 0))}</b><span>Audio libre</span></div>
-                            <div class="taste-stat"><b>${formatCompactNumber(counts.commons || 0)}</b><span>Videos Commons</span></div>
+                            <div class="taste-stat"><b>${formatCompactNumber(data.totalCandidates)}</b><span>Total de recursos globales</span></div>
+                            <div class="taste-stat"><b>${formatCompactNumber(kinds.videos || 0)}</b><span>Videos YouTube</span></div>
+                            <div class="taste-stat"><b>${formatCompactNumber(kinds.playlists || 0)}</b><span>Listas de reproducción</span></div>
+                            <div class="taste-stat"><b>${formatCompactNumber(kinds.channels || 0)}</b><span>Canales</span></div>
+                            <div class="taste-stat"><b>${formatCompactNumber(kinds.audio || 0)}</b><span>Audio libre y fuentes directas</span></div>
                         </div>
                         <div class="knowledge-toolbar" aria-label="Filtros de la base global">
                             <input class="knowledge-filter" id="knowledgeArtistFilter" type="search" placeholder="Filtrar por artista o canal…" autocomplete="off">
                             <select class="knowledge-filter" id="knowledgeSourceFilter" aria-label="Filtrar por fuente"><option value="">Todas las fuentes</option><option value="youtube">YouTube</option><option value="openverse">Openverse</option><option value="commons">Commons</option><option value="jamendo">Jamendo</option></select>
+                            <select class="knowledge-filter" id="knowledgeKindFilter" aria-label="Filtrar por tipo"><option value="">Todos los tipos</option><option value="video">Videos</option><option value="playlist">Listas de reproducción</option><option value="channel">Canales</option><option value="audio">Audio directo</option><option value="freevideo">Videos libres</option></select>
                             <select class="knowledge-filter" id="knowledgeHealthFilter" aria-label="Filtrar por salud"><option value="">Todos los estados</option><option value="unverified">Sin verificar</option><option value="healthy">Saludable</option><option value="suspect">Sospechoso</option><option value="invalid">Inválido</option></select>
+                            ${mineToggle}
                             <button type="button" class="taste-action" id="knowledgeRefresh"><i class="fas fa-rotate"></i> Actualizar</button>
                         </div>
+                        <p class="knowledge-scope-note">${scopeNote}</p>
                         <div class="knowledge-panel-status" id="knowledgePanelStatus"></div>
                         <div class="knowledge-catalog-grid" id="knowledgeCatalogGrid"></div>
                         <div class="catalog-more-wrap" id="knowledgeMoreWrap"></div>
                         <div class="taste-actions"><a href="${GLOBAL_RESERVE_ENDPOINT}?action=export" class="taste-action primary" target="_blank" rel="noopener noreferrer"><i class="fas fa-download"></i> Exportar CSV completo</a></div>
                     </section>`;
-                knowledgeBaseState = { offset: 0, limit: 24, loading: false, done: false, total: null, items: [], filters: { artist: '', source: '', health: '' }, requestId: 0 };
+                knowledgeBaseState = { offset: 0, limit: 24, loading: false, done: false, total: null, items: [], filters: { artist: '', source: '', health: '', kind: '', mine: Boolean(globalCatalogMineOnly && nowarfyAuthUser?.id) }, requestId: 0 };
                 setupKnowledgeBaseFilters();
                 await loadKnowledgeBasePage();
             } catch (error) {
@@ -3048,6 +3077,11 @@
         // Abre una ficha nativa con las listas públicas y los videos subidos del canal.
         function browseChannel(channelId, channelTitle) {
             if (!channelId) return;
+            void reserveDiscoveredCandidates([{
+                url: String(channelId), type: 'yt', resourceKind: 'youtube#channel',
+                title: String(channelTitle || 'Canal de YouTube'), artist: 'Canal de YouTube',
+                channelId: String(channelId), channelTitle: String(channelTitle || 'Canal de YouTube')
+            }], { context: 'channel_open', queryContext: `channel:${channelId}` });
             pushNowarfyHistory('channel', { channelId: String(channelId), channelTitle: String(channelTitle || '') });
             loadChannelProfile(channelId, channelTitle);
         }
@@ -3581,10 +3615,16 @@
                 heading.innerHTML = `<div class="section-title"><i class="fas fa-satellite-dish"></i> Canales</div><p class="discovery-intro">Canales reales organizados por historial, escucha actual y escenas musicales. Abrí uno para ver su descripción, estadísticas, listas y videos publicados.</p>`;
                 container.appendChild(heading);
                 const hasHistory = renderChannelHistoryRail();
-                const renderedChannelKeys = new Set(readTaste().channels.map(channelStableKey).filter(Boolean));
+                const globalChannels = await loadGlobalChannelCatalog({ reset: true });
+                renderGlobalChannelLibrary();
+                const renderedChannelKeys = new Set([
+                    ...readTaste().channels.map(channelStableKey),
+                    ...(globalChannels?.items || []).map(channelStableKey)
+                ].filter(Boolean));
                 const seed = currentList[0] || queue.find(item => item?._qid === currentPlayingQid) || homeVideos[0] || homeMusicVideos[0] || { title: getTasteSeed(), artist: getTasteSeed(), genre: currentMood || 'rock metal' };
                 const relatedStyle = getRadioStyle(seed);
                 let rendered = hasHistory ? 1 : 0;
+                rendered += globalChannels?.items?.length || 0;
                 rendered += await renderGlobalChannelRail(`Canales relacionados · ${relatedStyle}`, 'Según tu escucha actual y la reserva global', { styleKey: relatedStyle, limit: 24, seen: renderedChannelKeys });
                 const settled = await Promise.allSettled(GENRE_CHANNEL_LISTS.map(async collection => {
                     const saved = await reserveGetGlobalCandidates({ source: 'youtube', kind: 'youtube#channel', styleKey: collection.styleKey, scope: 'search', limit: 24 });
@@ -3606,6 +3646,137 @@
                 if (!rendered) renderEmptyState('No hay canales disponibles ahora', 'Probá volver a intentarlo cuando YouTube vuelva a responder o buscá un canal por nombre.');
             } finally {
                 loader.style.display = 'none';
+            }
+        }
+
+        async function loadGlobalPlaylistCatalog({ reset = false } = {}) {
+            if (reset || !globalPlaylistCatalogState) {
+                globalPlaylistCatalogState = { offset: 0, limit: 24, items: [], total: null, loading: false, done: false };
+            }
+            const state = globalPlaylistCatalogState;
+            if (state.loading || state.done) return state;
+            state.loading = true;
+            try {
+                const page = await reserveGetGlobalCandidates({ kind: 'playlist', scope: 'search', limit: state.limit, offset: state.offset });
+                const localPage = state.offset === 0 ? await reserveGetLocalCandidates({ kind: 'playlist' }) : [];
+                const combinedPage = [...page, ...localPage];
+                const seen = new Set(state.items.map(item => reserveCandidateKey(item) || item.url));
+                combinedPage.forEach(item => {
+                    const key = reserveCandidateKey(item) || item.url;
+                    if (!key || seen.has(key) || !hasUsablePlaylistItems(item)) return;
+                    seen.add(key);
+                    state.items.push({ ...item, type: 'yt', resourceKind: 'youtube#playlist', isPlaylist: true });
+                });
+                state.offset += page.length;
+                const globalTotal = Number.isFinite(Number(page.total)) ? Number(page.total) : null;
+                state.total = globalTotal === null ? Math.max(state.items.length, 0) : Math.max(globalTotal, state.items.length);
+                state.done = page.length < state.limit || (globalTotal !== null && state.offset >= globalTotal);
+            } catch (_) {
+                state.done = true;
+            } finally {
+                state.loading = false;
+            }
+            return state;
+        }
+
+        function renderGlobalPlaylistLibrary() {
+            const container = document.getElementById('dynamicSections');
+            const state = globalPlaylistCatalogState;
+            if (!container || !state) return;
+            container.querySelector('[data-global-playlists]')?.remove();
+            const playlists = itemsWithArtwork(uniqueMediaByUrl(state.items, 140)).filter(hasUsablePlaylistItems);
+            if (!playlists.length) return;
+            const section = document.createElement('section');
+            section.dataset.globalPlaylists = 'true';
+            section.className = 'global-playlists-section';
+            const total = Number.isFinite(state.total) ? ` · ${formatCompactNumber(state.total)} recuperadas` : '';
+            section.innerHTML = `<div class="section-title"><i class="fas fa-layer-group"></i> Listas de reproducción globales${escapeHtml(total)} <span class="library-rail-hint">Catálogo compartido · se alimenta con cada búsqueda e interacción</span></div>`;
+            const grid = document.createElement('div');
+            grid.className = 'grid';
+            playlists.forEach((playlist, index) => grid.appendChild(buildPlaylistCard(playlist, index)));
+            section.appendChild(grid);
+            if (!state.done) {
+                const wrap = document.createElement('div');
+                wrap.className = 'catalog-more-wrap';
+                const button = document.createElement('button');
+                button.type = 'button';
+                button.className = 'catalog-more';
+                button.innerHTML = '<i class="fas fa-plus"></i> Cargar más listas globales';
+                button.onclick = async () => {
+                    button.disabled = true;
+                    button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Cargando listas...';
+                    await loadGlobalPlaylistCatalog();
+                    renderGlobalPlaylistLibrary();
+                };
+                wrap.appendChild(button);
+                section.appendChild(wrap);
+            }
+            container.appendChild(section);
+        }
+
+        async function loadGlobalChannelCatalog({ reset = false } = {}) {
+            if (reset || !globalChannelCatalogState) {
+                globalChannelCatalogState = { offset: 0, limit: 24, items: [], total: null, loading: false, done: false };
+            }
+            const state = globalChannelCatalogState;
+            if (state.loading || state.done) return state;
+            state.loading = true;
+            try {
+                const page = await reserveGetGlobalCandidates({ kind: 'channel', scope: 'search', limit: state.limit, offset: state.offset });
+                const localPage = state.offset === 0 ? await reserveGetLocalCandidates({ kind: 'channel' }) : [];
+                const combinedPage = [...page, ...localPage];
+                const seen = new Set(state.items.map(item => reserveCandidateKey(item) || item.url));
+                combinedPage.forEach(item => {
+                    const key = reserveCandidateKey(item) || item.url;
+                    if (!key || seen.has(key)) return;
+                    seen.add(key);
+                    state.items.push({ ...item, type: 'yt', resourceKind: 'youtube#channel', channelId: item.channelId || item.sourceId || item.url, channelTitle: item.channelTitle || item.title });
+                });
+                state.offset += page.length;
+                const globalTotal = Number.isFinite(Number(page.total)) ? Number(page.total) : null;
+                state.total = globalTotal === null ? Math.max(state.items.length, 0) : Math.max(globalTotal, state.items.length);
+                state.done = page.length < state.limit || (globalTotal !== null && state.offset >= globalTotal);
+            } catch (_) {
+                state.done = true;
+            } finally {
+                state.loading = false;
+            }
+            return state;
+        }
+
+        function renderGlobalChannelLibrary() {
+            const container = document.getElementById('dynamicSections');
+            const state = globalChannelCatalogState;
+            if (!container || !state) return;
+            const oldSection = container.querySelector('[data-global-channels]');
+            const nextSibling = oldSection?.nextSibling || null;
+            oldSection?.remove();
+            const channels = itemsWithArtwork(uniqueMediaByUrl(state.items, 140));
+            if (!channels.length) return;
+            const previousCount = container.children.length;
+            renderChannelRow(channels, 'Canales globales recuperados', 'Catálogo compartido · se alimenta con cada búsqueda e interacción');
+            const section = container.children[previousCount];
+            if (!section) return;
+            if (nextSibling?.parentNode === container) container.insertBefore(section, nextSibling);
+            section.dataset.globalChannels = 'true';
+            const total = Number.isFinite(state.total) ? ` · ${formatCompactNumber(state.total)} recuperados` : '';
+            const title = section.querySelector('.section-title');
+            if (title) title.innerHTML = `<i class="fas fa-satellite-dish"></i> Canales globales${escapeHtml(total)} <span class="library-rail-hint">Catálogo compartido · se alimenta con cada búsqueda e interacción</span>`;
+            if (!state.done) {
+                const wrap = document.createElement('div');
+                wrap.className = 'catalog-more-wrap';
+                const button = document.createElement('button');
+                button.type = 'button';
+                button.className = 'catalog-more';
+                button.innerHTML = '<i class="fas fa-plus"></i> Cargar más canales globales';
+                button.onclick = async () => {
+                    button.disabled = true;
+                    button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Cargando canales...';
+                    await loadGlobalChannelCatalog();
+                    renderGlobalChannelLibrary();
+                };
+                wrap.appendChild(button);
+                section.appendChild(wrap);
             }
         }
 
@@ -3727,11 +3898,13 @@
                 currentList = [];
                 const savedPlaylists = readTaste().playlists.map(item => ({
                     url: item.id, title: item.title, artist: item.artist || 'YouTube', img: item.img || '',
-                    description: item.description || '', channelId: item.channelId || '', type: 'playlist', isPlaylist: true, itemCount: null
+                    description: item.description || '', channelId: item.channelId || '', type: 'playlist', resourceKind: 'youtube#playlist', isPlaylist: true, itemCount: null
                 }));
+                await loadGlobalPlaylistCatalog({ reset: true });
+                renderGlobalPlaylistLibrary();
                 if (savedPlaylists.length) renderPlaylistGrid(savedPlaylists, 'Listas abiertas anteriormente');
-                if (homePlaylists.length) renderPlaylistGrid(homePlaylists, savedPlaylists.length ? 'Más listas para explorar' : 'Listas de reproducción y álbumes');
-                if (!savedPlaylists.length && !homePlaylists.length) renderEmptyState('No hay listas disponibles ahora', 'Probá buscar el nombre de un artista o álbum.');
+                if (homePlaylists.length) renderPlaylistGrid(homePlaylists, savedPlaylists.length ? 'Listas sugeridas para explorar' : 'Listas destacadas');
+                if (!globalPlaylistCatalogState?.items.length && !savedPlaylists.length && !homePlaylists.length) renderEmptyState('No hay listas disponibles ahora', 'Probá buscar el nombre de un artista o álbum.');
                 return;
             }
             if (section === 'videos') {
@@ -3910,6 +4083,12 @@
         }
 
         async function openPlaylist(playlist, options = {}) {
+            if (playlist?.url) {
+                void reserveDiscoveredCandidates([{ ...playlist, type: 'yt', resourceKind: 'youtube#playlist', isPlaylist: true }], {
+                    context: 'playlist_open',
+                    queryContext: `playlist:${playlist.url}`
+                });
+            }
             pushNowarfyHistory('playlist', {
                 playlistId: String(playlist?.url || ''),
                 playlist: {
@@ -4307,10 +4486,14 @@
                 body: JSON.stringify({ action: 'query-upsert', ...payload, discoveredBy: nowarfyAuthUser?.id || nowarfyAnonymousId })
             });
         }
-        async function reserveGetGlobalCandidates({ styleKey = '', artist = '', source = '', query = '', scope = 'radio', kind = '', limit = 20 } = {}) {
+        async function reserveGetGlobalCandidates({ styleKey = '', artist = '', source = '', query = '', scope = 'radio', kind = '', limit = 20, offset = 0, discoveredBy = '' } = {}) {
             const params = new URLSearchParams({ action: 'search', styleKey, artist, source, query, scope, kind, limit: String(Math.min(Math.max(Number(limit) || 20, 1), 50)) });
+            if (Number(offset) > 0) params.set('offset', String(Math.max(0, Number(offset) || 0)));
+            if (discoveredBy) params.set('discoveredBy', String(discoveredBy));
             const data = await globalReserveRequest(`${GLOBAL_RESERVE_ENDPOINT}?${params.toString()}`);
-            return Array.isArray(data?.results) ? data.results : [];
+            const results = Array.isArray(data?.results) ? data.results : [];
+            results.total = Number.isFinite(Number(data?.total)) ? Number(data.total) : null;
+            return results;
         }
         async function reserveDiscoveredCandidates(songs, options = {}) {
             const entries = (songs || []).map(song => normalizeReserveCandidate(song, options)).filter(Boolean);
@@ -4347,6 +4530,29 @@
                 } catch (error) { resolve(); }
             });
             void reserveTrim();
+        }
+        async function reserveGetLocalCandidates({ kind = '' } = {}) {
+            const db = await openReserveDb();
+            let items = [];
+            if (db) {
+                items = await new Promise(resolve => {
+                    try {
+                        const request = db.transaction(RESERVE_CANDIDATES_STORE, 'readonly').objectStore(RESERVE_CANDIDATES_STORE).getAll();
+                        request.onsuccess = () => resolve(request.result || []);
+                        request.onerror = () => resolve([]);
+                    } catch (error) { resolve([]); }
+                });
+            }
+            items = [...items, ...readReserveFallback()];
+            items = [...new Map(items.map(item => [item.candidateKey || reserveCandidateKey(item), item])).values()];
+            return items.filter(item => {
+                if (item.status === 'invalid' || item.status === 'expired') return false;
+                if (!kind) return true;
+                if (kind === 'playlist') return item.resourceKind === 'youtube#playlist' || item.type === 'playlist' || item.isPlaylist;
+                if (kind === 'channel') return item.resourceKind === 'youtube#channel';
+                if (kind === 'video') return item.resourceKind === 'youtube#video';
+                return item.type === kind;
+            });
         }
         async function reserveGetCandidates({ styleKey = '', artist = '', source = '', limit = 20 } = {}) {
             const db = await openReserveDb();
@@ -4403,9 +4609,9 @@
             const text = candidates.map(candidate => `${candidate.title || ''} ${candidate.artist || ''} ${candidate.description || ''}`).join(' ').toLowerCase();
             return ['latin rock', 'alternative rock', 'grunge', 'punk rock', 'hard rock', 'heavy metal', 'metal'].find(style => text.includes(style)) || 'rock';
         }
-        async function reserveSearchCandidates(query, { styleKey = '', limit = 20 } = {}) {
+        async function reserveSearchCandidates(query, { styleKey = '', limit = 20, kind = '', offset = 0, discoveredBy = '' } = {}) {
             const db = await openReserveDb();
-            let items = await reserveGetGlobalCandidates({ styleKey, query, scope: 'search', limit });
+            let items = await reserveGetGlobalCandidates({ styleKey, query, scope: 'search', kind, limit, offset, discoveredBy });
             if (db) {
                 const localItems = await new Promise(resolve => {
                     try {
