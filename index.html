@@ -1993,6 +1993,7 @@
         let ytPlayer = null;
         let ytStartupTimer = null;
         let ytPlaybackIntent = false;
+        let ytPlayCommandAt = 0;
         let ytApiReady = false;
         let pendingYTRequest = null;
         let progressInterval = null;
@@ -2022,6 +2023,8 @@
         let automaticAdvanceTargetQid = null;
         let automaticQueueRecoveryInFlight = false;
         const PLAYBACK_CONTINUITY_CHECK_MS = 9000;
+        const YT_PLAY_RETRY_THROTTLE_MS = 750;
+        const YT_END_EARLY_TOLERANCE_SECONDS = 1.5;
         let channelFilter = null; // { id, title } cuando el usuario entra a ver el contenido de un canal
         let activeBrowseMode = 'home';
         let globalPlaylistCatalogState = null;
@@ -4465,7 +4468,7 @@
                 ytApiReady = true;
                 const pending = pendingYTRequest;
                 pendingYTRequest = null;
-                if (pending) initYTPlayer(pending.resourceId, pending.isPlaylist, pending.resumeSession || null);
+                if (pending) initYTPlayer(pending.resourceId, pending.isPlaylist, pending.resumeSession || null, !!pending.deferAutoplay);
             };
         }
 
@@ -5263,6 +5266,7 @@
                 : null;
             currentPlayingQid = song._qid;
             currentSourceIdx = options.sourceIdx ?? null;
+            ytPlayCommandAt = 0;
             pendingVideoResumeSession = resumeSession;
             restoreVideoMinimizedAfterReady = !!(resumeSession && song.type === 'yt' && options.restoreMinimized);
             if (!resumeSession) clearVideoResumeSession();
@@ -5276,6 +5280,7 @@
             renderQueue();
 
             if (song.type === 'yt') {
+                if (!options.deferAutoplay && resumeSession?.wasPlaying !== false) startSilentLoop();
                 freeVideoEl.pause();
                 freeVideoEl.removeAttribute('src');
                 freeVideoEl.hidden = true;
@@ -5283,7 +5288,7 @@
                 if (ytApiReady && window.YT && window.YT.Player) {
                     initYTPlayer(song.url, song.isPlaylist, resumeSession, !!options.deferAutoplay);
                 } else {
-                    pendingYTRequest = { resourceId: song.url, isPlaylist: song.isPlaylist, resumeSession };
+                    pendingYTRequest = { resourceId: song.url, isPlaylist: song.isPlaylist, resumeSession, deferAutoplay: !!options.deferAutoplay };
                     loadYouTubeAPI();
                 }
             } else if (song.type === 'freevideo') {
@@ -6091,6 +6096,28 @@
             ytPlayer = new YT.Player('yt-player', playerConfig);
         }
 
+        function requestYouTubePlayback(reason = 'retry') {
+            const song = currentQueueSong();
+            if (!ytPlayer || song?.type !== 'yt' || !ytPlaybackIntent || playbackStoppedByUser) return false;
+            let state = null;
+            try { state = ytPlayer.getPlayerState?.(); } catch (error) { state = null; }
+            if (window.YT?.PlayerState?.PLAYING != null && state === YT.PlayerState.PLAYING) {
+                startSilentLoop();
+                return true;
+            }
+            const now = Date.now();
+            if (now - ytPlayCommandAt < YT_PLAY_RETRY_THROTTLE_MS) return false;
+            ytPlayCommandAt = now;
+            try {
+                ytPlayer.playVideo();
+                startSilentLoop();
+                return true;
+            } catch (error) {
+                console.debug('YouTube no aceptó todavía playVideo', reason, error);
+                return false;
+            }
+        }
+
         function onYTReady(event) {
             if (event?.target && event.target !== ytPlayer) return;
             const v = parseFloat(document.getElementById('volumeSlider').value);
@@ -6112,25 +6139,22 @@
             }
             // El parámetro autoplay no alcanza cuando el navegador bloquea autoplay.
             // La acción original del usuario ya habilitó reproducción: reintentamos
-            // explícitamente al recibir onReady para que el primer Play no quede en -1.
+            // explícitamente al recibir onReady y también desde el heartbeat multimedia.
             if (song?.type === 'yt' && !playbackStoppedByUser && !(resume?.wasPlaying === false) && ytPlayer.playVideo) {
                 ytPlaybackIntent = true;
-                window.setTimeout(() => {
-                    if (ytPlayer && currentQueueSong()?.url === song.url && !playbackStoppedByUser) {
-                        ytPlayer.playVideo();
-                        clearTimeout(ytStartupTimer);
-                        ytStartupTimer = setTimeout(() => {
-                            if (currentQueueSong()?.url !== song.url || playbackStoppedByUser || !ytPlayer?.getPlayerState) return;
-                            const state = ytPlayer.getPlayerState();
-                            if (state !== YT.PlayerState.PLAYING) {
-                                setTrackLoading(false);
-                                document.getElementById('videoStage')?.classList.add('is-error');
-                                showToast('YouTube no pudo iniciar este video; continuamos con otra pista', 'fa-forward');
-                                queueAutomaticAdvance('youtube-start-timeout');
-                            }
-                        }, 12000);
+                requestYouTubePlayback('ready');
+                clearTimeout(ytStartupTimer);
+                ytStartupTimer = setTimeout(() => {
+                    if (currentQueueSong()?.url !== song.url || playbackStoppedByUser || !ytPlayer?.getPlayerState) return;
+                    requestYouTubePlayback('startup-timeout-retry');
+                    const state = ytPlayer.getPlayerState();
+                    if (state !== YT.PlayerState.PLAYING) {
+                        setTrackLoading(false);
+                        document.getElementById('videoStage')?.classList.add('is-error');
+                        showToast('YouTube no pudo iniciar este video; intentaremos continuar', 'fa-forward');
+                        queueAutomaticAdvance('youtube-start-timeout');
                     }
-                }, 0);
+                }, 12000);
             }
         }
         function onYTStateChange(event) {
@@ -6145,15 +6169,21 @@
                 if (!progressInterval) startProgress(ytPlayer);
                 if (nowarfyRemoteIsPlayer) void publishNowarfyRemoteState();
             } else if (event.data === YT.PlayerState.PAUSED) {
-                stopSilentLoop();
-                // Una pausa voluntaria cancela el timeout; una pausa con intención de play
-                // puede ser el estado que deja el challenge anti-bot de YouTube.
-                if (playbackStoppedByUser || !ytPlaybackIntent) {
+                // ChromeOS puede emitir PAUSED al ocultar una PWA aunque el usuario no haya
+                // pedido pausar. En ese caso conservamos la intención y dejamos que el
+                // heartbeat multimedia reintente playVideo; solo una pausa explícita detiene todo.
+                const shouldKeepPlaying = ytPlaybackIntent && !playbackStoppedByUser;
+                if (shouldKeepPlaying) {
+                    isPlaying = true;
+                    startSilentLoop();
+                    requestYouTubePlayback('background-paused');
+                } else {
+                    stopSilentLoop();
                     clearTimeout(ytStartupTimer);
                     ytStartupTimer = null;
+                    isPlaying = false;
+                    persistVideoResumeSession(true);
                 }
-                isPlaying = false;
-                persistVideoResumeSession(true);
                 if (nowarfyRemoteIsPlayer) void publishNowarfyRemoteState();
             } else if (event.data === YT.PlayerState.BUFFERING) {
                 setTrackLoading(true, currentIndex);
@@ -6274,6 +6304,7 @@
             clearTimeout(ytStartupTimer);
             ytStartupTimer = null;
             ytPlaybackIntent = false;
+            ytPlayCommandAt = 0;
             if (ytPlayer) { ytPlayer.stopVideo(); ytPlayer.destroy(); ytPlayer = null; }
             pendingYTRequest = null;
             freeVideoEl.pause();
@@ -6574,20 +6605,46 @@
         }
         function setupPlaybackContinuity() {
             const inspectCurrentPlayback = () => {
-                if (playbackStoppedByUser || !isPlaying || !currentPlayingQid) return;
+                if (playbackStoppedByUser || !currentPlayingQid) return;
                 const current = currentQueueSong();
                 if (!current) return;
-                if (current.type === 'mp3' && activeAudioEl?.ended) queueAutomaticAdvance('direct-ended-fallback');
-                if (current.type === 'yt' && ytPlayer?.getPlayerState && window.YT && ytPlayer.getPlayerState() === YT.PlayerState.ENDED) queueAutomaticAdvance('youtube-ended-fallback');
+                if (current.type === 'mp3' && isPlaying && activeAudioEl?.ended) {
+                    queueAutomaticAdvance('direct-ended-fallback');
+                    return;
+                }
+                if (current.type !== 'yt' || !ytPlayer?.getPlayerState || !window.YT) return;
+                let state = null;
+                let position = 0;
+                let duration = 0;
+                try {
+                    state = ytPlayer.getPlayerState();
+                    position = Number(ytPlayer.getCurrentTime?.() || 0);
+                    duration = Number(ytPlayer.getDuration?.() || 0);
+                } catch (error) { return; }
+                if (state === YT.PlayerState.ENDED || (duration > 0 && position >= Math.max(0, duration - YT_END_EARLY_TOLERANCE_SECONDS) && ytPlaybackIntent)) {
+                    queueAutomaticAdvance('youtube-timed-ended-fallback');
+                    return;
+                }
+                // Si ChromeOS dejó el iframe pausado o sin arrancar mientras la intención
+                // seguía activa, el evento timeupdate del audio auxiliar vuelve a darle play.
+                if (ytPlaybackIntent && !playbackStoppedByUser && state !== YT.PlayerState.PLAYING) {
+                    if (!isPlaying) {
+                        isPlaying = true;
+                        updateIcon();
+                        updatePlaybackState();
+                    }
+                    startSilentLoop();
+                    requestYouTubePlayback(`heartbeat-${state}`);
+                }
             };
             automaticAdvanceTimer = null;
             window.setInterval(inspectCurrentPlayback, PLAYBACK_CONTINUITY_CHECK_MS);
             // El evento multimedia del audio nativo puede seguir llegando cuando ChromeOS
-            // congela los temporizadores de JavaScript. No avanza por sí solo: solo inspecciona
-            // el estado oficial del IFrame o del audio y respeta la pausa del usuario.
+            // congela los temporizadores de JavaScript. Inspecciona estado, tiempo restante
+            // y reintenta playVideo solo si el usuario aún quería seguir reproduciendo.
             silentAudioLoop?.addEventListener('timeupdate', inspectCurrentPlayback);
             silentAudioLoop?.addEventListener('playing', inspectCurrentPlayback);
-            document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') inspectCurrentPlayback(); });
+            document.addEventListener('visibilitychange', () => inspectCurrentPlayback());
             window.addEventListener('focus', inspectCurrentPlayback);
         }
 

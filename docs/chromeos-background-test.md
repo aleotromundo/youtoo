@@ -33,3 +33,19 @@ La fuente `assets/nowarfy-silence.wav` carga correctamente en Chromium: formato 
 El WAV no pudo iniciar desde la consola porque Chromium exige un gesto de usuario (`NotAllowedError`), que es el comportamiento esperado de la política de autoplay. Al activar el área de reproducción, el IFrame de YouTube cargó, pero el entorno de prueba mostró el desafío de YouTube “Sign in to confirm you’re not a bot”; por ese motivo no fue posible observar una reproducción real ni medir un cambio de pista de YouTube en este sandbox. El botón visible de control continúa siendo el elemento `#playBtn`; los índices del navegador cambian cuando se monta el IFrame.
 
 ---
+
+## Mitigación adicional para ChromeOS
+
+Tras observar que ChromeOS no avanzaba siempre al terminar un video, el frontend fue reforzado sin reemplazar el IFrame oficial. El watchdog ahora consulta, cuando el navegador entrega el evento multimedia, el estado del IFrame y la pareja `getCurrentTime()`/`getDuration()`. Si el estado llega a `ENDED` o el tiempo queda dentro de los últimos segundos, se encola el avance. Si ChromeOS deja el IFrame en `PAUSED`, `CUED` o `UNSTARTED` sin que el usuario haya pedido pausa, se conserva la intención de reproducción y se vuelve a intentar `playVideo()` con un límite de frecuencia.
+
+También se conserva `deferAutoplay` cuando la API de YouTube todavía está cargando. Esto evita que una transición de pista pierda accidentalmente la intención de reproducción. La nueva lógica mejora los casos en que la pestaña sigue activa pero el IFrame quedó pausado; no puede superar un bloqueo de YouTube, una suspensión total del proceso o una política de autoplay del sistema.
+
+## Estado honesto de validación
+
+La prueba automatizada confirma la secuencia del watchdog con estados simulados: reproduce la siguiente pista en orden, detecta el final por tiempo, reintenta una pista pausada y no inicia radio automática por error. La validación de pantalla apagada debe hacerse en el ChromeOS real con una cuenta y un video reproducible, porque el entorno local no puede simular fielmente esa política ni el challenge de YouTube.
+
+---
+
+Autor: Manus AI.
+
+---
