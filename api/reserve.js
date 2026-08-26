@@ -236,18 +236,36 @@ export default async function handler(req, res) {
       res.setHeader('Content-Disposition', 'attachment; filename="nowarfy-discovery-reserve.csv"');
       return res.status(200).send(`\ufeff${exportCsv(result.data || [])}`);
     }
+    if (req.method === 'GET' && action === 'stats') {
+      const [candidates, queries] = await Promise.all([
+        supabaseRequest('youtoo_discovery_candidates?select=count', { headers: { Prefer: 'count=exact' } }),
+        supabaseRequest('youtoo_discovery_queries?select=count', { headers: { Prefer: 'count=exact' } })
+      ]);
+      const recent = await supabaseRequest('youtoo_discovery_candidates?select=title,artist,source,discovered_at&order=discovered_at.desc&limit=10');
+      return json(res, 200, {
+        totalCandidates: candidates.response?.headers.get('content-range')?.split('/')[1] || 0,
+        totalQueries: queries.response?.headers.get('content-range')?.split('/')[1] || 0,
+        recent: recent.data || []
+      });
+    }
 
     if (req.method !== 'POST') return json(res, 405, { error: { source: 'supabase', message: 'Método no permitido' } });
     if (action === 'query-upsert') {
       const row = asQueryRow(body);
       if (!row) return json(res, 400, { error: { source: 'supabase', message: 'Estado de consulta inválido' } });
+      if (body.discoveredBy) row.discovered_by = text(body.discoveredBy, 128);
       const result = await supabaseRequest('youtoo_discovery_queries?on_conflict=query_key', { method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' }, body: JSON.stringify(row) });
       if (!result.response?.ok) return json(res, result.response?.status || 502, { error: { source: 'supabase', message: result.data?.message || 'No se pudo guardar el estado de la consulta' } });
       return json(res, 200, { saved: true, queryKey: row.query_key });
     }
 
     if (action === 'upsert') {
-      const entries = (Array.isArray(body.entries) ? body.entries : []).slice(0, MAX_BATCH).map(asRow).filter(Boolean);
+      const discoveredBy = text(body.discoveredBy, 128);
+      const entries = (Array.isArray(body.entries) ? body.entries : []).slice(0, MAX_BATCH).map(e => {
+        const r = asRow(e);
+        if (r && discoveredBy) r.discovered_by = discoveredBy;
+        return r;
+      }).filter(Boolean);
       if (!entries.length) return json(res, 400, { error: { source: 'supabase', message: 'No hay candidatos válidos para guardar' } });
       const result = await supabaseRequest('youtoo_discovery_candidates?on_conflict=candidate_key', { method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' }, body: JSON.stringify(entries) });
       if (!result.response?.ok) return json(res, result.response?.status || 502, { error: { source: 'supabase', message: result.data?.message || 'No se pudo guardar la reserva global' } });

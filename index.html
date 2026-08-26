@@ -796,6 +796,20 @@
         .taste-stat { padding: 13px; border: 1px solid rgba(190,188,255,.12); border-radius: 12px; background: rgba(8,8,18,.31); }
         .taste-stat b { display: block; color: #5eead4; font: 800 1.12rem 'Sora', sans-serif; }
         .taste-stat span { color: #aaaac2; font-size: .7rem; }
+        .knowledge-recent { margin-top: 30px; }
+        .knowledge-recent h3 { font-size: 1.1rem; margin-bottom: 15px; color: #5eead4; }
+        .knowledge-list { display: grid; gap: 10px; max-height: 400px; overflow-y: auto; padding-right: 5px; }
+        .knowledge-item { background: rgba(255,255,255,.05); padding: 12px; border-radius: 10px; display: flex; justify-content: space-between; align-items: center; gap: 15px; border: 1px solid rgba(255,255,255,.05); }
+        .knowledge-item-main { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+        .knowledge-item-main strong { font-size: .9rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: #fff; }
+        .knowledge-item-main span { font-size: .8rem; opacity: .7; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .knowledge-item-meta { display: flex; flex-direction: column; align-items: flex-end; gap: 5px; flex-shrink: 0; }
+        .source-tag { font-size: .65rem; padding: 2px 6px; border-radius: 4px; text-transform: uppercase; font-weight: bold; }
+        .source-youtube { background: rgba(255,0,0,.2); color: #ff4444; }
+        .source-openverse { background: rgba(0,255,0,.2); color: #44ff44; }
+        .source-jamendo { background: rgba(255,165,0,.2); color: #ffaa44; }
+        .source-commons { background: rgba(0,165,255,.2); color: #44aaff; }
+        .time-tag { font-size: .7rem; opacity: .5; }
         .taste-actions { display: flex; flex-wrap: wrap; gap: 9px; }
         .taste-action { border: 1px solid rgba(190,188,255,.2); border-radius: 9px; padding: 9px 12px; color: #e9e7ff; background: rgba(255,255,255,.04); font: 800 .74rem 'Manrope', sans-serif; cursor: pointer; }
         .taste-action.primary { border-color: rgba(94,234,212,.4); color: #09111a; background: #5eead4; }
@@ -1315,6 +1329,7 @@
         const AUTH_CONFIG_ENDPOINT = '/api/auth-config';
         let nowarfySupabase = null;
         let nowarfyAuthUser = null;
+        let nowarfyAnonymousId = localStorage.getItem('nowarfy_anon_id') || (()=>{ const id='anon_'+Math.random().toString(36).slice(2,11); localStorage.setItem('nowarfy_anon_id', id); return id; })();
         let nowarfyAuthConfigured = false;
         let nowarfyAuthInitialised = false;
         let nowarfyAuthInitPromise = null;
@@ -2128,10 +2143,62 @@
                         <div class="taste-stat"><b>${taste.plays.length}</b><span>Reproducciones recordadas</span></div>
                         <div class="taste-stat"><b>${taste.channels.length + taste.playlists.length}</b><span>Canales y listas abiertas</span></div>
                     </div>
-                    <div class="taste-actions"><button class="taste-action danger" type="button" id="tasteClear"><i class="fas fa-trash"></i> Borrar datos locales</button></div>
+                    <div class="taste-actions">
+                        <button class="taste-action" type="button" id="knowledgeBaseBtn"><i class="fas fa-database"></i> Base de conocimiento global</button>
+                        <button class="taste-action danger" type="button" id="tasteClear"><i class="fas fa-trash"></i> Borrar datos locales</button>
+                    </div>
                 </section>`;
             document.getElementById('tasteToggle').onclick = () => setPersonalization(!taste.personalization);
             document.getElementById('tasteClear').onclick = clearTasteData;
+            document.getElementById('knowledgeBaseBtn').onclick = renderKnowledgeBase;
+        }
+
+        async function renderKnowledgeBase() {
+            minimizeActiveVideoForNavigation();
+            const container = document.getElementById('dynamicSections');
+            const loader = document.getElementById('loader');
+            container.innerHTML = '';
+            loader.style.display = 'flex';
+            try {
+                const data = await globalReserveRequest(`${GLOBAL_RESERVE_ENDPOINT}?action=stats`);
+                if (!data) throw new Error('stats_unavailable');
+                container.innerHTML = `
+                    <section class="taste-data-panel" aria-label="Base de conocimiento global">
+                        <div class="section-header-back">
+                            <button type="button" class="video-stage-close" onclick="renderTasteData()"><i class="fas fa-arrow-left"></i> Volver a Tus datos</button>
+                        </div>
+                        <h2>Base de conocimiento de Nowarfy</h2>
+                        <p>Este es el catálogo colectivo alimentado por todos los usuarios. Cada búsqueda y reproducción en cualquier dispositivo agrega nuevas URLs y metadatos a esta biblioteca compartida.</p>
+                        <div class="taste-stats">
+                            <div class="taste-stat"><b>${formatCompactNumber(data.totalCandidates)}</b><span>URLs descubiertas</span></div>
+                            <div class="taste-stat"><b>${formatCompactNumber(data.totalQueries)}</b><span>Búsquedas procesadas</span></div>
+                        </div>
+                        <div class="knowledge-recent">
+                            <h3>Descubrimientos recientes</h3>
+                            <div class="knowledge-list">
+                                ${data.recent.map(item => `
+                                    <div class="knowledge-item">
+                                        <div class="knowledge-item-main">
+                                            <strong>${escapeHtml(item.title)}</strong>
+                                            <span>${escapeHtml(item.artist)}</span>
+                                        </div>
+                                        <div class="knowledge-item-meta">
+                                            <span class="source-tag source-${item.source}">${item.source}</span>
+                                            <span class="time-tag">${new Date(item.discovered_at).toLocaleDateString()}</span>
+                                        </div>
+                                    </div>
+                                `).join('')}
+                            </div>
+                        </div>
+                        <div class="taste-actions">
+                            <a href="${GLOBAL_RESERVE_ENDPOINT}?action=export" class="taste-action primary" target="_blank"><i class="fas fa-download"></i> Exportar base de datos (CSV)</a>
+                        </div>
+                    </section>`;
+            } catch (error) {
+                renderEmptyState('No pudimos cargar las estadísticas globales', 'La reserva global puede estar temporalmente fuera de servicio.');
+            } finally {
+                loader.style.display = 'none';
+            }
         }
         function deriveChannels(videos) {
             const seen = new Set();
@@ -3898,7 +3965,7 @@
             globalReserveSyncInFlight = true;
             void globalReserveRequest(GLOBAL_RESERVE_ENDPOINT, {
                 method: 'POST',
-                body: JSON.stringify({ action: 'upsert', entries: batch })
+                body: JSON.stringify({ action: 'upsert', entries: batch, discoveredBy: nowarfyAuthUser?.id || nowarfyAnonymousId })
             }).finally(() => {
                 globalReserveSyncInFlight = false;
                 flushReserveGlobal();
@@ -3924,7 +3991,7 @@
             if (!payload?.source || !payload?.query) return;
             void globalReserveRequest(GLOBAL_RESERVE_ENDPOINT, {
                 method: 'POST',
-                body: JSON.stringify({ action: 'query-upsert', ...payload })
+                body: JSON.stringify({ action: 'query-upsert', ...payload, discoveredBy: nowarfyAuthUser?.id || nowarfyAnonymousId })
             });
         }
         async function reserveGetGlobalCandidates({ styleKey = '', artist = '', source = '', query = '', scope = 'radio', kind = '', limit = 20 } = {}) {
