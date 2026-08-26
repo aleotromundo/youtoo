@@ -1379,6 +1379,8 @@
         const nowarfyRemoteSeenCommandIds = new Map();
         let nowarfyRemoteSession = null;
         let nowarfyRemoteShadowSong = null;
+        let nowarfyRemoteShadowState = null;
+        let nowarfyRemoteShadowTimer = null;
         let nowarfyRemoteDeviceId = null;
         let nowarfyRemoteIsPlayer = false;
         let nowarfyClaimInFlight = false;
@@ -1572,7 +1574,8 @@
         }
         function remoteStateSnapshot() {
             const { song, position, duration } = currentRemotePosition();
-            return { resourceId: song?.url || null, title: song?.title || '', artist: song?.artist || '', type: song?.type || null, img: song?.img || '', channelId: song?.channelId || '', isPlaying: !!isPlaying, volume: Math.round(lastVolume * 100), position: Math.round(position * 10) / 10, duration: Math.round(duration * 10) / 10, currentQid: currentPlayingQid || song?._qid || null, queueRound, playlist: Array.isArray(queue) ? queue.slice(0, 100).map(remoteSongSnapshot).filter(Boolean) : [], updatedAt: new Date().toISOString() };
+            const positionAt = Date.now();
+            return { resourceId: song?.url || null, title: song?.title || '', artist: song?.artist || '', type: song?.type || null, img: song?.img || '', channelId: song?.channelId || '', isPlaying: !!isPlaying, volume: Math.round(lastVolume * 100), position: Math.round(position * 10) / 10, positionAt, duration: Math.round(duration * 10) / 10, currentQid: currentPlayingQid || song?._qid || null, queueRound, playlist: Array.isArray(queue) ? queue.slice(0, 100).map(remoteSongSnapshot).filter(Boolean) : [], updatedAt: new Date(positionAt).toISOString() };
         }
         function detectNowarfyDeviceName() {
             const ua = navigator.userAgent || '';
@@ -1651,6 +1654,7 @@
                         const wasPlayer = nowarfyRemoteIsPlayer;
                         nowarfyRemoteSession = payload.new;
                         nowarfyRemoteIsPlayer = payload.new.active_device_id === nowarfyRemoteDeviceId;
+                        updateRemoteShadowTimer();
                         if (wasPlayer && !nowarfyRemoteIsPlayer) { stopAll(); isPlaying = false; updateIcon(); setTrackLoading(false); }
                         updateNowarfyAuthUI();
                         if (payload.new.state) updateRemoteControlsFromState(payload.new.state);
@@ -1667,6 +1671,7 @@
                 nowarfyDeviceRefreshTimer = setInterval(() => { void refreshNowarfyRemoteDevices(); }, 5000);
                 if (nowarfyRemoteStateTimer) clearInterval(nowarfyRemoteStateTimer);
                 nowarfyRemoteStateTimer = setInterval(() => { void touchNowarfyRemoteDevice(); if (nowarfyRemoteIsPlayer) void publishNowarfyRemoteState(); }, 3000);
+                updateRemoteShadowTimer();
             } catch (error) { remoteStatus('Control remoto no disponible todavía; la reproducción local sigue funcionando.'); }
         }
         async function touchNowarfyRemoteDevice() {
@@ -1709,7 +1714,7 @@
             picker.hidden = !picker.hidden;
             if (!picker.hidden) void refreshNowarfyRemoteDevices();
         }
-        async function teardownNowarfyRemoteControl() { if (nowarfyRemoteStateTimer) clearInterval(nowarfyRemoteStateTimer); if (nowarfyDeviceRefreshTimer) clearInterval(nowarfyDeviceRefreshTimer); nowarfyRemoteStateTimer = null; nowarfyDeviceRefreshTimer = null; nowarfyRemoteDevices = []; nowarfyRemoteBroadcastReady = false; nowarfyRemoteSeenCommandIds.clear(); if (nowarfyRemoteChannel && nowarfySupabase) await nowarfySupabase.removeChannel(nowarfyRemoteChannel); nowarfyRemoteChannel = null; nowarfyRemoteSession = null; nowarfyRemoteShadowSong = null; nowarfyRemoteDeviceId = null; nowarfyRemoteIsPlayer = false; }
+        async function teardownNowarfyRemoteControl() { if (nowarfyRemoteStateTimer) clearInterval(nowarfyRemoteStateTimer); if (nowarfyDeviceRefreshTimer) clearInterval(nowarfyDeviceRefreshTimer); nowarfyRemoteStateTimer = null; nowarfyDeviceRefreshTimer = null; if (nowarfyRemoteShadowTimer) clearInterval(nowarfyRemoteShadowTimer); nowarfyRemoteShadowTimer = null; nowarfyRemoteDevices = []; nowarfyRemoteBroadcastReady = false; nowarfyRemoteSeenCommandIds.clear(); if (nowarfyRemoteChannel && nowarfySupabase) await nowarfySupabase.removeChannel(nowarfyRemoteChannel); nowarfyRemoteChannel = null; nowarfyRemoteSession = null; nowarfyRemoteShadowSong = null; nowarfyRemoteShadowState = null; nowarfyRemoteDeviceId = null; nowarfyRemoteIsPlayer = false; }
         async function claimNowarfyPlayer() { return selectNowarfyPlaybackDevice(nowarfyRemoteDeviceId); }
         async function selectNowarfyPlaybackDevice(deviceId) {
             if (nowarfyClaimInFlight) return;
@@ -1729,6 +1734,7 @@
                 nowarfyRemoteSession = result.data;
                 const wasLocalPlayer = nowarfyRemoteIsPlayer;
                 nowarfyRemoteIsPlayer = deviceId === nowarfyRemoteDeviceId;
+                updateRemoteShadowTimer();
                 if (deviceId !== nowarfyRemoteDeviceId && wasLocalPlayer) {
                     // Cortar el audio aquí mismo evita que ambos dispositivos reproduzcan a la vez
                     // mientras llega el evento de Realtime al reproductor anterior.
@@ -1769,8 +1775,28 @@
             const result = await nowarfySupabase.from('youtoo_remote_sessions').update({ state, version: Number(nowarfyRemoteSession.version || 0) + 1, updated_at: new Date().toISOString() }).eq('id', nowarfyRemoteSession.id).eq('active_device_id', nowarfyRemoteDeviceId);
             if (!result.error) nowarfyRemoteSession.state = state;
         }
+        function updateRemoteShadowTimer() {
+            if (nowarfyRemoteShadowTimer) clearInterval(nowarfyRemoteShadowTimer);
+            nowarfyRemoteShadowTimer = null;
+            if (nowarfyRemoteSession && !nowarfyRemoteIsPlayer) nowarfyRemoteShadowTimer = setInterval(updateRemoteShadowProgress, 500);
+        }
+        function updateRemoteShadowProgress() {
+            if (nowarfyRemoteIsPlayer || !nowarfyRemoteShadowState) return;
+            const state = nowarfyRemoteShadowState;
+            const duration = Number(state.duration || 0);
+            if (!duration) return;
+            const capturedAt = Number(state.positionAt) || Date.parse(state.updatedAt) || Date.now();
+            const elapsed = state.isPlaying ? Math.max(0, (Date.now() - capturedAt) / 1000) : 0;
+            const position = Math.min(duration, Math.max(0, Number(state.position || 0) + elapsed));
+            const pct = Math.max(0, Math.min(100, position / duration * 100));
+            progFill.style.width = `${pct}%`;
+            progThumb.style.left = `${pct}%`;
+            currTimeEl.innerText = format(position);
+            totalTimeEl.innerText = format(duration);
+        }
         function updateRemoteControlsFromState(state, forceQueue = false) {
             if (!state) return;
+            if (!nowarfyRemoteIsPlayer) nowarfyRemoteShadowState = { ...state };
             if ((!nowarfyRemoteIsPlayer || forceQueue) && Array.isArray(state.playlist) && state.playlist.length) {
                 const remoteQueue = state.playlist.map(item => ({ ...item, _qid: item._qid || queueIdCounter++ })).filter(item => item.url);
                 if (remoteQueue.length) {
@@ -1788,8 +1814,7 @@
                 if (!nowarfyRemoteShadowSong || nowarfyRemoteShadowSong.url !== nextShadow.url || nowarfyRemoteShadowSong.title !== nextShadow.title) { nowarfyRemoteShadowSong = nextShadow; updateNowPlaying(nextShadow); }
                 isPlaying = !!state.isPlaying;
                 updateIcon();
-                const duration = Number(state.duration || 0), position = Number(state.position || 0);
-                if (duration) { const pct = Math.max(0, Math.min(100, position / duration * 100)); progFill.style.width = `${pct}%`; progThumb.style.left = `${pct}%`; currTimeEl.innerText = format(position); totalTimeEl.innerText = format(duration); }
+                updateRemoteShadowProgress();
             }
             const volume = document.getElementById('volumeSlider');
             if (volume && document.activeElement !== volume && Number.isFinite(Number(state.volume))) { volume.value = Number(state.volume) / 100; volume.style.background = `linear-gradient(to right, var(--accent) ${Number(state.volume)}%, #535353 ${Number(state.volume)}%)`; }
@@ -3166,7 +3191,7 @@
             welcome.className = 'home-welcome';
             if (lastViewed?.title) {
                 welcome.innerHTML = `<span class="home-welcome-copy"><span class="home-welcome-brandline"><span class="home-welcome-logo"><img class="brand-lockup-mark" src="assets/nowarfy-logo-red-solid.png" alt=""><span class="brand-lockup-text"><strong>Nowarfy</strong><span>YouToo</span><sup class="brand-registered">®</sup></span></span><span class="home-welcome-kicker">Bienvenido de nuevo</span></span><h1>Seguimos desde donde quedaste</h1><p>Lo último que viste fue <strong>${escapeHtml(lastViewed.title)}</strong>${lastViewed.artist ? ` · ${escapeHtml(lastViewed.artist)}` : ''}. El reproductor empieza detenido: tocá esta tarjeta o el botón de reproducir cuando quieras continuar.</p></span>${lastViewed.img ? `<img class="home-welcome-art" src="${escapeHtml(lastViewed.img)}" alt="" loading="lazy">` : ''}`;
-                welcome.addEventListener('click', () => selectSong(lastViewed, 0));
+                welcome.addEventListener('click', () => resumeSongFromWelcome(lastViewed, 0));
             } else {
                 welcome.innerHTML = `<span class="home-welcome-copy"><span class="home-welcome-brandline"><span class="home-welcome-logo"><img class="brand-lockup-mark" src="assets/nowarfy-logo-red-solid.png" alt=""><span class="brand-lockup-text"><strong>Nowarfy</strong><span>YouToo</span><sup class="brand-registered">®</sup></span></span><span class="home-welcome-kicker">Bienvenido a Nowarfy · YouToo</span></span><h1>Descubrí música real, sin límites</h1><p>Explorá artistas, canales y fuentes musicales. El reproductor empieza detenido para que vos elijas cuándo comenzar.</p></span>`;
             }
@@ -4341,6 +4366,26 @@
             growQueueIfNeeded(true);
         }
 
+        function resumeSongFromWelcome(song, sourceIdx = 0) {
+            const resume = readVideoResumeSession();
+            const matches = resume && String(resume.resourceId) === String(song?.url) && (!resume.type || resume.type === song?.type);
+            if (!matches) { selectSong(song, sourceIdx); return; }
+            const existingIndex = queue.findIndex(item => String(item.url) === String(song.url) && item.type === song.type);
+            if (existingIndex >= 0) {
+                playQueueAt(existingIndex, { sourceIdx, resumeSession: { ...resume, wasPlaying: true }, restoreMinimized: !!resume.minimized });
+                return;
+            }
+            const q = withQid(song);
+            queue = [q];
+            queueSeenKeys = new Set([songKey(q)]);
+            queueRound = 0;
+            persistQueue();
+            renderQueue();
+            playQueueAt(0, { sourceIdx, resumeSession: { ...resume, wasPlaying: true }, restoreMinimized: !!resume.minimized });
+            void reserveDiscoveredCandidates([song], { context: 'radio', seed: song });
+            growQueueIfNeeded(true);
+        }
+
         // Agregar una canción a la cola actual sin interrumpir lo que está sonando.
         function addToQueue(song) {
             const k = songKey(song);
@@ -4525,6 +4570,17 @@
             standby.load();
         }
 
+        function applyResumeSessionToMedia(media, song, resumeSession) {
+            if (!media || !song || !resumeSession || String(resumeSession.resourceId) !== String(song.url)) return;
+            const position = Math.max(0, Number(resumeSession.position) || 0);
+            const apply = () => {
+                if (currentQueueSong()?.url !== song.url || media !== activeAudioEl) return;
+                const duration = Number(media.duration);
+                media.currentTime = duration > 0 ? Math.min(position, Math.max(0, duration - 0.25)) : position;
+            };
+            if (media.readyState >= 1) apply();
+            else media.addEventListener('loadedmetadata', apply, { once: true });
+        }
         function bindDirectAudioEvents(audio) {
             audio.ontimeupdate = () => {
                 if (audio !== activeAudioEl) return;
@@ -4535,7 +4591,18 @@
                 if (!crossfadeInProgress && current?.type === 'mp3' && next?.type === 'mp3' && Number.isFinite(remaining) && remaining > 0 && remaining <= CROSSFADE_SECONDS) beginDirectAudioCrossfade();
             };
             audio.onended = () => {
-                if (audio === activeAudioEl && !crossfadeInProgress) queueAutomaticAdvance('direct-ended');
+                if (audio === activeAudioEl && !crossfadeInProgress) {
+                    clearVideoResumeSession();
+                    queueAutomaticAdvance('direct-ended');
+                }
+            };
+            audio.onpause = () => {
+                if (audio !== activeAudioEl || audio.ended || crossfadeInProgress || String(audio.dataset.queueId || '') !== String(currentPlayingQid || '')) return;
+                isPlaying = false;
+                persistVideoResumeSession(true);
+                updateIcon();
+                updatePlaybackState();
+                if (nowarfyRemoteIsPlayer) void publishNowarfyRemoteState();
             };
             audio.onwaiting = () => { if (audio === activeAudioEl) setTrackLoading(true, currentSourceIdx); };
             audio.onplaying = () => {
@@ -4547,6 +4614,7 @@
                 setTrackLoading(false);
                 if (!progressInterval) startProgress(audio);
                 prepareNextDirectAudio();
+                if (nowarfyRemoteIsPlayer) void publishNowarfyRemoteState();
             };
             audio.onerror = () => {
                 if (audio !== activeAudioEl) return;
@@ -4622,13 +4690,13 @@
             playbackStoppedByUser = false;
             currentIndex = idx;
             const song = queue[idx];
-            const resumeSession = song.type === 'yt' && options.resumeSession && String(options.resumeSession.resourceId) === String(song.url)
+            const resumeSession = ['yt', 'mp3', 'freevideo'].includes(song.type) && options.resumeSession && String(options.resumeSession.resourceId) === String(song.url) && (!options.resumeSession.type || options.resumeSession.type === song.type)
                 ? options.resumeSession
                 : null;
             currentPlayingQid = song._qid;
             currentSourceIdx = options.sourceIdx ?? null;
             pendingVideoResumeSession = resumeSession;
-            restoreVideoMinimizedAfterReady = !!(resumeSession && options.restoreMinimized);
+            restoreVideoMinimizedAfterReady = !!(resumeSession && song.type === 'yt' && options.restoreMinimized);
             if (!resumeSession) clearVideoResumeSession();
             updateNowPlaying(song);
             rememberPlay(song);
@@ -4660,10 +4728,13 @@
                 applyVolume(parseFloat(document.getElementById('volumeSlider').value));
                 bindDirectAudioEvents(freeVideoEl);
                 freeVideoEl.onloadedmetadata = () => {
+                    applyResumeSessionToMedia(freeVideoEl, song, resumeSession);
                     if (freeVideoEl === activeAudioEl && currentQueueSong()?.type === 'freevideo') renderVideoStageDetails({ ...song, duration: freeVideoEl.duration || song.duration });
                 };
                 freeVideoEl.load();
-                if (!options.deferAutoplay) freeVideoEl.play().catch(e => { console.error(e); setTrackLoading(false); showToast('No se pudo reproducir este video libre', 'fa-triangle-exclamation'); });
+                const shouldAutoplayFreeVideo = !options.deferAutoplay && resumeSession?.wasPlaying !== false;
+                if (shouldAutoplayFreeVideo) freeVideoEl.play().catch(e => { console.error(e); setTrackLoading(false); showToast('No se pudo reproducir este video libre', 'fa-triangle-exclamation'); });
+                else setTrackLoading(false);
             } else {
                 hideVideoStage(false);
                 activeAudioEl = audioEl;
@@ -4674,7 +4745,10 @@
                 audioEl.dataset.queueId = String(song._qid);
                 applyVolume(parseFloat(document.getElementById('volumeSlider').value));
                 bindDirectAudioEvents(audioEl);
-                if (!options.deferAutoplay) audioEl.play().catch(e => { console.error(e); setTrackLoading(false); showToast('No se pudo reproducir esta pista', 'fa-triangle-exclamation'); });
+                audioEl.onloadedmetadata = () => applyResumeSessionToMedia(audioEl, song, resumeSession);
+                const shouldAutoplayAudio = !options.deferAutoplay && resumeSession?.wasPlaying !== false;
+                if (shouldAutoplayAudio) audioEl.play().catch(e => { console.error(e); setTrackLoading(false); showToast('No se pudo reproducir esta pista', 'fa-triangle-exclamation'); });
+                else setTrackLoading(false);
             }
 
         }
@@ -4892,16 +4966,23 @@
             lastVideoResumeSaveAt = 0;
         }
 
+        function getLocalPlaybackPosition(song = currentQueueSong()) {
+            if (!song || !['yt', 'mp3', 'freevideo'].includes(song.type)) return null;
+            if (nowarfyRemoteSession && !nowarfyRemoteIsPlayer) return null;
+            if (song.type === 'yt') return ytPlayer?.getCurrentTime ? Number(ytPlayer.getCurrentTime()) || 0 : null;
+            return activeAudioEl ? Number(activeAudioEl.currentTime) || 0 : null;
+        }
         function persistVideoResumeSession(force = false) {
             const song = currentQueueSong();
-            if (!song || song.type !== 'yt' || !ytPlayer?.getCurrentTime) return;
+            const position = getLocalPlaybackPosition(song);
+            if (!song?.url || position === null) return;
             const now = Date.now();
             if (!force && now - lastVideoResumeSaveAt < 3000) return;
             try {
-                const position = Number(ytPlayer.getCurrentTime()) || 0;
                 localStorage.setItem(VIDEO_RESUME_STORAGE_KEY, JSON.stringify({
                     qid: currentPlayingQid,
                     resourceId: song.url,
+                    type: song.type,
                     isPlaylist: !!song.isPlaylist,
                     position: Math.max(0, position),
                     wasPlaying: !!isPlaying,
@@ -4948,7 +5029,7 @@
                 updateNowPlaying(song);
 
                 const resume = readVideoResumeSession();
-                if (song.type === 'yt' && resume && String(resume.resourceId) === String(song.url) && (!resume.qid || Number(resume.qid) === Number(qid))) {
+                if (['yt', 'mp3', 'freevideo'].includes(song.type) && resume && String(resume.resourceId) === String(song.url) && (!resume.type || resume.type === song.type) && (!resume.qid || Number(resume.qid) === Number(qid))) {
                     // Se conserva la posición para el próximo clic en reproducir, pero nunca se inicia solo.
                     pendingVideoResumeSession = resume;
                 }
@@ -5473,6 +5554,7 @@
                 isPlaying = true;
                 setTrackLoading(false);
                 if (!progressInterval) startProgress(ytPlayer);
+                if (nowarfyRemoteIsPlayer) void publishNowarfyRemoteState();
             } else if (event.data === YT.PlayerState.PAUSED) {
                 // Una pausa voluntaria cancela el timeout; una pausa con intención de play
                 // puede ser el estado que deja el challenge anti-bot de YouTube.
@@ -5482,6 +5564,7 @@
                 }
                 isPlaying = false;
                 persistVideoResumeSession(true);
+                if (nowarfyRemoteIsPlayer) void publishNowarfyRemoteState();
             } else if (event.data === YT.PlayerState.BUFFERING) {
                 setTrackLoading(true, currentIndex);
             } else if (event.data === YT.PlayerState.ENDED) {
@@ -5513,7 +5596,8 @@
             // Si venimos de restaurar la cola guardada y todavía no se cargó nada en el reproductor, arrancarla.
             if (!ytPlayer && !audioEl.src && !freeVideoEl.src) {
                 const resume = pendingVideoResumeSession;
-                playQueueAt(currentIndex, resume ? { resumeSession: resume, restoreMinimized: !!resume.minimized } : {});
+                const explicitResume = resume ? { ...resume, wasPlaying: true } : null;
+                playQueueAt(currentIndex, explicitResume ? { resumeSession: explicitResume, restoreMinimized: !!explicitResume.minimized } : {});
                 return;
             }
             const song = queue[currentIndex];
@@ -5602,8 +5686,8 @@
                 if (source === ytPlayer) {
                     curr = source.getCurrentTime();
                     dur = source.getDuration();
-                    persistVideoResumeSession();
                 } else { curr = source.currentTime; dur = source.duration; }
+                persistVideoResumeSession();
                 if (dur) {
                     const pct = (curr / dur) * 100;
                     updateMediaPosition(dur, curr);
@@ -5640,6 +5724,7 @@
             const song = queue[currentIndex];
             if (song.type === 'yt' && ytPlayer) { const d = ytPlayer.getDuration(); if (d) ytPlayer.seekTo(d * pct, true); }
             else if ((song.type === 'mp3' || song.type === 'freevideo') && activeAudioEl.duration) { activeAudioEl.currentTime = activeAudioEl.duration * pct; }
+            persistVideoResumeSession(true);
         }
 
         function seekBy(deltaSeconds) {
@@ -5652,6 +5737,7 @@
             } else if (song.type === 'mp3' || song.type === 'freevideo') {
                 activeAudioEl.currentTime = Math.max(0, Math.min(activeAudioEl.duration || 0, activeAudioEl.currentTime + deltaSeconds));
             }
+            persistVideoResumeSession(true);
         }
 
         function setupProgressDrag() {
@@ -5848,7 +5934,7 @@
         }
 
         function setupBackgroundPersistence() {
-            const save = () => { persistQueue(); persistVideoResumeSession(true); updatePlaybackState(); };
+            const save = () => { persistQueue(); persistVideoResumeSession(true); updatePlaybackState(); if (nowarfyRemoteIsPlayer) void publishNowarfyRemoteState(); };
             document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') save(); });
             window.addEventListener('pagehide', save);
         }
