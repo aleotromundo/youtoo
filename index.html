@@ -884,9 +884,14 @@
         .nowarfy-device-picker[hidden] { display: none !important; }
         .nowarfy-device-picker-title { display:flex; justify-content:space-between; gap:8px; color:#dce8ff; font-size:.78rem; font-weight:700; }
         .nowarfy-device-list { display:grid; gap:6px; max-height:180px; overflow:auto; }
-        .nowarfy-device-option { display:flex; align-items:center; justify-content:space-between; gap:8px; width:100%; text-align:left; padding:8px 10px !important; font-size:.76rem; }
-        .nowarfy-device-option.is-active { border-color: rgba(87,239,199,.75) !important; background: rgba(87,239,199,.14) !important; }
-        .nowarfy-device-option small { color:#aebbd5; font-size:.68rem; }
+        .nowarfy-device-option { display:flex; align-items:center; justify-content:space-between; gap:8px; width:100%; text-align:left; padding:10px 12px !important; font-size:.78rem; border: 1px solid rgba(255,255,255,.1) !important; transition: all .2s ease; }
+        .nowarfy-device-option:hover { background: rgba(255,255,255,.05); border-color: rgba(255,255,255,.2) !important; }
+        .nowarfy-device-option.is-active { border-color: #5eead4 !important; background: rgba(94,234,212,.12) !important; }
+        .nowarfy-device-option .device-info { display: flex; align-items: center; gap: 10px; min-width: 0; }
+        .nowarfy-device-option .device-info i { color: #5eead4; width: 16px; text-align: center; }
+        .nowarfy-device-option .device-name-text { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .nowarfy-device-option .device-status-text { color:#aebbd5; font-size:.66rem; font-weight: 700; text-transform: uppercase; letter-spacing: .02em; flex-shrink: 0; }
+        .nowarfy-device-option.is-active .device-status-text { color: #5eead4; }
         .nowarfy-account-btn { width: 100%; margin-top: 10px; border: 1px solid rgba(190,188,255,.2); border-radius: 10px; padding: 9px 10px; color: #e8e7ff; background: rgba(255,255,255,.06); cursor: pointer; font: inherit; font-size: .72rem; text-align: left; }
         .auth-modal-open { overflow: hidden; }
         .nowarfy-qr-modal { position: fixed; z-index: 10000; inset: 0; display: grid; place-items: center; padding: 22px; background: rgba(2,3,10,.78); backdrop-filter: blur(10px); }
@@ -1610,25 +1615,34 @@
         }
         async function touchNowarfyRemoteDevice() {
             if (!nowarfySupabase || !nowarfyAuthUser || !nowarfyRemoteDeviceId) return;
-            await nowarfySupabase.from('youtoo_remote_devices').update({ last_seen_at: new Date().toISOString(), role: nowarfyRemoteIsPlayer ? 'player' : 'controller' }).eq('id', nowarfyRemoteDeviceId).eq('user_id', nowarfyAuthUser.id);
+            const deviceName = detectNowarfyDeviceName();
+            await nowarfySupabase.from('youtoo_remote_devices').update({ last_seen_at: new Date().toISOString(), role: nowarfyRemoteIsPlayer ? 'player' : 'controller', device_name: deviceName }).eq('id', nowarfyRemoteDeviceId).eq('user_id', nowarfyAuthUser.id);
         }
         async function refreshNowarfyRemoteDevices() {
             if (!nowarfySupabase || !nowarfyAuthUser) return [];
-            const cutoff = new Date(Date.now() - 15000).toISOString();
+            const cutoff = new Date(Date.now() - 25000).toISOString();
             const result = await nowarfySupabase.from('youtoo_remote_devices').select('id,device_name,role,last_seen_at').eq('user_id', nowarfyAuthUser.id).gte('last_seen_at', cutoff).order('last_seen_at', { ascending: false });
             if (result.error) return nowarfyRemoteDevices;
             nowarfyRemoteDevices = result.data || [];
             const count = document.getElementById('nowarfyDeviceCount');
             if (count) count.textContent = `(${nowarfyRemoteDevices.length})`;
             const hint = document.getElementById('nowarfyDevicePickerHint');
-            if (hint) hint.textContent = `${nowarfyRemoteDevices.length} conectado${nowarfyRemoteDevices.length === 1 ? '' : 's'}`;
+            if (hint) hint.textContent = `${nowarfyRemoteDevices.length} dispositivo${nowarfyRemoteDevices.length === 1 ? '' : 's'}`;
             const list = document.getElementById('nowarfyDeviceList');
             if (list) {
                 list.innerHTML = nowarfyRemoteDevices.length ? nowarfyRemoteDevices.map((device, index) => {
                     const isSelected = device.id === nowarfyRemoteSession?.active_device_id;
                     const isCurrent = device.id === nowarfyRemoteDeviceId;
-                    return `<button type="button" class="nowarfy-device-option${isSelected ? ' is-active' : ''}" onclick="selectNowarfyPlaybackDevice('${device.id}')"><span><i class="fas ${isSelected ? 'fa-volume-high' : 'fa-mobile-screen'}"></i> ${index + 1}. ${escapeHtml(device.device_name || 'Dispositivo Nowarfy')}</span><small>${isSelected ? 'Reproduciendo aquí' : isCurrent ? 'Este dispositivo' : 'Disponible'}</small></button>`;
-                }).join('') : '<small>No hay dispositivos activos en este momento.</small>';
+                    const isMobile = /Móvil/i.test(device.device_name || '');
+                    const icon = isSelected ? 'fa-volume-high' : (isMobile ? 'fa-mobile-screen' : 'fa-desktop');
+                    return `<button type="button" class="nowarfy-device-option${isSelected ? ' is-active' : ''}" onclick="selectNowarfyPlaybackDevice('${device.id}')">
+                        <span class="device-info">
+                            <i class="fas ${icon}"></i>
+                            <span class="device-name-text">${escapeHtml(device.device_name || 'Dispositivo')}</span>
+                        </span>
+                        <small class="device-status-text">${isSelected ? 'Reproduciendo' : isCurrent ? 'Este equipo' : 'Disponible'}</small>
+                    </button>`;
+                }).join('') : '<small>No hay dispositivos activos.</small>';
             }
             updateNowarfyAuthUI();
             return nowarfyRemoteDevices;
