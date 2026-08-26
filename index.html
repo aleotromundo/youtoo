@@ -2989,15 +2989,19 @@
         // Clasificación editorial: los videos no musicales siguen disponibles, pero quedan fuera de la radio y de los carruseles musicales.
         let videoClassificationReviewTimer = null;
         function videoSearchText(item) {
-            return `${item?.title || ''} ${item?.artist || ''} ${item?.channelTitle || ''} ${item?.description || ''} ${item?.genre || ''}`.toLowerCase();
+            const tags = Array.isArray(item?.tags) ? item.tags.map(tag => typeof tag === 'object' ? tag.name || '' : tag).join(' ') : String(item?.tags || item?.metadata?.tags || '');
+            return `${item?.title || ''} ${item?.artist || ''} ${item?.channelTitle || ''} ${item?.description || ''} ${item?.genre || ''} ${tags}`.toLowerCase();
         }
         function isNonMusicalVideo(item) {
             if (!item?.url || !['yt', 'freevideo'].includes(item.type)) return false;
             if (item.type === 'freevideo') return true;
-            if (item.contentGroup === 'non_music_video' || item.metadata?.contentGroup === 'non_music_video') return true;
-            if (item.categoryId && String(item.categoryId) !== '10') return true;
+            // No confiar en contentGroup persistido: puede venir de una clasificación anterior y quedar obsoleto.
             const text = videoSearchText(item);
-            return /tutorial|how to|documentary|documental|vlog|podcast|interview|entrevista|news|noticias|review|reseña|reaction|reacción|gameplay|gaming|trailer|teaser|lecture|clase|curso|comedy|comedia|short film|cortometraje|live stream|streaming|sports|deportes|travel|viaje|cooking|cocina|technology|tecnología|unboxing|tutorial/.test(text);
+            const categoryId = String(item.categoryId || item.videoSnippet?.categoryId || '');
+            const hasStrongMusicSignal = /official music video|music video|video musical|videoclip|official audio|lyric video|lyrics?|letra|band version|full album|álbum completo|album completo|full concert|live performance|presentación en vivo|canción|cancion|single|remix|cover|acoustic|instrumental|karaoke|song|track|concert|concierto|music video/.test(text);
+            if (categoryId === '10' || hasStrongMusicSignal) return false;
+            // La categoría de YouTube por sí sola no alcanza: muchos videoclips están en Entertainment (24).
+            return /tutorial|how to|documentary|documental|vlog|podcast|interview|entrevista|news|noticias|review|reseña|reaction|reacción|gameplay|gaming|trailer|teaser|lecture|clase|curso|comedy|comedia|short film|cortometraje|live stream|streaming|sports|deportes|travel|viaje|cooking|cocina|technology|tecnología|unboxing|audiobook|audiolibro|lesson|tutorial/.test(text);
         }
         function musicalVideoPool(items, limit = 120) {
             return uniqueMediaByUrl((items || []).filter(item => item?.type === 'yt' && !isNonMusicalVideo(item)), limit);
