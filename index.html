@@ -1749,7 +1749,7 @@
 
         // --- COLA DE REPRODUCCIÓN PERSISTENTE (radio automática) ---
         const QUEUE_BATCH = 20;       // canciones que se suman en cada ronda de autogeneración
-        const QUEUE_LOW_WATER = 5;    // cuando quedan <= a esto por delante, se pide otra ronda
+        // La siguiente tanda se genera recién al terminar la tanda actual; no se usa un umbral anticipado.
         let queue = [];                // lista completa de la cola actual
         let queueSeenKeys = new Set(); // para no repetir canciones dentro de la cola
         let queueIdCounter = 0;        // id incremental único por ítem de la cola (sobrevive a reordenes/borrados)
@@ -1810,6 +1810,8 @@
         let ambientArtworkLockedToCurrent = false;
         let activeChannelCatalog = null;
         let activePlaylistCatalog = null;
+        let nowarfyRestoringHistory = false;
+        let nowarfyLastHistoryState = null;
 
         const audioEl = document.getElementById('audio-element');
         const nextAudioEl = document.getElementById('audio-element-next');
@@ -1829,6 +1831,7 @@
         const searchClearBtn = document.getElementById('searchClear');
 
         initVolume();
+        initNowarfyHistory();
         // Se difiere el inicio para que el perfil local y sus funciones ya estén inicializados.
         setTimeout(resetView, 0);
         loadYouTubeAPI();
@@ -2619,7 +2622,12 @@
                 if (nextButton) { nextButton.disabled = false; nextButton.innerHTML = '<i class="fas fa-plus"></i> Seguir cargando resultados'; }
             }
         }
-        async function performSmartSearch(query) {
+        async function performSmartSearch(query, options = {}) {
+            pushNowarfyHistory('search', {
+                query: String(query || ''),
+                channelId: channelFilter?.id || '',
+                channelTitle: channelFilter?.title || ''
+            });
             // Al iniciar una búsqueda, liberar el área principal para mostrar los nuevos resultados.
             // El video continúa reproduciéndose y queda accesible desde el indicador flotante.
             minimizeActiveVideoForNavigation();
@@ -2692,6 +2700,7 @@
         // Abre una ficha nativa con las listas públicas y los videos subidos del canal.
         function browseChannel(channelId, channelTitle) {
             if (!channelId) return;
+            pushNowarfyHistory('channel', { channelId: String(channelId), channelTitle: String(channelTitle || '') });
             loadChannelProfile(channelId, channelTitle);
         }
 
@@ -2861,7 +2870,8 @@
         }
 
         // La portada reutiliza caché/reserva local; las fuentes externas solo se consultan tras confirmar una búsqueda.
-        async function resetView() {
+        async function resetView(options = {}) {
+            pushNowarfyHistory('home');
             closeNowarfyMobileNav();
             minimizeActiveVideoForNavigation();
             searchQuery = ""; currentMood = null; channelFilter = null; activeBrowseMode = 'home';
@@ -2979,6 +2989,81 @@
             if (freeMusic.length >= 2) renderLibraryRail(freeMusic, 'Música libre disponible', "<i class='fas fa-headphones'></i>", false, { hint: 'Audio con carátula y licencia · sin repetir videos', showControls: true });
             if (!resume.length && !recommended.length && !featured.length && !musicVideos.length && !playlists.length && !freeMusic.length) renderEmptyState('No hay opciones disponibles ahora', 'Probá recargar dentro de unos segundos o buscá un artista.');
         }
+
+        function initNowarfyHistory() {
+            // Conservamos una entrada raíz y agregamos una entrada centinela. Así, el primer
+            // Atrás de Android genera `popstate` dentro de la app en vez de sacar el documento.
+            const root = { nowarfy: true, view: 'home', root: true };
+            const guard = { nowarfy: true, view: 'home', guard: true };
+            history.replaceState(root, '', window.location.href);
+            history.pushState(guard, '', window.location.href);
+            nowarfyLastHistoryState = guard;
+        }
+
+        function pushNowarfyHistory(view, data = {}) {
+            if (nowarfyRestoringHistory) return;
+            const next = { nowarfy: true, view, ...data };
+            const current = history.state;
+            const sameRoute = current?.nowarfy && current.view === next.view &&
+                (current.query || '') === (next.query || '') &&
+                (current.section || '') === (next.section || '') &&
+                (current.channelId || '') === (next.channelId || '') &&
+                (current.playlistId || '') === (next.playlistId || '');
+            nowarfyLastHistoryState = next;
+            if (!sameRoute) history.pushState(next, '', window.location.href);
+        }
+
+        function closeNowarfyBackOverlays() {
+            let closed = false;
+            const sidebar = document.querySelector('.sidebar');
+            if (sidebar?.classList.contains('mobile-nav-open')) { closeNowarfyMobileNav(); closed = true; }
+            const authModal = document.getElementById('nowarfyAuthModal');
+            if (authModal && !authModal.hidden) { closeNowarfyAuth(); closed = true; }
+            const qrModal = document.getElementById('nowarfyQrModal');
+            if (qrModal && !qrModal.hidden) { closeNowarfyQr(); closed = true; }
+            const devicePicker = document.getElementById('nowarfyDevicePicker');
+            if (devicePicker && !devicePicker.hidden) { devicePicker.hidden = true; closed = true; }
+            const queuePanel = document.getElementById('queuePanel');
+            if (queuePanel?.classList.contains('open')) { queuePanel.classList.remove('open'); closed = true; }
+            const videoStage = document.getElementById('videoStage');
+            if (videoStage?.classList.contains('visible') && isVisualVideo(currentQueueSong?.())) {
+                setVideoStageMinimized(true);
+                closed = true;
+            }
+            return closed;
+        }
+
+        async function restoreNowarfyHistory(state) {
+            if (!state?.nowarfy || nowarfyRestoringHistory) return;
+            nowarfyRestoringHistory = true;
+            nowarfyLastHistoryState = state;
+            try {
+                if (state.view === 'home') await resetView({ fromHistory: true });
+                else if (state.view === 'section') await showSection(state.section || 'home', { fromHistory: true });
+                else if (state.view === 'search') {
+                    searchInput.value = state.query || '';
+                    searchClearBtn.classList.toggle('show', !!state.query);
+                    channelFilter = state.channelId ? { id: state.channelId, title: state.channelTitle || '' } : null;
+                    await performSmartSearch(state.query || '', { fromHistory: true });
+                } else if (state.view === 'channel') {
+                    await loadChannelProfile(state.channelId, state.channelTitle || '');
+                } else if (state.view === 'playlist') {
+                    await openPlaylist(state.playlist, { fromHistory: true });
+                } else if (state.view === 'queue') openQueueFromSidebar({ fromHistory: true });
+                else if (state.view === 'player') showFloatingPlayer({ fromHistory: true });
+                else await resetView({ fromHistory: true });
+            } finally {
+                nowarfyRestoringHistory = false;
+            }
+        }
+
+        window.addEventListener('popstate', event => {
+            if (closeNowarfyBackOverlays()) {
+                history.pushState(nowarfyLastHistoryState || { nowarfy: true, view: 'home' }, '', window.location.href);
+                return;
+            }
+            if (event.state?.nowarfy) void restoreNowarfyHistory(event.state);
+        });
 
         function activateNavigation(section) {
             closeNowarfyMobileNav();
@@ -3204,7 +3289,8 @@
             }
         }
 
-        function openQueueFromSidebar() {
+        function openQueueFromSidebar(options = {}) {
+            pushNowarfyHistory('queue');
             minimizeActiveVideoForNavigation();
             activeBrowseMode = 'queue';
             activateNavigation('queue');
@@ -3213,7 +3299,8 @@
             else renderQueue();
         }
 
-        function showFloatingPlayer() {
+        function showFloatingPlayer(options = {}) {
+            pushNowarfyHistory('player');
             minimizeActiveVideoForNavigation();
             activeBrowseMode = 'player';
             activateNavigation('player');
@@ -3227,7 +3314,8 @@
             if (isVisualVideo(song) && stage?.classList.contains('visible')) setVideoStageMinimized(true);
         }
 
-        async function showSection(section) {
+        async function showSection(section, options = {}) {
+            pushNowarfyHistory('section', { section });
             minimizeActiveVideoForNavigation();
             activeBrowseMode = section;
             activateNavigation(section);
@@ -3438,7 +3526,15 @@
             if (state.nextPageToken) addCatalogMore(container, 'Cargar más de esta lista', () => loadMoreOpenPlaylist(state.nextPageToken));
         }
 
-        async function openPlaylist(playlist) {
+        async function openPlaylist(playlist, options = {}) {
+            pushNowarfyHistory('playlist', {
+                playlistId: String(playlist?.url || ''),
+                playlist: {
+                    url: String(playlist?.url || ''), title: String(playlist?.title || 'Lista de reproducción'),
+                    artist: String(playlist?.artist || playlist?.channelTitle || 'YouTube'), img: playlist?.img || '',
+                    description: playlist?.description || '', channelId: playlist?.channelId || ''
+                }
+            });
             rememberPlaylist(playlist);
             const loader = document.getElementById('loader');
             const container = document.getElementById('dynamicSections');
@@ -4133,13 +4229,15 @@
         }
 
         async function ensureInitialRadioQueue() {
-            if (queue.length >= QUEUE_BATCH) {
+            // Nunca reemplazar ni ampliar por red una cola restaurada al abrir la página.
+            // La tanda siguiente se solicita solo después de consumir la última pista.
+            if (queue.length > 0) {
                 if (currentPlayingQid == null) {
                     currentIndex = 0;
                     currentPlayingQid = queue[0]._qid;
                     updateNowPlaying(queue[0]);
                 }
-                await growQueueIfNeeded(true);
+                renderQueue();
                 return;
             }
             const catalogCandidates = uniqueMediaByUrl([
@@ -4168,8 +4266,8 @@
             updateNowPlaying(queue[0]);
             persistQueue();
             renderQueue();
-            // Si el catálogo tuviera menos de 20 elementos, la radio los completa por red.
-            if (queue.length < QUEUE_BATCH) await growQueueIfNeeded(true);
+            // Al abrir no se consulta la red para completar una tanda incompleta.
+            // Una selección explícita de una canción sí inicia su tanda de 20.
         }
 
         function nextQueueIndex() {
@@ -4344,7 +4442,6 @@
                 if (!options.deferAutoplay) audioEl.play().catch(e => { console.error(e); setTrackLoading(false); showToast('No se pudo reproducir esta pista', 'fa-triangle-exclamation'); });
             }
 
-            growQueueIfNeeded();
         }
 
         // --- AUTOGENERACIÓN DE LA COLA ---
@@ -4528,9 +4625,10 @@
         async function growQueueIfNeeded(force = false) {
             if (queueFetching || queue.length === 0) return;
             const idx = queue.findIndex(s => s._qid === currentPlayingQid);
-            const remaining = queue.length - (idx + 1);
-            const needsInitialTopUp = queue.length < QUEUE_BATCH;
-            if (!force && !needsInitialTopUp && remaining > QUEUE_LOW_WATER) return;
+            const atPlaylistEnd = idx >= 0 && idx + 1 >= queue.length;
+            // Una Playlist ya armada es intocable hasta su última pista. `force` se reserva para
+            // la creación inicial después de elegir una canción o para completar la radio inicial.
+            if (!force && !atPlaylistEnd) return;
             const seed = queue[idx] || queue[queue.length - 1];
             if (!seed) return;
             queueFetching = true;
@@ -4855,15 +4953,10 @@
             const current = queue[currentIndex];
             if (!current || current.type !== 'yt') return false;
             const currentQueueIndex = queue.findIndex(item => item._qid === currentPlayingQid);
-            // Aunque se apaguen las sugerencias automáticas de video, una cola ya armada nunca debe cortarse sola.
+            // Una cola armada siempre se consume en orden. Al llegar al final, el motor de radio
+            // genera la tanda siguiente usando la pista actual como semilla; no se reemplaza por una sugerencia.
             if (currentQueueIndex >= 0 && currentQueueIndex + 1 < queue.length) {
                 playQueueAt(currentQueueIndex + 1);
-                return true;
-            }
-            if (!videoAutoplay) return false;
-            const suggested = getVideoSuggestions(current)[0];
-            if (suggested) {
-                selectSong(suggested, suggested.sourceIndex ?? 0);
                 return true;
             }
             return false;
@@ -4900,9 +4993,8 @@
             automaticQueueRecoveryInFlight = true;
             try {
                 const current = currentQueueSong();
-                const immediateFallback = findAutomaticFallback(current);
-                if (appendAutomaticFallback(immediateFallback)) return true;
-
+                // Al llegar al final, la tanda siguiente se genera usando la pista actual como semilla.
+                // Esto conserva el orden completo de la Playlist actual y evita saltos prematuros.
                 await growQueueIfNeeded();
                 if (playbackStoppedByUser || currentPlayingQid !== targetQid) return false;
                 const currentQueueIndex = queue.findIndex(item => item._qid === targetQid);
@@ -4910,7 +5002,9 @@
                     playQueueAt(currentQueueIndex + 1);
                     return true;
                 }
-                return false;
+                // Solo si no se pudo formar una tanda nueva, usar un candidato ya disponible.
+                const immediateFallback = findAutomaticFallback(current);
+                return appendAutomaticFallback(immediateFallback);
             } catch (error) {
                 console.warn('No se pudo recuperar una pista para continuar la cola', error);
                 return false;
@@ -4934,9 +5028,8 @@
             automaticAdvanceTimer = window.setTimeout(async () => {
                 automaticAdvanceTimer = null;
                 if (playbackStoppedByUser || currentPlayingQid !== targetQid) return;
-                // Ante un bloqueo de YouTube, preferir una fuente directa ya reservada
-                // (Openverse/Jamendo) antes de encadenar otro embed que pueda fallar igual.
-                if (reason.startsWith('youtube-') && await recoverAutomaticQueue(targetQid)) return;
+                // Primero se consume cualquier pista que ya esté en la Playlist, incluso cuando
+                // la anterior terminó o falló. Solo al no existir una siguiente se genera otra tanda.
                 if (nextSong(false)) return;
                 if (await recoverAutomaticQueue(targetQid)) return;
                 isPlaying = false;
@@ -5221,7 +5314,14 @@
             if (idx === -1) return false;
             if (!manual && queue.length === 1) return false;
             let next = idx + 1;
-            if (next >= queue.length) next = 0;
+            // El avance automático nunca vuelve al principio de la misma tanda. El modo manual
+            // puede seguir envolviendo la cola, pero el modo radio debe pedir la tanda siguiente.
+            if (next >= queue.length) {
+                // Tanto el avance automático como el botón Siguiente deben continuar la radio
+                // desde la última pista, nunca volver al principio de la misma tanda.
+                void recoverAutomaticQueue(currentPlayingQid);
+                return true;
+            }
             playQueueAt(next);
             return true;
         }
