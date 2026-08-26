@@ -1966,6 +1966,8 @@
         const nextAudioEl = document.getElementById('audio-element-next');
         const freeVideoEl = document.getElementById('freeVideoPlayer');
         let activeAudioEl = audioEl;
+        let mediaSessionHandlersReady = false;
+        let mediaSessionSongKey = '';
         let crossfadeInProgress = false;
         let crossfadeTimer = null;
         const CROSSFADE_SECONDS = 3;
@@ -1985,6 +1987,7 @@
         setTimeout(resetView, 0);
         loadYouTubeAPI();
         setupProgressDrag();
+        setupBackgroundPlaybackSupport();
         setupKeyboardShortcuts();
         restoreQueueFromStorage();
         setupQueueTrashDropzone();
@@ -4585,6 +4588,7 @@
             audio.ontimeupdate = () => {
                 if (audio !== activeAudioEl) return;
                 updateProgress(audio.currentTime, audio.duration);
+                updateMediaPosition(audio.duration, audio.currentTime);
                 const current = queue[currentIndex];
                 const next = queue[nextQueueIndex()];
                 const remaining = Number(audio.duration) - Number(audio.currentTime);
@@ -5615,7 +5619,22 @@
                 }
             } else {
                 if (crossfadeInProgress) cancelDirectCrossfade();
-                if (isPlaying) activeAudioEl.pause(); else activeAudioEl.play(); isPlaying = !isPlaying;
+                if (isPlaying) {
+                    activeAudioEl.pause();
+                    isPlaying = false;
+                } else {
+                    const playAttempt = activeAudioEl.play();
+                    isPlaying = true;
+                    if (playAttempt?.catch) {
+                        playAttempt.catch(() => {
+                            isPlaying = false;
+                            setTrackLoading(false);
+                            updateIcon();
+                            updatePlaybackState();
+                            showToast('El navegador bloqueó la reproducción; tocá Reproducir para habilitarla', 'fa-play');
+                        });
+                    }
+                }
             }
             updateIcon();
             updatePlaybackState();
@@ -5892,32 +5911,59 @@
         }
 
         // --- MEDIA SESSION (controles del sistema / auriculares / lockscreen) ---
+        function setupBackgroundPlaybackSupport() {
+            // El audio HTML5 es el mecanismo compatible con la reproducción de fondo.
+            // No usamos un Wake Lock: impediría apagar la pantalla y gastaría batería.
+            [audioEl, nextAudioEl, freeVideoEl].forEach(media => {
+                media.setAttribute('preload', 'metadata');
+                if (media !== audioEl && media !== nextAudioEl) media.setAttribute('playsinline', '');
+                media.addEventListener('play', updatePlaybackState);
+                media.addEventListener('pause', updatePlaybackState);
+                media.addEventListener('ended', updatePlaybackState);
+            });
+            if ('mediaSession' in navigator) {
+                try { navigator.mediaSession.playbackState = 'none'; } catch (e) { /* API opcional */ }
+            }
+        }
         function updateMediaSession(song) {
-            if (!('mediaSession' in navigator)) return;
+            if (!('mediaSession' in navigator) || !song) return;
             try {
+                const nextSongKey = `${song.type || ''}:${song.url || ''}`;
                 navigator.mediaSession.metadata = new MediaMetadata({
-                    title: song.title, artist: song.artist, album: 'YouToo',
+                    title: song.title || 'Nowarfy YouToo',
+                    artist: song.artist || song.channelTitle || 'Nowarfy',
+                    album: 'Nowarfy YouToo',
                     artwork: song.img ? [{ src: song.img, sizes: '512x512', type: 'image/png' }] : []
                 });
-                navigator.mediaSession.setActionHandler('play', () => { if (!isPlaying) togglePlay(); });
-                navigator.mediaSession.setActionHandler('pause', () => { if (isPlaying) togglePlay(); });
-                navigator.mediaSession.setActionHandler('previoustrack', prevSong);
-                navigator.mediaSession.setActionHandler('nexttrack', () => nextSong(true));
-                navigator.mediaSession.setActionHandler('seekbackward', (d) => seekBy(-(d.seekOffset || 10)));
-                navigator.mediaSession.setActionHandler('seekforward', (d) => seekBy(d.seekOffset || 10));
-                navigator.mediaSession.setActionHandler('seekto', (d) => {
-                    const duration = getDuration();
-                    if (duration && Number.isFinite(d.seekTime)) commitSeek(d.seekTime / duration);
-                });
-            } catch (e) { /* API opcional */ }
+                if (!mediaSessionHandlersReady || mediaSessionSongKey !== nextSongKey) {
+                    const registerAction = (action, handler) => {
+                        try { navigator.mediaSession.setActionHandler(action, handler); } catch (e) { /* acción opcional */ }
+                    };
+                    registerAction('play', () => { if (!isPlaying) togglePlay(); });
+                    registerAction('pause', () => { if (isPlaying) togglePlay(); });
+                    registerAction('stop', () => { if (isPlaying) togglePlay(); });
+                    registerAction('previoustrack', prevSong);
+                    registerAction('nexttrack', () => nextSong(true));
+                    registerAction('seekbackward', (d) => seekBy(-(d.seekOffset || 10)));
+                    registerAction('seekforward', (d) => seekBy(d.seekOffset || 10));
+                    registerAction('seekto', (d) => {
+                        const duration = getDuration();
+                        if (duration && Number.isFinite(d.seekTime)) commitSeek(d.seekTime / duration);
+                    });
+                    mediaSessionHandlersReady = true;
+                    mediaSessionSongKey = nextSongKey;
+                }
+            } catch (e) { /* API opcional o acción no soportada */ }
         }
         function updateMediaPosition(duration, position) {
             if (!('mediaSession' in navigator) || !('setPositionState' in navigator.mediaSession)) return;
             if (!Number.isFinite(duration) || duration <= 0 || !Number.isFinite(position)) return;
-            try { navigator.mediaSession.setPositionState({ duration, position: Math.min(Math.max(position, 0), duration), playbackRate: 1 }); } catch (e) { /* API opcional */ }
+            const safePosition = Math.min(Math.max(position, 0), duration);
+            try { navigator.mediaSession.setPositionState({ duration, position: safePosition, playbackRate: 1 }); } catch (e) { /* API opcional */ }
         }
         function updatePlaybackState() {
-            if ('mediaSession' in navigator) navigator.mediaSession.playbackState = isPlaying ? 'playing' : 'paused';
+            if (!('mediaSession' in navigator)) return;
+            try { navigator.mediaSession.playbackState = isPlaying ? 'playing' : 'paused'; } catch (e) { /* API opcional */ }
         }
         function setupPlaybackContinuity() {
             const inspectCurrentPlayback = () => {
@@ -5937,6 +5983,7 @@
             const save = () => { persistQueue(); persistVideoResumeSession(true); updatePlaybackState(); if (nowarfyRemoteIsPlayer) void publishNowarfyRemoteState(); };
             document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') save(); });
             window.addEventListener('pagehide', save);
+            window.addEventListener('freeze', save);
         }
 
         let deferredInstallPrompt = null;
