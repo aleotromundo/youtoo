@@ -49,3 +49,11 @@ La prueba automatizada confirma la secuencia del watchdog con estados simulados:
 Autor: Manus AI.
 
 ---
+
+## Validación del anclaje multimedia v29
+
+El nuevo archivo `assets/nowarfy-audio-anchor.wav` es PCM mono de 48 kHz, 16 bits, 0,2 segundos, con una señal de 20 Hz a amplitud aproximada de -66 dBFS. En Chromium, tras un gesto de usuario, cargó con `readyState = 4`, duración `0.2`, `loop = true`, permaneció reproduciéndose y emitió seis eventos `timeupdate` durante una ventana de 0,9 segundos. El intento equivalente desde consola sin gesto devolvió `NotAllowedError`, que confirma la política de autoplay y no un fallo del archivo.
+
+## Reutilización del reproductor
+
+La prueba reproducible de playlist confirmó que la playlist prearmada comienza en orden, avanza al segundo video, pagina al tercero, usa un único objeto de reproductor nativo de YouTube y termina sin activar el modo radio. En producción, el IFrame se crea con el ID de la playlist y utiliza `getPlaylistIndex()`, `playVideoAt()`/`nextVideo()` y la paginación de `playlistItems.list` para mantener la cola local sincronizada.

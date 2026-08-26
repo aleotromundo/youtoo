@@ -69,15 +69,27 @@ try {
       if (value.includes('/api/reserve')) return { ok: true, json: async () => ({ ok: true }) };
       return { ok: false, json: async () => ({ error: 'test_not_found' }) };
     };
+    let playerCreations = 0;
+    const playerLoads = [];
     window.YT = {
-      PlayerState: { ENDED: 0, PLAYING: 1, PAUSED: 2, BUFFERING: 3 },
+      PlayerState: { ENDED: 0, PLAYING: 1, PAUSED: 2, BUFFERING: 3, CUED: 5, UNSTARTED: -1 },
       Player: function (_id, config) {
+        playerCreations += 1;
+        let nativeIndex = 0;
+        const nativePlaylist = ['prebuilt-video-1', 'prebuilt-video-2', 'prebuilt-video-3'];
         this.setVolume = () => {};
         this.playVideo = () => {};
+        this.loadVideoById = options => { playerLoads.push(options.videoId); };
+        this.cueVideoById = options => { playerLoads.push('cue:' + options.videoId); };
+        this.playVideoAt = index => { nativeIndex = index; config.events.onStateChange({ target: this, data: 1 }); };
+        this.nextVideo = () => { nativeIndex += 1; config.events.onStateChange({ target: this, data: nativeIndex < nativePlaylist.length ? 1 : 0 }); };
+        this.getPlaylist = () => [...nativePlaylist];
+        this.getPlaylistIndex = () => nativeIndex;
         this.pauseVideo = () => {};
         this.stopVideo = () => {};
         this.destroy = () => {};
         this.getDuration = () => 180;
+        this.getCurrentTime = () => 0;
         this.getPlayerState = () => 1;
         setTimeout(() => config.events.onReady({ target: this }), 0);
       }
@@ -85,12 +97,12 @@ try {
     ytApiReady = true;
     const playlist = { url: 'PL-prebuilt-test', title: 'Playlist prearmada de prueba', artist: 'Canal de prueba', img: 'https://i.ytimg.com/vi/prebuilt-video-1/mqdefault.jpg', channelId: 'channel-test', itemCount: 3, type: 'playlist', resourceKind: 'youtube#playlist', isPlaylist: true };
     await openPlaylist(playlist, { playNow: true });
-    const first = { mode: queuePlaybackMode, count: queue.length, urls: queue.map(item => item.url), current: currentQueueSong()?.url, nextPageToken: queuePlaylistContext?.nextPageToken || '' };
+    const first = { mode: queuePlaybackMode, count: queue.length, urls: queue.map(item => item.url), current: currentQueueSong()?.url, nextPageToken: queuePlaylistContext?.nextPageToken || '', playerCreations, playerLoads: [...playerLoads] };
     nextSong(false);
     const second = { count: queue.length, current: currentQueueSong()?.url, radioMode: queuePlaybackMode === 'radio' };
     nextSong(false);
     await new Promise(resolve => setTimeout(resolve, 100));
-    const third = { count: queue.length, urls: queue.map(item => item.url), current: currentQueueSong()?.url, nextPageToken: queuePlaylistContext?.nextPageToken || '' };
+    const third = { count: queue.length, urls: queue.map(item => item.url), current: currentQueueSong()?.url, nextPageToken: queuePlaylistContext?.nextPageToken || '', playerCreations, playerLoads: [...playerLoads] };
     nextSong(false);
     const finished = { mode: queuePlaybackMode, current: currentQueueSong()?.url, isPlaying, nextPageToken: queuePlaylistContext?.nextPageToken || '' };
     return { first, second, third, finished };
@@ -99,6 +111,7 @@ try {
     startsInOrder: result.first.mode === 'prebuilt_playlist' && result.first.urls.join(',') === 'prebuilt-video-1,prebuilt-video-2' && result.first.current === 'prebuilt-video-1',
     advancesInOrder: result.second.current === 'prebuilt-video-2' && result.second.radioMode === false,
     paginatesInOrder: result.third.count === 3 && result.third.urls.join(',') === 'prebuilt-video-1,prebuilt-video-2,prebuilt-video-3' && result.third.current === 'prebuilt-video-3' && result.third.nextPageToken === '',
+    nativePlaylistControls: result.third.playerCreations === 1 && result.third.playerLoads.length === 0,
     stopsAtEnd: result.finished.mode === 'prebuilt_playlist' && result.finished.current === 'prebuilt-video-3' && result.finished.isPlaying === false
   };
   console.log(JSON.stringify({ passed: Object.values(checks).every(Boolean), checks, result }, null, 2));
