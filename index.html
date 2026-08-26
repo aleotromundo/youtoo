@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Nowarfy · YouToo</title>
-    <meta name="theme-color" content="#8B5CF6">
+    <meta name="theme-color" content="#ef4444">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <link rel="manifest" href="/manifest.webmanifest">
@@ -674,8 +674,11 @@
         body.mode-youtoo .sidebar::after { content: 'VIDEO · AUDIO · CREADORES'; color: #72738f; font-weight: 800; font-size: .58rem; letter-spacing: .13em; margin-top: auto; padding: 0 10px 6px; }
         body.mode-youtoo .logo { font-size: 1.5rem; padding: 0 10px; }
         body.mode-youtoo .brand-nowarfi { display: none; }
-        .brand-youtoo { display: none; align-items: center; gap: 9px; }
-        .brand-youtoo img { width: 38px; height: 38px; display: block; border-radius: 50%; background: transparent; object-fit: contain; filter: drop-shadow(0 0 7px rgba(255,255,255,.16)); }
+        .brand-youtoo { display: none; align-items: center; min-width: 0; }
+        .brand-lockup { display: inline-flex; align-items: center; gap: 8px; min-width: 0; color: #fff; white-space: nowrap; }
+        .brand-lockup-mark { width: 42px; height: 42px; flex: 0 0 42px; display: block; object-fit: contain; filter: drop-shadow(0 0 9px rgba(239,68,68,.2)); }
+        .brand-lockup-text { display: inline-flex; align-items: baseline; gap: 5px; color: #fff; font: 800 1.08rem/1 'Manrope', sans-serif; letter-spacing: -.055em; }
+        .brand-lockup-text span { color: #f3f4f6; font-size: .72em; letter-spacing: -.04em; }
         body.mode-youtoo .brand-youtoo { display: flex; }
         body.mode-youtoo .nav-links li { border-radius: 11px; padding: 11px 13px; }
         body.mode-youtoo .nav-links li.active { background: linear-gradient(90deg, rgba(167,139,250,.2), rgba(94,234,212,.05)); }
@@ -834,6 +837,13 @@
         body.mode-youtoo .sidebar { min-height: 0; padding: 18px 14px calc(var(--player-height) + 18px); gap: 16px; overflow-y: auto; overscroll-behavior: contain; scroll-padding-bottom: calc(var(--player-height) + 18px); }
         body.mode-youtoo .logo { display: flex; align-items: center; min-height: 38px; }
         .brand-youtoo small { color: #8f90aa; font: 800 .62rem 'Manrope', sans-serif; letter-spacing: .08em; }
+        .home-welcome-copy { min-width: 0; display: flex; flex-direction: column; align-items: flex-start; }
+        .home-welcome-copy:has(.home-welcome-logo) { align-items: center; text-align: center; }
+        .home-welcome-logo { position: relative; z-index: 1; display: inline-flex; align-items: center; gap: 13px; margin: 0 auto 13px; color: #fff; }
+        .home-welcome-logo .brand-lockup-mark { width: 84px; height: 84px; flex-basis: 84px; }
+        .home-welcome-logo .brand-lockup-text { font-size: clamp(1.35rem, 3vw, 2rem); }
+        .home-welcome > .home-welcome-copy { min-width: 0; }
+        .home-welcome-copy .home-welcome-kicker { margin-top: 2px; }
         .nowarfy-nav-groups { display: flex; flex: 0 0 auto; min-height: auto; flex-direction: column; gap: 18px; }
         .nowarfy-nav-group { margin: 0; }
         .nowarfy-nav-label { display: block; padding: 0 11px 7px; color: #73748f; font: 800 .62rem 'Manrope', sans-serif; letter-spacing: .13em; text-transform: uppercase; }
@@ -1083,8 +1093,10 @@
         @media (max-width: 768px) {
             body.mode-youtoo .sidebar { position: sticky; top: 0; z-index: 900; width: 100%; min-height: 58px; height: auto; padding: 9px 12px; display: grid; grid-template-columns: 1fr auto auto; gap: 8px; align-items: center; overflow: visible; }
             body.mode-youtoo .sidebar .logo { display: flex; align-items: center; padding: 0; min-width: 0; overflow: hidden; }
-            body.mode-youtoo .sidebar .brand-youtoo { display: flex !important; align-items: center; min-width: 0; overflow: hidden; color: #fff; font-size: 1rem; gap: 6px; white-space: nowrap; }
-            body.mode-youtoo .sidebar .brand-youtoo img { width: 30px; height: 30px; }
+        body.mode-youtoo .sidebar .brand-youtoo { display: flex !important; align-items: center; min-width: 0; overflow: hidden; color: #fff; font-size: 1rem; }
+        body.mode-youtoo .sidebar .brand-lockup { width: 100%; gap: 7px; }
+        body.mode-youtoo .sidebar .brand-lockup-mark { width: 39px; height: 39px; flex-basis: 39px; }
+        body.mode-youtoo .sidebar .brand-lockup-text { font-size: 1.02rem; }
             .nowarfy-mobile-action { display: inline-flex; align-items: center; justify-content: center; gap: 6px; width: auto; min-width: 40px; height: 40px; padding: 0 10px; border: 1px solid rgba(190,188,255,.2); border-radius: 12px; color: #f4f2ff; background: rgba(255,255,255,.08); font-size: 1rem; }
             .nowarfy-mobile-action-text { display: inline; font-size: .7rem; font-weight: 800; letter-spacing: .01em; }
             .nowarfy-mobile-action:active { transform: scale(.94); }
@@ -1121,6 +1133,8 @@
         @media (max-width: 380px) {
             body.mode-youtoo .sidebar { padding-left: 8px; padding-right: 8px; }
             body.mode-youtoo .sidebar .brand-youtoo { font-size: .9rem; }
+            body.mode-youtoo .sidebar .brand-lockup-mark { width: 34px; height: 34px; flex-basis: 34px; }
+            body.mode-youtoo .sidebar .brand-lockup-text { font-size: .9rem; }
             body.mode-youtoo .nowarfy-mobile-action { min-width: 36px; width: auto; height: 36px; padding: 0 8px; gap: 5px; }
             body.mode-youtoo .nowarfy-mobile-action-text { font-size: .64rem; }
             body.mode-youtoo .player-bar { height: 146px; min-height: 146px; }
@@ -1137,7 +1151,7 @@
     <div class="main-container">
         <!-- SIDEBAR -->
         <aside class="sidebar" aria-label="Navegación principal de Nowarfy">
-            <div class="logo"><span class="brand-nowarfi"><img class="brand-nowarfi-mark" src="assets/nowarfy-icon-512.png" alt=""> Nowarfy</span><span class="brand-youtoo"><img src="assets/nowarfy-icon-512.png" alt="Paloma de Nowarfy"> Nowarfy <small>· YouToo</small></span></div>
+            <div class="logo"><span class="brand-nowarfi"><img class="brand-nowarfi-mark" src="assets/nowarfy-logo-red-solid.png" alt=""> Nowarfy</span><span class="brand-youtoo"><span class="brand-lockup"><img class="brand-lockup-mark" src="assets/nowarfy-logo-red-solid.png" alt=""><span class="brand-lockup-text"><strong>Nowarfy</strong><span>YouToo</span></span></span></span></div>
             <button type="button" class="nowarfy-mobile-action nowarfy-mobile-menu-toggle" id="nowarfyMobileMenuToggle" onclick="toggleNowarfyMobileNav()" aria-label="Abrir menú" aria-expanded="false"><i class="fas fa-bars"></i><span class="nowarfy-mobile-action-text">Menú</span></button>
             <button type="button" class="nowarfy-mobile-action nowarfy-mobile-account-toggle" onclick="openNowarfyAuth()" aria-label="Abrir cuenta"><i class="fas fa-user"></i><span class="nowarfy-mobile-action-text">Cuenta</span></button>
             <div class="nowarfy-nav-groups">
@@ -3091,10 +3105,10 @@
             welcome.type = 'button';
             welcome.className = 'home-welcome';
             if (lastViewed?.title) {
-                welcome.innerHTML = `<span><span class="home-welcome-kicker">Bienvenido de nuevo</span><h1>Seguimos desde donde quedaste</h1><p>Lo último que viste fue <strong>${escapeHtml(lastViewed.title)}</strong>${lastViewed.artist ? ` · ${escapeHtml(lastViewed.artist)}` : ''}. El reproductor empieza detenido: tocá esta tarjeta o el botón de reproducir cuando quieras continuar.</p></span>${lastViewed.img ? `<img class="home-welcome-art" src="${escapeHtml(lastViewed.img)}" alt="" loading="lazy">` : ''}`;
+                welcome.innerHTML = `<span class="home-welcome-copy"><span class="home-welcome-logo"><img class="brand-lockup-mark" src="assets/nowarfy-logo-red-solid.png" alt=""><span class="brand-lockup-text"><strong>Nowarfy</strong><span>YouToo</span></span></span><span class="home-welcome-kicker">Bienvenido de nuevo</span><h1>Seguimos desde donde quedaste</h1><p>Lo último que viste fue <strong>${escapeHtml(lastViewed.title)}</strong>${lastViewed.artist ? ` · ${escapeHtml(lastViewed.artist)}` : ''}. El reproductor empieza detenido: tocá esta tarjeta o el botón de reproducir cuando quieras continuar.</p></span>${lastViewed.img ? `<img class="home-welcome-art" src="${escapeHtml(lastViewed.img)}" alt="" loading="lazy">` : ''}`;
                 welcome.addEventListener('click', () => selectSong(lastViewed, 0));
             } else {
-                welcome.innerHTML = `<span><span class="home-welcome-kicker">Bienvenido a Nowarfy · YouToo</span><h1>Descubrí música real, sin límites</h1><p>Explorá artistas, canales y fuentes musicales. El reproductor empieza detenido para que vos elijas cuándo comenzar.</p></span>`;
+                welcome.innerHTML = `<span class="home-welcome-copy"><span class="home-welcome-logo"><img class="brand-lockup-mark" src="assets/nowarfy-logo-red-solid.png" alt=""><span class="brand-lockup-text"><strong>Nowarfy</strong><span>YouToo</span></span></span><span class="home-welcome-kicker">Bienvenido a Nowarfy · YouToo</span><h1>Descubrí música real, sin límites</h1><p>Explorá artistas, canales y fuentes musicales. El reproductor empieza detenido para que vos elijas cuándo comenzar.</p></span>`;
             }
             container.appendChild(welcome);
         }

@@ -1,4 +1,4 @@
-const CACHE_NAME = 'nowarfy-shell-v15';
+const CACHE_NAME = 'nowarfy-shell-v19';
 const APP_SHELL = [
   '/',
   '/index.html',
@@ -8,6 +8,7 @@ const APP_SHELL = [
   '/assets/nowarfy-icon-192.png',
   '/assets/nowarfy-icon-512.png',
   '/assets/nowarfy-apple-touch-icon.png',
+  '/assets/nowarfy-logo-red-solid.png',
   '/assets/nowarfy-qr.png'
 ];
 

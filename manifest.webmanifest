@@ -8,7 +8,7 @@
   "display": "standalone",
   "orientation": "any",
   "background_color": "#090914",
-  "theme_color": "#8B5CF6",
+  "theme_color": "#ef4444",
   "categories": ["music", "video", "entertainment"],
   "icons": [
     {
