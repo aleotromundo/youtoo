@@ -839,6 +839,37 @@
         .time-tag { font-size: .7rem; opacity: .5; }
         .taste-actions { display: flex; flex-wrap: wrap; gap: 9px; }
         .taste-action { border: 1px solid rgba(190,188,255,.2); border-radius: 9px; padding: 9px 12px; color: #e9e7ff; background: rgba(255,255,255,.04); font: 800 .74rem 'Manrope', sans-serif; cursor: pointer; }
+        .knowledge-toolbar { display: grid; grid-template-columns: minmax(0, 1fr) 150px 150px auto; gap: 9px; align-items: center; margin: 20px 0 15px; }
+        .knowledge-filter { min-width: 0; min-height: 39px; border: 1px solid rgba(190,188,255,.17); border-radius: 10px; padding: 8px 10px; color: #f3f1ff; background: rgba(7,8,18,.55); font: 700 .74rem 'Manrope', sans-serif; }
+        .knowledge-filter::placeholder { color: #9293aa; }
+        .knowledge-filter:focus { outline: 2px solid rgba(94,234,212,.35); outline-offset: 1px; border-color: rgba(94,234,212,.55); }
+        .knowledge-catalog-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px; }
+        .knowledge-candidate-card { position: relative; min-width: 0; padding: 8px 8px 11px; border: 1px solid rgba(190,188,255,.12); border-radius: 14px; background: linear-gradient(145deg, rgba(35,36,64,.72), rgba(12,13,26,.72)); cursor: pointer; transition: transform .18s var(--ease), border-color .18s var(--ease), box-shadow .18s var(--ease); }
+        .knowledge-candidate-card:hover, .knowledge-candidate-card:focus-visible { transform: translateY(-3px); border-color: rgba(94,234,212,.42); box-shadow: 0 14px 28px rgba(0,0,0,.24); outline: none; }
+        .knowledge-candidate-art { position: relative; aspect-ratio: 16/9; overflow: hidden; border-radius: 9px; background: #141526; }
+        .knowledge-candidate-art img { width: 100%; height: 100%; display: block; object-fit: cover; }
+        .knowledge-candidate-badges { position: absolute; top: 7px; left: 7px; right: 7px; display: flex; justify-content: space-between; gap: 5px; pointer-events: none; }
+        .knowledge-candidate-badge { max-width: 48%; overflow: hidden; padding: 3px 6px; border-radius: 999px; color: #fff; background: rgba(7,8,18,.82); font: 850 .58rem 'Manrope', sans-serif; letter-spacing: .03em; text-overflow: ellipsis; text-transform: uppercase; white-space: nowrap; }
+        .knowledge-candidate-badge.source-youtube { color: #ff8f9e; }
+        .knowledge-candidate-badge.source-openverse, .knowledge-candidate-badge.source-jamendo { color: #ffd58a; }
+        .knowledge-candidate-badge.source-commons { color: #8bd8ff; }
+        .knowledge-candidate-badge.health-healthy { color: #7df1c1; }
+        .knowledge-candidate-badge.health-suspect { color: #ffd58a; }
+        .knowledge-candidate-badge.health-invalid { color: #ff9aaa; }
+        .knowledge-candidate-body { min-width: 0; padding: 9px 2px 0; }
+        .knowledge-candidate-title, .knowledge-candidate-artist { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .knowledge-candidate-title { color: #f7f5ff; font: 800 .78rem/1.35 'Manrope', sans-serif; }
+        .knowledge-candidate-artist { margin-top: 3px; color: #aaaac2; font-size: .68rem; }
+        .knowledge-candidate-meta { display: flex; flex-wrap: wrap; gap: 4px 7px; margin-top: 7px; color: #85869f; font-size: .61rem; }
+        .knowledge-candidate-key { margin-top: 7px; overflow: hidden; color: #696b84; font: 600 .56rem/1.25 ui-monospace, SFMono-Regular, Menlo, monospace; text-overflow: ellipsis; white-space: nowrap; }
+        .knowledge-candidate-fav { position: absolute; top: 13px; right: 13px; z-index: 2; width: 28px; height: 28px; border: 1px solid rgba(255,255,255,.2); border-radius: 50%; color: #fff; background: rgba(7,8,18,.76); cursor: pointer; }
+        .knowledge-candidate-fav.active { color: #ff7b90; border-color: #ff7b90; }
+        .knowledge-panel-note { margin: 0 0 10px; color: #8e90aa; font-size: .7rem; line-height: 1.45; }
+        .knowledge-panel-status { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 24px; margin: 0 0 13px; color: #aeadc4; font-size: .7rem; }
+        .knowledge-panel-status strong { color: #5eead4; }
+        .knowledge-panel-empty { grid-column: 1 / -1; padding: 35px 14px; border: 1px dashed rgba(190,188,255,.18); border-radius: 13px; color: #999ab2; text-align: center; font-size: .78rem; }
+        @media (max-width: 720px) { .knowledge-toolbar { grid-template-columns: 1fr 1fr; } .knowledge-toolbar .knowledge-filter:first-child { grid-column: 1 / -1; } .knowledge-toolbar .taste-action { width: 100%; } }
+        @media (max-width: 430px) { .knowledge-catalog-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; } .knowledge-candidate-card { padding: 6px 6px 9px; border-radius: 11px; } .knowledge-candidate-badge { font-size: .5rem; } .knowledge-candidate-title { font-size: .67rem; } .knowledge-candidate-artist { font-size: .61rem; } .knowledge-candidate-meta { font-size: .54rem; } .knowledge-candidate-key { font-size: .49rem; } }
         .taste-action.primary { border-color: rgba(94,234,212,.4); color: #09111a; background: #5eead4; }
         .taste-action.danger { border-color: rgba(255,123,144,.35); color: #ffc2cd; }
         .channel-profile { position: relative; overflow: hidden; display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 20px; align-items: center; margin: 2px 0 24px; padding: 22px; border: 1px solid rgba(190,188,255,.2); border-radius: 18px; background: linear-gradient(125deg, rgba(68,49,118,.5), rgba(19,20,38,.94) 58%, rgba(12,44,53,.5)); }
@@ -1962,6 +1993,8 @@
         let activePlaylistCatalog = null;
         let nowarfyRestoringHistory = false;
         let nowarfyLastHistoryState = null;
+        let knowledgeBaseState = null;
+        let knowledgeBaseSearchTimer = null;
 
         const audioEl = document.getElementById('audio-element');
         const nextAudioEl = document.getElementById('audio-element-next');
@@ -2292,6 +2325,109 @@
             document.getElementById('knowledgeBaseBtn').onclick = renderKnowledgeBase;
         }
 
+        const KNOWLEDGE_SOURCE_LABELS = { youtube: 'YouTube', openverse: 'Openverse', commons: 'Commons', jamendo: 'Jamendo' };
+        const KNOWLEDGE_HEALTH_LABELS = { unverified: 'Sin verificar', healthy: 'Saludable', suspect: 'Sospechoso', invalid: 'Inválido' };
+        const KNOWLEDGE_KIND_LABELS = { 'youtube#video': 'Video', 'youtube#playlist': 'Lista', 'youtube#channel': 'Canal', 'commons#video': 'Video libre' };
+
+        function knowledgeSourceLabel(source) {
+            return KNOWLEDGE_SOURCE_LABELS[String(source || '').toLowerCase()] || 'Otra fuente';
+        }
+        function knowledgeHealthLabel(status) {
+            return KNOWLEDGE_HEALTH_LABELS[String(status || 'unverified').toLowerCase()] || 'Sin verificar';
+        }
+        function knowledgeKindLabel(item) {
+            return KNOWLEDGE_KIND_LABELS[item?.resourceKind] || (item?.type === 'mp3' ? 'Audio' : item?.type === 'freevideo' ? 'Video libre' : 'Recurso');
+        }
+        function knowledgeCandidateAction(item) {
+            if (!item) return;
+            if (item.resourceKind === 'youtube#channel') {
+                browseChannel(item.sourceId || item.channelId || item.url, item.title || item.artist || 'Canal de YouTube');
+            } else if (item.resourceKind === 'youtube#playlist' || item.isPlaylist) {
+                void openPlaylist(item);
+            } else {
+                selectSong(item);
+            }
+        }
+        function knowledgeCandidateCard(item, index) {
+            const source = String(item?.source || 'unknown').toLowerCase();
+            const health = String(item?.healthStatus || 'unverified').toLowerCase();
+            const image = escapeHtml(item?.img || 'assets/nowarfy-icon-512.png');
+            const title = escapeHtml(item?.title || 'Sin título');
+            const artist = escapeHtml(item?.artist || 'Artista no informado');
+            const key = escapeHtml(item?.candidateKey || 'sin-clave');
+            const sourceLabel = escapeHtml(knowledgeSourceLabel(source));
+            const healthLabel = escapeHtml(knowledgeHealthLabel(health));
+            const kindLabel = escapeHtml(knowledgeKindLabel(item));
+            const favorite = isFavoriteSong(item);
+            return `<article class="knowledge-candidate-card" data-knowledge-index="${index}" tabindex="0" aria-label="${title} · ${artist}">
+                <div class="knowledge-candidate-art"><img src="${image}" alt="" loading="lazy" data-knowledge-image><div class="knowledge-candidate-badges"><span class="knowledge-candidate-badge source-${escapeHtml(source)}">${sourceLabel}</span><span class="knowledge-candidate-badge health-${escapeHtml(health)}">${healthLabel}</span></div></div>
+                <button type="button" class="knowledge-candidate-fav${favorite ? ' active' : ''}" data-knowledge-favorite="${index}" aria-label="${favorite ? 'Quitar de favoritos' : 'Guardar en favoritos'}" title="${favorite ? 'Quitar de favoritos' : 'Guardar en favoritos'}"><i class="${favorite ? 'fas' : 'far'} fa-heart"></i></button>
+                <div class="knowledge-candidate-body"><strong class="knowledge-candidate-title">${title}</strong><span class="knowledge-candidate-artist">${artist}</span><div class="knowledge-candidate-meta"><span>${kindLabel}</span>${item?.duration ? `<span>${format(item.duration)}</span>` : ''}${item?.useCount ? `<span>${Number(item.useCount)} usos</span>` : ''}</div><div class="knowledge-candidate-key">${key}</div></div>
+            </article>`;
+        }
+        function renderKnowledgeCatalog() {
+            const state = knowledgeBaseState;
+            const grid = document.getElementById('knowledgeCatalogGrid');
+            const status = document.getElementById('knowledgePanelStatus');
+            const more = document.getElementById('knowledgeMoreWrap');
+            if (!state || !grid || !status || !more) return;
+            const totalLabel = Number.isFinite(state.total) ? ` de ${formatCompactNumber(state.total)}` : '';
+            status.innerHTML = state.loading
+                ? `<span>Mostrando <strong>${state.items.length}</strong>${totalLabel}</span><span><i class="fas fa-spinner fa-spin"></i> Cargando...</span>`
+                : `<span>Mostrando <strong>${state.items.length}</strong>${totalLabel}</span><span>${state.done ? 'Catálogo completo para estos filtros' : 'Desplazate para cargar más'}</span>`;
+            grid.innerHTML = state.items.length ? state.items.map(knowledgeCandidateCard).join('') : (state.loading ? '' : '<div class="knowledge-panel-empty">No hay candidatos que coincidan con estos filtros.</div>');
+            more.innerHTML = state.done ? '' : '<button type="button" class="catalog-more" id="knowledgeMoreButton"><i class="fas fa-plus"></i> Cargar más candidatos</button>';
+            document.querySelectorAll('#knowledgeCatalogGrid .knowledge-candidate-card').forEach(card => {
+                const index = Number(card.dataset.knowledgeIndex);
+                const item = state.items[index];
+                card.addEventListener('click', event => { if (!event.target.closest('[data-knowledge-favorite]')) knowledgeCandidateAction(item); });
+                card.addEventListener('keydown', event => { if ((event.key === 'Enter' || event.key === ' ') && !event.target.closest('[data-knowledge-favorite]')) { event.preventDefault(); knowledgeCandidateAction(item); } });
+                const favoriteButton = card.querySelector('[data-knowledge-favorite]');
+                favoriteButton?.addEventListener('click', event => { event.stopPropagation(); toggleFavoriteSong(item, favoriteButton); });
+                card.querySelector('[data-knowledge-image]')?.addEventListener('error', event => { event.currentTarget.src = 'assets/nowarfy-icon-512.png'; event.currentTarget.removeAttribute('data-knowledge-image'); });
+            });
+            document.getElementById('knowledgeMoreButton')?.addEventListener('click', () => void loadKnowledgeBasePage());
+        }
+        async function loadKnowledgeBasePage({ reset = false } = {}) {
+            const state = knowledgeBaseState;
+            if (!state || state.loading || (state.done && !reset)) return;
+            if (reset) { state.offset = 0; state.items = []; state.done = false; state.total = null; state.requestId += 1; }
+            const requestId = state.requestId;
+            state.loading = true;
+            renderKnowledgeCatalog();
+            try {
+                const params = new URLSearchParams({ action: 'search', scope: 'search', includeAll: 'true', limit: String(state.limit), offset: String(state.offset) });
+                if (state.filters.artist) params.set('artist', state.filters.artist);
+                if (state.filters.source) params.set('source', state.filters.source);
+                if (state.filters.health) params.set('healthStatus', state.filters.health);
+                const data = await globalReserveRequest(`${GLOBAL_RESERVE_ENDPOINT}?${params.toString()}`);
+                if (requestId !== state.requestId || !data) return;
+                const next = Array.isArray(data.results) ? data.results : [];
+                const seen = new Set(state.items.map(item => item.candidateKey || reserveCandidateKey(item)));
+                next.forEach(item => { const key = item.candidateKey || reserveCandidateKey(item); if (key && !seen.has(key)) { seen.add(key); state.items.push(item); } });
+                state.offset += next.length;
+                state.total = Number.isFinite(Number(data.total)) ? Number(data.total) : state.total;
+                state.done = next.length < state.limit || (Number.isFinite(state.total) && state.offset >= state.total);
+            } catch (error) {
+                if (requestId === state.requestId) { state.done = true; showToast('No se pudo cargar la reserva global', 'fa-triangle-exclamation'); }
+            } finally {
+                if (requestId === state.requestId) { state.loading = false; renderKnowledgeCatalog(); }
+            }
+        }
+        function setupKnowledgeBaseFilters() {
+            const artistInput = document.getElementById('knowledgeArtistFilter');
+            const sourceSelect = document.getElementById('knowledgeSourceFilter');
+            const healthSelect = document.getElementById('knowledgeHealthFilter');
+            const apply = () => {
+                knowledgeBaseState.filters = { artist: artistInput?.value.trim() || '', source: sourceSelect?.value || '', health: healthSelect?.value || '' };
+                clearTimeout(knowledgeBaseSearchTimer);
+                knowledgeBaseSearchTimer = setTimeout(() => void loadKnowledgeBasePage({ reset: true }), 250);
+            };
+            artistInput?.addEventListener('input', apply);
+            sourceSelect?.addEventListener('change', apply);
+            healthSelect?.addEventListener('change', apply);
+            document.getElementById('knowledgeRefresh')?.addEventListener('click', () => void loadKnowledgeBasePage({ reset: true }));
+        }
         async function renderKnowledgeBase() {
             minimizeActiveVideoForNavigation();
             const container = document.getElementById('dynamicSections');
@@ -2301,41 +2437,34 @@
             try {
                 const data = await globalReserveRequest(`${GLOBAL_RESERVE_ENDPOINT}?action=stats`);
                 if (!data) throw new Error('stats_unavailable');
-                const recent = Array.isArray(data.recent) ? data.recent.filter(item => item && item.title) : [];
+                const counts = data.sourceCounts || {};
                 container.innerHTML = `
-                    <section class="taste-data-panel" aria-label="Base de conocimiento global">
-                        <div class="section-header-back">
-                            <button type="button" class="video-stage-close" onclick="renderTasteData()"><i class="fas fa-arrow-left"></i> Volver a Tus datos</button>
-                        </div>
+                    <section class="taste-data-panel knowledge-panel" aria-label="Base de conocimiento global">
+                        <div class="section-header-back"><button type="button" class="video-stage-close" onclick="renderTasteData()"><i class="fas fa-arrow-left"></i> Volver a Tus datos</button></div>
                         <h2>Base de conocimiento de Nowarfy</h2>
-                        <p>Este es el catálogo colectivo alimentado por todos los usuarios. Cada búsqueda y reproducción en cualquier dispositivo agrega nuevas URLs y metadatos a esta biblioteca compartida.</p>
-                        <div class="taste-stats">
-                            <div class="taste-stat"><b>${formatCompactNumber(data.totalCandidates)}</b><span>URLs descubiertas</span></div>
-                            <div class="taste-stat"><b>${formatCompactNumber(data.totalQueries)}</b><span>Búsquedas procesadas</span></div>
+                        <p>Catálogo colectivo de URLs y metadatos descubiertos por todos los usuarios. Esta vista muestra la base completa; tus gustos solo cambian el orden y los filtros de las secciones personalizadas.</p>
+                        <div class="taste-stats knowledge-summary">
+                            <div class="taste-stat"><b>${formatCompactNumber(data.totalCandidates)}</b><span>Total de candidatos</span></div>
+                            <div class="taste-stat"><b>${formatCompactNumber(counts.youtube || 0)}</b><span>Videos y recursos YouTube</span></div>
+                            <div class="taste-stat"><b>${formatCompactNumber(Number(counts.openverse || 0) + Number(counts.jamendo || 0))}</b><span>Audio libre</span></div>
+                            <div class="taste-stat"><b>${formatCompactNumber(counts.commons || 0)}</b><span>Videos Commons</span></div>
                         </div>
-                        <div class="knowledge-recent">
-                            <h3>Descubrimientos recientes</h3>
-                            <div class="knowledge-list">
-                                ${recent.length ? recent.map(item => `
-                                    <div class="knowledge-item">
-                                        <div class="knowledge-item-main">
-                                            <strong>${escapeHtml(item.title)}</strong>
-                                            <span>${escapeHtml(item.artist || 'Artista no informado')}</span>
-                                        </div>
-                                        <div class="knowledge-item-meta">
-                                            <span class="source-tag source-${escapeHtml(item.source || 'unknown')}" >${escapeHtml(item.source || 'desconocido')}</span>
-                                            <span class="time-tag">${item.discovered_at ? new Date(item.discovered_at).toLocaleDateString() : 'Sin fecha'}</span>
-                                        </div>
-                                    </div>
-                                `).join('') : '<div class="empty-state"><strong>Aún no hay descubrimientos recientes</strong><span>Las próximas búsquedas válidas aparecerán aquí.</span></div>'}
-                            </div>
+                        <div class="knowledge-toolbar" aria-label="Filtros de la base global">
+                            <input class="knowledge-filter" id="knowledgeArtistFilter" type="search" placeholder="Filtrar por artista o canal…" autocomplete="off">
+                            <select class="knowledge-filter" id="knowledgeSourceFilter" aria-label="Filtrar por fuente"><option value="">Todas las fuentes</option><option value="youtube">YouTube</option><option value="openverse">Openverse</option><option value="commons">Commons</option><option value="jamendo">Jamendo</option></select>
+                            <select class="knowledge-filter" id="knowledgeHealthFilter" aria-label="Filtrar por salud"><option value="">Todos los estados</option><option value="unverified">Sin verificar</option><option value="healthy">Saludable</option><option value="suspect">Sospechoso</option><option value="invalid">Inválido</option></select>
+                            <button type="button" class="taste-action" id="knowledgeRefresh"><i class="fas fa-rotate"></i> Actualizar</button>
                         </div>
-                        <div class="taste-actions">
-                            <a href="${GLOBAL_RESERVE_ENDPOINT}?action=export" class="taste-action primary" target="_blank"><i class="fas fa-download"></i> Exportar base de datos (CSV)</a>
-                        </div>
+                        <div class="knowledge-panel-status" id="knowledgePanelStatus"></div>
+                        <div class="knowledge-catalog-grid" id="knowledgeCatalogGrid"></div>
+                        <div class="catalog-more-wrap" id="knowledgeMoreWrap"></div>
+                        <div class="taste-actions"><a href="${GLOBAL_RESERVE_ENDPOINT}?action=export" class="taste-action primary" target="_blank" rel="noopener noreferrer"><i class="fas fa-download"></i> Exportar CSV completo</a></div>
                     </section>`;
+                knowledgeBaseState = { offset: 0, limit: 24, loading: false, done: false, total: null, items: [], filters: { artist: '', source: '', health: '' }, requestId: 0 };
+                setupKnowledgeBaseFilters();
+                await loadKnowledgeBasePage();
             } catch (error) {
-                renderEmptyState('No pudimos cargar las estadísticas globales', 'La reserva global puede estar temporalmente fuera de servicio.');
+                renderEmptyState('No pudimos cargar la base global', 'La reserva global puede estar temporalmente fuera de servicio.');
             } finally {
                 loader.style.display = 'none';
             }

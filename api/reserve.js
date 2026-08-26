@@ -145,6 +145,14 @@ function fromRow(row) {
     duration: row.duration_seconds,
     embeddable: row.embeddable,
     status: row.status,
+    healthStatus: row.health_status || 'unverified',
+    healthCheckedAt: row.health_checked_at,
+    healthNextCheckAt: row.health_next_check_at,
+    healthHttpStatus: row.health_http_status,
+    healthContentType: row.health_content_type,
+    healthFailCount: row.health_fail_count || 0,
+    healthPassCount: row.health_pass_count || 0,
+    healthError: row.health_error || null,
     useCount: row.use_count,
     discoveredAt: row.discovered_at,
     lastSeenAt: row.last_seen_at,
@@ -178,6 +186,8 @@ function queryUrl(req) {
   const artist = text(req.query.artist, 300);
   const source = text(req.query.source, 32);
   const kind = text(req.query.kind, 80);
+  const healthStatus = text(req.query.healthStatus || req.query.health_status, 32).toLowerCase();
+  const status = text(req.query.status, 32).toLowerCase();
   const query = text(req.query.query, 300).toLowerCase();
   const scope = text(req.query.scope, 32).toLowerCase();
   if (style) params.set('style_key', `ilike.*${style.replace(/[*,()]/g, '')}*`);
@@ -188,10 +198,15 @@ function queryUrl(req) {
     const safeQuery = query.replace(/[*,()]/g, ' ').replace(/\s+/g, ' ').trim();
     if (safeQuery) params.set('or', `(query_context.ilike.*${safeQuery}*,title.ilike.*${safeQuery}*,artist.ilike.*${safeQuery}*,description.ilike.*${safeQuery}*)`);
   }
-  if (scope !== 'search') params.set('radio_eligible', 'eq.true');
-  params.set('status', 'in.(available,queued,played)');
+  if (healthStatus && ['unverified', 'healthy', 'suspect', 'invalid'].includes(healthStatus)) params.set('health_status', `eq.${healthStatus}`);
+  if (status && ['available', 'queued', 'played', 'invalid', 'expired'].includes(status)) params.set('status', `eq.${status}`);
+  else if (text(req.query.includeAll, 10).toLowerCase() !== 'true') params.set('status', 'in.(available,queued,played)');
+  if (scope !== 'search' && text(req.query.includeAll, 10).toLowerCase() !== 'true') params.set('radio_eligible', 'eq.true');
   params.set('order', 'last_used_at.asc.nullsfirst,discovered_at.desc');
-  params.set('limit', String(boundedInt(req.query.limit, 20, MAX_LIMIT)));
+  const limit = boundedInt(req.query.limit, 20, MAX_LIMIT);
+  const offset = Math.max(0, Number.parseInt(req.query.offset, 10) || 0);
+  params.set('limit', String(limit));
+  if (offset) params.set('offset', String(offset));
   return params.toString();
 }
 
@@ -222,10 +237,12 @@ export default async function handler(req, res) {
     }
 
     if (req.method === 'GET' && action === 'search') {
-      const result = await supabaseRequest(`youtoo_discovery_candidates?${queryUrl(req)}`);
+      const result = await supabaseRequest(`youtoo_discovery_candidates?${queryUrl(req)}`, { headers: { Prefer: 'count=exact' } });
       if (!result.response?.ok) return json(res, result.response?.status || 502, { error: { source: 'supabase', message: result.data?.message || 'No se pudo leer la reserva global' } });
+      const contentRange = result.response.headers.get('content-range') || '';
+      const totalMatch = contentRange.match(/\/(\d+)$/);
       compactCache(res);
-      return json(res, 200, { results: (result.data || []).map(fromRow) });
+      return json(res, 200, { results: (result.data || []).map(fromRow), total: totalMatch ? Number(totalMatch[1]) : null });
     }
 
     if (req.method === 'GET' && action === 'export') {
@@ -237,15 +254,18 @@ export default async function handler(req, res) {
       return res.status(200).send(`\ufeff${exportCsv(result.data || [])}`);
     }
     if (req.method === 'GET' && action === 'stats') {
-      const [candidates, queries] = await Promise.all([
+      const [candidates, queries, sourceResults] = await Promise.all([
         supabaseRequest('youtoo_discovery_candidates?select=count', { headers: { Prefer: 'count=exact' } }),
-        supabaseRequest('youtoo_discovery_queries?select=count', { headers: { Prefer: 'count=exact' } })
+        supabaseRequest('youtoo_discovery_queries?select=count', { headers: { Prefer: 'count=exact' } }),
+        Promise.all(['youtube', 'openverse', 'commons', 'jamendo'].map(source => supabaseRequest(`youtoo_discovery_candidates?select=count&source=eq.${source}`, { headers: { Prefer: 'count=exact' } })))
       ]);
-      const recent = await supabaseRequest('youtoo_discovery_candidates?select=title,artist,source,discovered_at&order=discovered_at.desc&limit=10');
+      const recent = await supabaseRequest('youtoo_discovery_candidates?select=*&order=discovered_at.desc&limit=10');
+      const sourceCounts = Object.fromEntries(['youtube', 'openverse', 'commons', 'jamendo'].map((source, index) => [source, Number(sourceResults[index]?.response?.headers.get('content-range')?.split('/')[1] || 0)]));
       return json(res, 200, {
         totalCandidates: candidates.response?.headers.get('content-range')?.split('/')[1] || 0,
         totalQueries: queries.response?.headers.get('content-range')?.split('/')[1] || 0,
-        recent: recent.data || []
+        sourceCounts,
+        recent: (recent.data || []).map(fromRow)
       });
     }
 
