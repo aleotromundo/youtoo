@@ -817,6 +817,31 @@
         .playlist-play-btn:hover { transform: scale(1.08); filter: brightness(1.08); box-shadow: 0 10px 24px rgba(94,234,212,.28); }
         .playlist-open { display: inline-flex; align-items: center; gap: 7px; margin: 9px 2px 5px; color: #5eead4; font-size: .72rem; font-weight: 800; }
         .playlist-card:hover .playlist-open { color: #d9d4ff; }
+
+        .playlist-hero { display: flex; flex-direction: column; gap: 20px; margin-bottom: 25px; padding: 10px 2px; border-bottom: 1px solid rgba(255,255,255,0.06); }
+        .playlist-hero-top { display: flex; align-items: flex-end; gap: 24px; }
+        .playlist-hero-img { width: 190px; aspect-ratio: 1; border-radius: 12px; object-fit: cover; box-shadow: 0 12px 40px rgba(0,0,0,0.6); background: #181818; flex-shrink: 0; }
+        .playlist-hero-info { flex: 1; min-width: 0; display: flex; flex-direction: column; justify-content: flex-end; padding-bottom: 8px; }
+        .playlist-hero-eyebrow { color: #5eead4; font-size: 0.75rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 8px; }
+        .playlist-hero-title { color: white; font-size: clamp(1.8rem, 5vw, 3.2rem); font-weight: 900; line-height: 1.1; margin-bottom: 12px; letter-spacing: -0.02em; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+        .playlist-hero-meta { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; color: #a9aac0; font-size: 0.85rem; font-weight: 700; }
+        .playlist-hero-artist { color: white; }
+        .playlist-hero-artist:hover { text-decoration: underline; cursor: pointer; }
+        .playlist-hero-sep { opacity: 0.4; }
+        .playlist-hero-actions { display: flex; align-items: center; gap: 20px; margin-top: 10px; }
+        .playlist-hero-play { width: 56px; height: 56px; border-radius: 50%; background: var(--accent); border: 0; color: #080a14; display: flex; align-items: center; justify-content: center; font-size: 1.4rem; cursor: pointer; box-shadow: 0 8px 24px rgba(29,185,84,0.3); transition: transform 0.2s var(--ease), background 0.2s var(--ease); }
+        .playlist-hero-play:hover { transform: scale(1.06); background: var(--accent-hover); box-shadow: 0 8px 30px rgba(29,185,84,0.4); }
+        .playlist-hero-play:active { transform: scale(0.96); }
+        .playlist-hero-play i { margin-left: 3px; }
+
+        @media (max-width: 768px) {
+            .playlist-hero-top { flex-direction: column; align-items: center; text-align: center; gap: 16px; }
+            .playlist-hero-img { width: 160px; }
+            .playlist-hero-info { align-items: center; padding-bottom: 0; }
+            .playlist-hero-title { font-size: 1.8rem; -webkit-line-clamp: 3; }
+            .playlist-hero-meta { justify-content: center; }
+            .playlist-hero-actions { justify-content: center; }
+        }
         .taste-rail { position: sticky; top: 0; z-index: 12; margin: -2px -2px 16px; padding: 10px 2px 12px; background: linear-gradient(180deg, rgba(10,10,18,.98) 74%, rgba(10,10,18,0)); }
         .taste-chips { display: flex; align-items: center; gap: 8px; overflow-x: auto; padding: 0 2px 6px; scrollbar-width: none; }
         .taste-chips::-webkit-scrollbar { display: none; }
@@ -4005,12 +4030,14 @@
             container.appendChild(section);
         }
 
-        function renderSongList(list, title, icon) {
+        function renderSongList(list, title, icon, options = {}) {
             const visibleSongs = itemsWithArtwork(list);
             if (!visibleSongs.length) return;
             const container = document.getElementById('dynamicSections');
             const section = document.createElement('div');
-            section.innerHTML = `<div class="section-title">${icon} ${escapeHtml(title)}</div>`;
+            if (!options.skipTitle) {
+                section.innerHTML = `<div class="section-title">${icon} ${escapeHtml(title)}</div>`;
+            }
             const songList = document.createElement('div');
             songList.className = 'song-list';
 
@@ -4087,15 +4114,44 @@
             const container = document.getElementById('dynamicSections');
             container.innerHTML = '';
             currentList = state.tracks;
-            const back = document.createElement('div');
-            const backButton = document.createElement('button');
-            backButton.type = 'button';
-            backButton.className = 'video-stage-close';
-            backButton.innerHTML = '<i class="fas fa-arrow-left"></i> Volver';
-            backButton.onclick = returnFromPlaylist;
-            back.appendChild(backButton);
-            container.appendChild(back);
-            renderSongList(state.tracks, `${state.playlist.title} · ${state.pageInfo?.totalResults || state.tracks.length} videos`, "<i class='fas fa-list-music'></i>");
+
+            const hero = document.createElement('div');
+            hero.className = 'playlist-hero';
+            const total = Number(state.pageInfo?.totalResults || state.tracks.length);
+            const countLabel = Number.isFinite(total) && total > 0 ? `${new Intl.NumberFormat('es-UY').format(total)} videos` : 'Lista de reproducción';
+            
+            hero.innerHTML = `
+                <div class="playlist-hero-top">
+                    <img src="${escapeHtml(state.playlist.img || '')}" class="playlist-hero-img" alt="" onerror="this.src='https://www.gstatic.com/youtube/src/web/htdocs/img/no_thumbnail.jpg'">
+                    <div class="playlist-hero-info">
+                        <span class="playlist-hero-eyebrow">Lista de reproducción</span>
+                        <h1 class="playlist-hero-title" title="${escapeHtml(state.playlist.title)}">${escapeHtml(state.playlist.title)}</h1>
+                        <div class="playlist-hero-meta">
+                            <span class="playlist-hero-artist">${escapeHtml(state.playlist.artist || 'YouTube')}</span>
+                            <span class="playlist-hero-sep">·</span>
+                            <span>${countLabel}</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="playlist-hero-actions">
+                    <button type="button" class="playlist-hero-play" title="Reproducir toda la lista" aria-label="Reproducir toda la lista">
+                        <i class="fas fa-play"></i>
+                    </button>
+                    <button type="button" class="video-stage-close" style="margin:0; background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.1);">
+                        <i class="fas fa-arrow-left"></i> Volver
+                    </button>
+                </div>`;
+
+            hero.querySelector('.playlist-hero-play').onclick = () => {
+                startPrebuiltPlaylistPlayback(state.playlist, state.tracks, state.pageInfo || {}, state.nextPageToken || '');
+            };
+            hero.querySelector('.video-stage-close').onclick = returnFromPlaylist;
+            if (state.playlist.channelId) {
+                hero.querySelector('.playlist-hero-artist').onclick = () => browseChannel(state.playlist.channelId, state.playlist.artist);
+            }
+
+            container.appendChild(hero);
+            renderSongList(state.tracks, `Contenido de la lista`, "<i class='fas fa-list-music'></i>", { skipTitle: true });
             if (state.nextPageToken) addCatalogMore(container, 'Cargar más de esta lista', () => loadMoreOpenPlaylist(state.nextPageToken));
         }
 
