@@ -1390,7 +1390,7 @@
     <audio id="audio-element" preload="metadata"></audio>
     <audio id="audio-element-next" preload="metadata" aria-hidden="true"></audio>
     <!-- Motor de persistencia Audio Keep-Alive (Silencio infinito para evitar suspensión en segundo plano) -->
-    <audio id="silent-audio-loop" loop preload="auto" src="data:audio/wav;base64,UklGRigAAABXQVZFRm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQQAAAAAAA=="></audio>
+    <audio id="silent-audio-loop" loop preload="auto" src="assets/nowarfy-silence.wav" aria-hidden="true"></audio>
     <div class="toast-container" id="toastContainer"></div>
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -1946,6 +1946,7 @@
         let searchTimeout = null;
         let activeSearchPagination = null;
         let searchMoreObserver = null;
+        let knowledgeMoreObserver = null;
         let ytPlayer = null;
         let ytStartupTimer = null;
         let ytPlaybackIntent = false;
@@ -2389,7 +2390,15 @@
                 favoriteButton?.addEventListener('click', event => { event.stopPropagation(); toggleFavoriteSong(item, favoriteButton); });
                 card.querySelector('[data-knowledge-image]')?.addEventListener('error', event => { event.currentTarget.src = 'assets/nowarfy-icon-512.png'; event.currentTarget.removeAttribute('data-knowledge-image'); });
             });
-            document.getElementById('knowledgeMoreButton')?.addEventListener('click', () => void loadKnowledgeBasePage());
+            const moreButton = document.getElementById('knowledgeMoreButton');
+            moreButton?.addEventListener('click', () => void loadKnowledgeBasePage());
+            if ('IntersectionObserver' in window && moreButton) {
+                knowledgeMoreObserver?.disconnect();
+                knowledgeMoreObserver = new IntersectionObserver(entries => {
+                    if (entries.some(entry => entry.isIntersecting)) void loadKnowledgeBasePage();
+                }, { rootMargin: '500px 0px' });
+                knowledgeMoreObserver.observe(moreButton);
+            }
         }
         async function loadKnowledgeBasePage({ reset = false } = {}) {
             const state = knowledgeBaseState;
@@ -5451,10 +5460,11 @@
                 updateIcon();
                 updatePlaybackState();
                 persistVideoResumeSession(true);
+                stopSilentLoop();
                 return;
             }
             automaticAdvanceTargetQid = targetQid;
-            automaticAdvanceTimer = window.setTimeout(async () => {
+            const advance = async () => {
                 automaticAdvanceTimer = null;
                 if (playbackStoppedByUser || currentPlayingQid !== targetQid) return;
                 // Primero se consume cualquier pista que ya esté en la Playlist, incluso cuando
@@ -5462,10 +5472,16 @@
                 if (nextSong(false)) return;
                 if (await recoverAutomaticQueue(targetQid)) return;
                 isPlaying = false;
+                stopSilentLoop();
                 updateIcon();
                 updatePlaybackState();
                 if (reason.endsWith('error')) showToast('No encontramos otra pista reproducible en este momento', 'fa-triangle-exclamation');
-            }, 180);
+            };
+            // En segundo plano ChromeOS puede congelar los timers; una tarea de microturno
+            // permite consumir una pista ya presente en la cola apenas llega ENDED. El timeout
+            // breve se mantiene solo para la transición normal en primer plano.
+            if (document.visibilityState === 'hidden') Promise.resolve().then(advance);
+            else automaticAdvanceTimer = window.setTimeout(advance, 180);
         }
 
         function isVisualVideo(song) {
@@ -5664,10 +5680,12 @@
                 ytStartupTimer = null;
                 playbackStoppedByUser = false;
                 isPlaying = true;
+                startSilentLoop();
                 setTrackLoading(false);
                 if (!progressInterval) startProgress(ytPlayer);
                 if (nowarfyRemoteIsPlayer) void publishNowarfyRemoteState();
             } else if (event.data === YT.PlayerState.PAUSED) {
+                stopSilentLoop();
                 // Una pausa voluntaria cancela el timeout; una pausa con intención de play
                 // puede ser el estado que deja el challenge anti-bot de YouTube.
                 if (playbackStoppedByUser || !ytPlaybackIntent) {
@@ -5681,6 +5699,7 @@
                 setTrackLoading(true, currentIndex);
             } else if (event.data === YT.PlayerState.ENDED) {
                 isPlaying = false;
+                stopSilentLoop();
                 clearVideoResumeSession();
                 queueAutomaticAdvance('youtube-ended');
             }
@@ -6096,6 +6115,11 @@
             };
             automaticAdvanceTimer = null;
             window.setInterval(inspectCurrentPlayback, PLAYBACK_CONTINUITY_CHECK_MS);
+            // El evento multimedia del audio nativo puede seguir llegando cuando ChromeOS
+            // congela los temporizadores de JavaScript. No avanza por sí solo: solo inspecciona
+            // el estado oficial del IFrame o del audio y respeta la pausa del usuario.
+            silentAudioLoop?.addEventListener('timeupdate', inspectCurrentPlayback);
+            silentAudioLoop?.addEventListener('playing', inspectCurrentPlayback);
             document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') inspectCurrentPlayback(); });
             window.addEventListener('focus', inspectCurrentPlayback);
         }
