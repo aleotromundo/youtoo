@@ -59,6 +59,21 @@
         @media (prefers-reduced-motion: no-preference) { .ambient-artwork-background.is-visible { animation: ambientArtworkDrift 18s ease-in-out infinite alternate; } @keyframes ambientArtworkDrift { from { transform: scale(1.1) translate3d(-1.2%, -0.8%, 0); } to { transform: scale(1.16) translate3d(1.2%, 1%, 0); } } }
 
         button, input { font-family: inherit; }
+        button:not(:disabled) { -webkit-tap-highlight-color: transparent; }
+        :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+        @media (prefers-reduced-motion: no-preference) {
+            button:not(:disabled) { transition: transform .16s var(--ease), filter .18s var(--ease), box-shadow .18s var(--ease); }
+            button:not(:disabled):active { transform: scale(.97); }
+            .card, .song-row { will-change: transform; }
+            .card:active, .song-row:active { transform: translateY(-2px) scale(.99); }
+            .btn-control { border-radius: 50%; padding: 7px; }
+            .btn-control:hover { color: #fff; background: rgba(167,139,250,.12); box-shadow: 0 0 0 1px rgba(167,139,250,.16), 0 7px 18px rgba(0,0,0,.2); transform: translateY(-1px) scale(1.08); }
+            .btn-control:active { transform: scale(.92); }
+            .btn-play:active, .library-rail-nav:active, .card-favorite:active, .card-addq:active, .song-row-addq:active { transform: scale(.92); }
+            .mood-btn:active, .catalog-more:active, .share-btn:active, .taste-chip:active { filter: brightness(1.14); }
+            .library-rail-nav { box-shadow: 0 5px 14px rgba(0,0,0,.16); }
+            .library-rail-nav:hover { transform: translateY(-2px) scale(1.04); box-shadow: 0 9px 20px rgba(94,234,212,.18); }
+        }
         :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
         .main-container { display: flex; flex: 1; overflow: hidden; position: relative; }
@@ -179,14 +194,20 @@
         .home-recommended-rail, .home-resume-rail { position: relative; overflow: hidden; margin-top: 18px; padding: 14px 15px 8px; border: 1px solid rgba(190,188,255,.14); border-radius: 17px; }
         .home-recommended-rail { background: radial-gradient(500px 230px at 8% -55%, rgba(94,234,212,.17), transparent 72%), linear-gradient(118deg, rgba(20,45,57,.62), rgba(17,18,35,.76)); }
         .home-resume-rail { background: radial-gradient(420px 190px at 12% -45%, rgba(167,139,250,.18), transparent 72%), linear-gradient(118deg, rgba(42,31,70,.62), rgba(17,18,35,.76)); }
-        .home-welcome { position: relative; overflow: hidden; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 18px; align-items: center; margin: 4px 0 18px; padding: 22px 24px; border: 1px solid rgba(167,139,250,.28); border-radius: 22px; background: radial-gradient(520px 180px at 8% 0%, rgba(167,139,250,.24), transparent 70%), linear-gradient(118deg, rgba(32,27,57,.92), rgba(13,18,34,.88) 68%, rgba(14,48,51,.72)); box-shadow: 0 22px 52px rgba(0,0,0,.22), inset 0 1px 0 rgba(255,255,255,.06); }
-        .home-welcome::after { content: ''; position: absolute; width: 220px; height: 220px; right: -72px; top: -116px; border-radius: 50%; background: radial-gradient(circle, rgba(94,234,212,.22), transparent 68%); pointer-events: none; }
-        .home-welcome-kicker { color: #a7f3d0; font-size: .68rem; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; }
-        .home-welcome h1 { margin: 7px 0 5px; color: #fff; font-size: clamp(1.25rem, 2.2vw, 1.85rem); line-height: 1.1; }
-        .home-welcome p { max-width: 680px; margin: 0; color: rgba(232,231,255,.76); line-height: 1.5; }
-        .home-welcome-art { position: relative; z-index: 1; width: 96px; height: 96px; object-fit: cover; border-radius: 18px; box-shadow: 0 13px 30px rgba(0,0,0,.34); }
-        @media (max-width: 620px) { .home-welcome { grid-template-columns: 1fr; } .home-welcome-art { width: 76px; height: 76px; } }
-        .home-recommended-rail .library-rail, .home-resume-rail .library-rail { padding-bottom: 13px; }
+        .home-welcome { position: relative; overflow: hidden; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: clamp(18px, 3vw, 34px); align-items: center; margin: 4px 0 18px; padding: clamp(18px, 3vw, 28px) clamp(18px, 3.2vw, 32px); border: 1px solid rgba(167,139,250,.28); border-radius: 22px; background: radial-gradient(520px 180px at 8% 0%, rgba(167,139,250,.24), transparent 70%), linear-gradient(118deg, rgba(32,27,57,.92), rgba(13,18,34,.88) 68%, rgba(14,48,51,.72)); box-shadow: 0 22px 52px rgba(0,0,0,.22), inset 0 1px 0 rgba(255,255,255,.06); }
+        .home-welcome::after { content: ''; position: absolute; width: 260px; height: 260px; right: -88px; top: -142px; border-radius: 50%; background: radial-gradient(circle, rgba(94,234,212,.22), transparent 68%); pointer-events: none; }
+        .home-welcome-copy { position: relative; z-index: 1; min-width: 0; display: flex; flex-direction: column; align-items: center; text-align: center; }
+        .home-welcome-brandline { align-self: stretch; display: flex; align-items: center; justify-content: flex-start; gap: clamp(10px, 2vw, 20px); min-width: 0; margin-bottom: 10px; flex-wrap: wrap; }
+        .home-welcome-logo { flex: 0 0 auto; }
+        .home-welcome-kicker { flex: 0 0 auto; color: #a7f3d0; font-size: .68rem; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; }
+        .home-welcome h1 { max-width: 780px; margin: 3px auto 7px; color: #fff; font-size: clamp(1.25rem, 2.2vw, 1.85rem); line-height: 1.1; }
+        .home-welcome p { max-width: 680px; margin: 0 auto; color: rgba(232,231,255,.76); line-height: 1.5; }
+        .home-welcome-art { position: relative; z-index: 1; width: clamp(84px, 10vw, 112px); height: clamp(84px, 10vw, 112px); object-fit: cover; border-radius: 18px; box-shadow: 0 13px 30px rgba(0,0,0,.34), 0 0 0 1px rgba(255,255,255,.08); }
+        @media (max-width: 620px) { .home-welcome { grid-template-columns: minmax(0, 1fr) auto; gap: 12px; padding: 16px; } .home-welcome::after { right: 0; top: -92px; width: 180px; height: 180px; } .home-welcome-brandline { align-content: flex-start; gap: 8px; margin-bottom: 7px; } .home-welcome-kicker { font-size: .56rem; letter-spacing: .1em; } .home-welcome-art { width: 68px; height: 68px; border-radius: 14px; } .home-welcome h1 { font-size: clamp(1.05rem, 5.1vw, 1.45rem); } .home-welcome p { font-size: .76rem; line-height: 1.4; } }
+        @media (max-width: 360px) { .home-welcome { grid-template-columns: 1fr; } .home-welcome-art { justify-self: end; margin-top: 2px; } .home-welcome-brandline { flex-direction: column; align-items: flex-start; gap: 6px; } }
+        .home-recommended-rail .library-rail, .home-resume-rail .library-rail, .home-mobile-recent-rail .library-rail { padding-bottom: 13px; }
+        .home-mobile-recent-rail { display: none; }
+        @media (max-width: 768px) { .home-mobile-recent-rail { display: block; } .home-resume-rail { display: none; } }
         @keyframes featured-ambient-flow { 0%, 100% { transform: translate3d(0,0,0) scale(1); } 50% { transform: translate3d(-32px,34px,0) scale(1.13); } }
         @media (prefers-reduced-motion: reduce) { .featured-rail::before { animation: none; } }
         @media (max-width: 1180px) { .library-rail .library-card { flex-basis: calc((100% - 36px) / 3); } }
@@ -839,13 +860,12 @@
         body.mode-youtoo .sidebar { min-height: 0; padding: 18px 14px calc(var(--player-height) + 18px); gap: 16px; overflow-y: auto; overscroll-behavior: contain; scroll-padding-bottom: calc(var(--player-height) + 18px); }
         body.mode-youtoo .logo { display: flex; align-items: center; min-height: 38px; }
         .brand-youtoo small { color: #8f90aa; font: 800 .62rem 'Manrope', sans-serif; letter-spacing: .08em; }
-        .home-welcome-copy { min-width: 0; display: flex; flex-direction: column; align-items: flex-start; }
-        .home-welcome-copy:has(.home-welcome-logo) { align-items: center; text-align: center; }
-        .home-welcome-logo { position: relative; z-index: 1; display: inline-flex; align-items: center; gap: 13px; margin: 0 auto 13px; color: #fff; }
-        .home-welcome-logo .brand-lockup-mark { width: 84px; height: 84px; flex-basis: 84px; }
-        .home-welcome-logo .brand-lockup-text { font-size: clamp(1.35rem, 3vw, 2rem); }
+        .home-welcome-logo { position: relative; z-index: 1; display: inline-flex; align-items: center; gap: 10px; min-width: 0; color: #fff; }
+        .home-welcome-logo .brand-lockup-mark { width: 62px; height: 62px; flex: 0 0 62px; }
+        .home-welcome-logo .brand-lockup-text { font-size: clamp(1.18rem, 2.7vw, 1.78rem); }
         .home-welcome > .home-welcome-copy { min-width: 0; }
-        .home-welcome-copy .home-welcome-kicker { margin-top: 2px; }
+        .home-welcome-copy .home-welcome-kicker { margin-top: 0; }
+        @media (max-width: 620px) { .home-welcome-logo { gap: 7px; } .home-welcome-logo .brand-lockup-mark { width: 48px; height: 48px; flex-basis: 48px; } .home-welcome-logo .brand-lockup-text { font-size: clamp(.92rem, 4.5vw, 1.22rem); } }
         .nowarfy-nav-groups { display: flex; flex: 0 0 auto; min-height: auto; flex-direction: column; gap: 18px; }
         .nowarfy-nav-group { margin: 0; }
         .nowarfy-nav-label { display: block; padding: 0 11px 7px; color: #73748f; font: 800 .62rem 'Manrope', sans-serif; letter-spacing: .13em; text-transform: uppercase; }
@@ -3141,10 +3161,10 @@
             welcome.type = 'button';
             welcome.className = 'home-welcome';
             if (lastViewed?.title) {
-                welcome.innerHTML = `<span class="home-welcome-copy"><span class="home-welcome-logo"><img class="brand-lockup-mark" src="assets/nowarfy-logo-red-solid.png" alt=""><span class="brand-lockup-text"><strong>Nowarfy</strong><span>YouToo</span><sup class="brand-registered">®</sup></span></span><span class="home-welcome-kicker">Bienvenido de nuevo</span><h1>Seguimos desde donde quedaste</h1><p>Lo último que viste fue <strong>${escapeHtml(lastViewed.title)}</strong>${lastViewed.artist ? ` · ${escapeHtml(lastViewed.artist)}` : ''}. El reproductor empieza detenido: tocá esta tarjeta o el botón de reproducir cuando quieras continuar.</p></span>${lastViewed.img ? `<img class="home-welcome-art" src="${escapeHtml(lastViewed.img)}" alt="" loading="lazy">` : ''}`;
+                welcome.innerHTML = `<span class="home-welcome-copy"><span class="home-welcome-brandline"><span class="home-welcome-logo"><img class="brand-lockup-mark" src="assets/nowarfy-logo-red-solid.png" alt=""><span class="brand-lockup-text"><strong>Nowarfy</strong><span>YouToo</span><sup class="brand-registered">®</sup></span></span><span class="home-welcome-kicker">Bienvenido de nuevo</span></span><h1>Seguimos desde donde quedaste</h1><p>Lo último que viste fue <strong>${escapeHtml(lastViewed.title)}</strong>${lastViewed.artist ? ` · ${escapeHtml(lastViewed.artist)}` : ''}. El reproductor empieza detenido: tocá esta tarjeta o el botón de reproducir cuando quieras continuar.</p></span>${lastViewed.img ? `<img class="home-welcome-art" src="${escapeHtml(lastViewed.img)}" alt="" loading="lazy">` : ''}`;
                 welcome.addEventListener('click', () => selectSong(lastViewed, 0));
             } else {
-                welcome.innerHTML = `<span class="home-welcome-copy"><span class="home-welcome-logo"><img class="brand-lockup-mark" src="assets/nowarfy-logo-red-solid.png" alt=""><span class="brand-lockup-text"><strong>Nowarfy</strong><span>YouToo</span><sup class="brand-registered">®</sup></span></span><span class="home-welcome-kicker">Bienvenido a Nowarfy · YouToo</span><h1>Descubrí música real, sin límites</h1><p>Explorá artistas, canales y fuentes musicales. El reproductor empieza detenido para que vos elijas cuándo comenzar.</p></span>`;
+                welcome.innerHTML = `<span class="home-welcome-copy"><span class="home-welcome-brandline"><span class="home-welcome-logo"><img class="brand-lockup-mark" src="assets/nowarfy-logo-red-solid.png" alt=""><span class="brand-lockup-text"><strong>Nowarfy</strong><span>YouToo</span><sup class="brand-registered">®</sup></span></span><span class="home-welcome-kicker">Bienvenido a Nowarfy · YouToo</span></span><h1>Descubrí música real, sin límites</h1><p>Explorá artistas, canales y fuentes musicales. El reproductor empieza detenido para que vos elijas cuándo comenzar.</p></span>`;
             }
             container.appendChild(welcome);
         }
@@ -3157,6 +3177,8 @@
             const lastViewed = normalizeTasteTrack(taste.plays[0]);
             renderHomeWelcome(lastViewed);
             if (lastViewed) used.add(songKey(lastViewed));
+            const recentVideos = uniqueMediaByUrl(taste.plays.map(normalizeTasteTrack).filter(item => item && (item.type === 'yt' || item.type === 'freevideo')), 3);
+            if (recentVideos.length) renderLibraryRail(recentVideos, 'Últimos videos reproducidos', "<i class='fas fa-clock-rotate-left'></i>", false, { hint: 'Búsquedas y playlists · los 3 más recientes', showControls: true, className: 'home-mobile-recent-rail' });
             const resume = takeNovelItems(taste.plays.map(normalizeTasteTrack).filter(Boolean), used, 8);
             if (resume.length) renderLibraryRail(resume, 'Seguí desde donde quedaste', "<i class='fas fa-clock-rotate-left'></i>", false, { hint: 'Tu actividad reciente · sin repetir en otras sesiones', showControls: true, className: 'home-resume-rail' });
             const recommended = takeNovelItems(homeRecommended.filter(item => !isNonMusicalVideo(item)), used, 8);
