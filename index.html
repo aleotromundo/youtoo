@@ -1389,6 +1389,8 @@
 
     <audio id="audio-element" preload="metadata"></audio>
     <audio id="audio-element-next" preload="metadata" aria-hidden="true"></audio>
+    <!-- Motor de persistencia Audio Keep-Alive (Silencio infinito para evitar suspensión en segundo plano) -->
+    <audio id="silent-audio-loop" loop preload="auto" src="data:audio/wav;base64,UklGRigAAABXQVZFRm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQQAAAAAAA=="></audio>
     <div class="toast-container" id="toastContainer"></div>
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -2014,6 +2016,7 @@
         const totalTimeEl = document.getElementById('totalTime');
         const searchInput = document.getElementById('searchInput');
         const searchClearBtn = document.getElementById('searchClear');
+        const silentAudioLoop = document.getElementById('silent-audio-loop');
 
         initVolume();
         initNowarfyHistory();
@@ -5718,21 +5721,24 @@
             }
             if (song.type === 'yt') {
                 if (ytPlayer) {
-                    if (isPlaying) { ytPlaybackIntent = false; ytPlayer.pauseVideo(); }
-                    else { ytPlaybackIntent = true; ytPlayer.playVideo(); }
+                    if (isPlaying) { ytPlaybackIntent = false; ytPlayer.pauseVideo(); stopSilentLoop(); }
+                    else { ytPlaybackIntent = true; ytPlayer.playVideo(); startSilentLoop(); }
                     isPlaying = !isPlaying;
                 }
             } else {
                 if (crossfadeInProgress) cancelDirectCrossfade();
                 if (isPlaying) {
                     activeAudioEl.pause();
+                    stopSilentLoop();
                     isPlaying = false;
                 } else {
                     const playAttempt = activeAudioEl.play();
+                    startSilentLoop();
                     isPlaying = true;
                     if (playAttempt?.catch) {
                         playAttempt.catch(() => {
                             isPlaying = false;
+                            stopSilentLoop();
                             setTrackLoading(false);
                             updateIcon();
                             updatePlaybackState();
@@ -6019,9 +6025,10 @@
         function setupBackgroundPlaybackSupport() {
             // El audio HTML5 es el mecanismo compatible con la reproducción de fondo.
             // No usamos un Wake Lock: impediría apagar la pantalla y gastaría batería.
-            [audioEl, nextAudioEl, freeVideoEl].forEach(media => {
+            [audioEl, nextAudioEl, freeVideoEl, silentAudioLoop].forEach(media => {
+                if (!media) return;
                 media.setAttribute('preload', 'metadata');
-                if (media !== audioEl && media !== nextAudioEl) media.setAttribute('playsinline', '');
+                if (media !== audioEl && media !== nextAudioEl && media !== silentAudioLoop) media.setAttribute('playsinline', '');
                 media.addEventListener('play', updatePlaybackState);
                 media.addEventListener('pause', updatePlaybackState);
                 media.addEventListener('ended', updatePlaybackState);
@@ -6029,6 +6036,15 @@
             if ('mediaSession' in navigator) {
                 try { navigator.mediaSession.playbackState = 'none'; } catch (e) { /* API opcional */ }
             }
+        }
+        function startSilentLoop() {
+            if (!silentAudioLoop) return;
+            const playAttempt = silentAudioLoop.play();
+            if (playAttempt?.catch) playAttempt.catch(() => { /* Silencio: fallo no crítico */ });
+        }
+        function stopSilentLoop() {
+            if (!silentAudioLoop) return;
+            silentAudioLoop.pause();
         }
         function updateMediaSession(song) {
             if (!('mediaSession' in navigator) || !song) return;
