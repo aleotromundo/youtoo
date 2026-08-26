@@ -300,23 +300,29 @@
         .card-summary { display: -webkit-box; margin: 5px 2px 0; overflow: hidden; color: #a9aac0; font-size: .69rem; line-height: 1.35; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
         .playlist-open { min-height: 18px; }
         .song-row-summary { display: block; max-width: 560px; margin-top: 3px; overflow: hidden; color: #84869f; font-size: .68rem; line-height: 1.3; text-overflow: ellipsis; white-space: nowrap; }
+        .card-actions { position: absolute; z-index: 8; right: 10px; bottom: 10px; display: flex; align-items: center; gap: 8px; opacity: 0; transform: translateY(8px); transition: opacity .22s var(--ease), transform .22s var(--ease); }
+        .card-actions > * { flex: 0 0 auto; }
         .play-btn {
-            position: absolute; right: 20px; bottom: 85px; width: 48px; height: 48px; border-radius: 50%;
-            background-color: var(--accent); display: flex; align-items: center; justify-content: center;
-            opacity: 0; transform: translateY(10px); transition: .3s var(--ease); color: black; font-size: 1.2rem;
-            box-shadow: 0 6px 16px rgba(0,0,0,0.5), 0 0 0 0 var(--accent-glow);
+            position: static; width: 44px; height: 44px; border: 1px solid rgba(255,255,255,.28); border-radius: 50%;
+            background: linear-gradient(135deg, var(--accent), #a78bfa); display: flex; align-items: center; justify-content: center;
+            color: #080a14; font-size: 1.05rem; cursor: pointer;
+            box-shadow: 0 8px 20px rgba(0,0,0,.42), 0 0 0 0 var(--accent-glow);
         }
-        .card:hover .play-btn { opacity: 1; transform: translateY(0); }
-        .card:hover .play-btn:hover { background-color: var(--accent-hover); transform: scale(1.08); box-shadow: 0 6px 20px var(--accent-glow); }
+        .card:hover .card-actions,
+        .card:focus-within .card-actions { opacity: 1; transform: translateY(0); }
+        .card-actions .play-btn:hover { background: var(--accent-hover); transform: scale(1.08); box-shadow: 0 6px 20px var(--accent-glow); }
 
         .card-addq {
-            position: absolute; right: 20px; bottom: 140px; width: 34px; height: 34px; border-radius: 50%;
-            background: rgba(0,0,0,0.55); border: 1px solid rgba(255,255,255,0.18); color: white;
+            position: static; width: 34px; height: 34px; border-radius: 50%;
+            background: rgba(8,8,18,.82); border: 1px solid rgba(255,255,255,.25); color: white;
             display: flex; align-items: center; justify-content: center; font-size: 0.8rem; cursor: pointer;
-            opacity: 0; transform: translateY(10px); transition: .3s var(--ease); backdrop-filter: blur(4px);
+            backdrop-filter: blur(7px); transition: transform .18s var(--ease), background .18s var(--ease), border-color .18s var(--ease), color .18s var(--ease);
         }
-        .card:hover .card-addq { opacity: 1; transform: translateY(0); }
-        .card:hover .card-addq:hover { background: var(--accent); border-color: var(--accent); color: black; transform: scale(1.08); }
+        .card-actions .card-addq:hover { background: var(--accent); border-color: var(--accent); color: black; transform: scale(1.08); }
+        @media (hover: none) {
+            .card .card-actions { opacity: 1; transform: translateY(0); }
+            .playlist-card-actions { pointer-events: auto; }
+        }
         .card-favorite { position: absolute; z-index: 8; top: 9px; right: 9px; width: 34px; height: 34px; border: 1px solid rgba(255,255,255,.23); border-radius: 50%; color: #fff; background: rgba(8,8,18,.78); display: inline-flex; align-items: center; justify-content: center; cursor: pointer; backdrop-filter: blur(5px); transition: transform .18s var(--ease), color .18s var(--ease), background .18s var(--ease), border-color .18s var(--ease); }
         .card-favorite:hover { transform: scale(1.08); border-color: #ff7b90; color: #ff9cad; }
         .card-favorite.active { border-color: #ff7b90; color: #ff7b90; background: rgba(65,17,30,.86); }
@@ -799,10 +805,16 @@
         @media (max-width: 560px) { .video-suggestions { padding: 15px; } .video-suggestions-list { grid-template-columns: 1fr; } .video-suggestion { grid-template-columns: 105px minmax(0, 1fr); } .video-suggestion-thumb { width: 105px; } }
         .video-source-badge { position: absolute; top: 9px; left: 9px; z-index: 3; padding: 5px 7px; border-radius: 6px; background: rgba(8,8,18,.78); color: #e6e1ff; font-size: .58rem; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; }
         .video-source-badge i { color: #ff7b90; margin-right: 4px; }
-        .card-duration { position: absolute; right: 9px; bottom: 9px; z-index: 3; padding: 4px 6px; border-radius: 5px; background: rgba(8,8,18,.82); color: #fff; font-size: .66rem; font-weight: 800; font-variant-numeric: tabular-nums; }
-        .playlist-card { text-align: left; color: inherit; width: 100%; border: 0; cursor: pointer; }
+        .card-duration { position: absolute; left: 9px; right: auto; bottom: 9px; z-index: 3; padding: 4px 6px; border-radius: 5px; background: rgba(8,8,18,.82); color: #fff; font-size: .66rem; font-weight: 800; font-variant-numeric: tabular-nums; }
+        .playlist-card { position: relative; text-align: left; color: inherit; width: 100%; cursor: pointer; }
+        .playlist-card:focus-visible { outline: 3px solid rgba(94,234,212,.8); outline-offset: 3px; }
         .playlist-source-badge { position: absolute; top: 9px; left: 9px; z-index: 3; padding: 5px 7px; border-radius: 6px; background: rgba(8,8,18,.78); color: #e6e1ff; font-size: .58rem; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; }
         .playlist-source-badge i { color: #c4b5fd; margin-right: 4px; }
+        .playlist-card-actions { position: absolute; z-index: 6; left: 9px; right: 9px; bottom: 9px; display: flex; align-items: center; justify-content: space-between; gap: 8px; pointer-events: none; }
+        .playlist-count-badge { display: inline-flex; align-items: center; gap: 5px; min-height: 27px; max-width: calc(100% - 52px); padding: 4px 8px; overflow: hidden; border: 1px solid rgba(255,255,255,.18); border-radius: 999px; background: rgba(8,8,18,.84); color: #f4f2ff; font-size: .62rem; font-weight: 800; line-height: 1; text-overflow: ellipsis; white-space: nowrap; backdrop-filter: blur(7px); }
+        .playlist-count-badge i { color: #5eead4; }
+        .playlist-play-btn { pointer-events: auto; flex: 0 0 auto; width: 44px; height: 44px; border: 1px solid rgba(255,255,255,.3); border-radius: 50%; background: linear-gradient(135deg, #5eead4, #a78bfa); color: #090b16; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; font-size: 1rem; box-shadow: 0 8px 20px rgba(0,0,0,.42); transition: transform .18s var(--ease), filter .18s var(--ease), box-shadow .18s var(--ease); }
+        .playlist-play-btn:hover { transform: scale(1.08); filter: brightness(1.08); box-shadow: 0 10px 24px rgba(94,234,212,.28); }
         .playlist-open { display: inline-flex; align-items: center; gap: 7px; margin: 9px 2px 5px; color: #5eead4; font-size: .72rem; font-weight: 800; }
         .playlist-card:hover .playlist-open { color: #d9d4ff; }
         .taste-rail { position: sticky; top: 0; z-index: 12; margin: -2px -2px 16px; padding: 10px 2px 12px; background: linear-gradient(180deg, rgba(10,10,18,.98) 74%, rgba(10,10,18,0)); }
@@ -1967,10 +1979,14 @@
         let lastVolume = 0.8;
         const VIDEO_AUTOPLAY_STORAGE_KEY = 'youtoo_video_autoplay_v1';
         const CONTINUOUS_PLAYBACK_STORAGE_KEY = 'nowarfy_continuous_playback_v1';
+        const QUEUE_MODE_STORAGE_KEY = 'nowarfy_queue_mode_v1';
+        const QUEUE_PLAYLIST_STORAGE_KEY = 'nowarfy_queue_playlist_v1';
         const VIDEO_RESUME_STORAGE_KEY = 'nowarfy_video_resume_v1';
         const VIDEO_RESUME_MAX_AGE_MS = 14 * 24 * 60 * 60 * 1000;
         let videoAutoplay = localStorage.getItem(VIDEO_AUTOPLAY_STORAGE_KEY) !== 'false';
         let continuousPlayback = localStorage.getItem(CONTINUOUS_PLAYBACK_STORAGE_KEY) !== 'false';
+        let queuePlaybackMode = localStorage.getItem(QUEUE_MODE_STORAGE_KEY) === 'prebuilt_playlist' ? 'prebuilt_playlist' : 'radio';
+        let queuePlaylistContext = null;
         let videoStageObserver = null;
         let videoStageMinimized = false;
         let pendingVideoResumeSession = null;
@@ -2223,7 +2239,7 @@
             const entry = {
                 id: String(playlist.url), title: String(playlist.title || 'Lista de reproducción'),
                 artist: String(playlist.artist || playlist.channelTitle || 'YouTube'), img: playlist.img || '',
-                description: playlist.description || '', channelId: playlist.channelId || '', at: Date.now()
+                description: playlist.description || '', channelId: playlist.channelId || '', itemCount: playlist.itemCount ?? null, at: Date.now()
             };
             taste.playlists = rememberUnique(taste.playlists, entry, item => item.id);
             writeTaste(taste);
@@ -2600,6 +2616,7 @@
                         type: 'yt',
                         resourceKind: item.id.kind,
                         isPlaylist: item.id.kind === 'youtube#playlist',
+                        itemCount: item.contentDetails?.itemCount ?? null,
                         duration: parseYouTubeDuration(item.contentDetails && item.contentDetails.duration),
                         publishedAt: item.videoSnippet?.publishedAt || item.snippet.publishedAt || '',
                         viewCount: item.statistics?.viewCount || '',
@@ -3898,7 +3915,7 @@
                 currentList = [];
                 const savedPlaylists = readTaste().playlists.map(item => ({
                     url: item.id, title: item.title, artist: item.artist || 'YouTube', img: item.img || '',
-                    description: item.description || '', channelId: item.channelId || '', type: 'playlist', resourceKind: 'youtube#playlist', isPlaylist: true, itemCount: null
+                    description: item.description || '', channelId: item.channelId || '', type: 'playlist', resourceKind: 'youtube#playlist', isPlaylist: true, itemCount: item.itemCount ?? null
                 }));
                 await loadGlobalPlaylistCatalog({ reset: true });
                 renderGlobalPlaylistLibrary();
@@ -4082,6 +4099,30 @@
             if (state.nextPageToken) addCatalogMore(container, 'Cargar más de esta lista', () => loadMoreOpenPlaylist(state.nextPageToken));
         }
 
+        function startPrebuiltPlaylistPlayback(playlist, tracks, pageInfo = {}, nextPageToken = '') {
+            if (!playlist?.url || !tracks?.length) return false;
+            queuePlaybackMode = 'prebuilt_playlist';
+            queuePlaylistContext = {
+                playlistId: String(playlist.url), title: String(playlist.title || 'Lista de reproducción'),
+                artist: String(playlist.artist || playlist.channelTitle || 'YouTube'), img: playlist.img || '',
+                channelId: playlist.channelId || '', totalResults: Number(pageInfo.totalResults || tracks.length),
+                nextPageToken: String(nextPageToken || '')
+            };
+            continuousPlayback = true;
+            localStorage.setItem(CONTINUOUS_PLAYBACK_STORAGE_KEY, 'true');
+            queue = [];
+            queueSeenKeys = new Set();
+            queueRound = 0;
+            appendPrebuiltPlaylistTracks(tracks);
+            persistQueueMode();
+            persistQueue();
+            renderContinuousPlaybackControls();
+            renderQueue();
+            playQueueAt(0, { sourceIdx: tracks[0].sourceIndex ?? 0 });
+            showToast(`Reproduciendo playlist · ${queue.length} videos en orden`, 'fa-list-music');
+            return true;
+        }
+
         async function openPlaylist(playlist, options = {}) {
             if (playlist?.url) {
                 void reserveDiscoveredCandidates([{ ...playlist, type: 'yt', resourceKind: 'youtube#playlist', isPlaylist: true }], {
@@ -4108,16 +4149,20 @@
                 if (!response.ok || !data.items?.length) throw new Error('playlist_unavailable');
                 const tracks = mapPlaylistVideoItems(data.items, { channelId: playlist.channelId || '', channelTitle: playlist.artist || '', img: playlist.img || '', collectionId: playlist.url, collectionTitle: playlist.title, collectionImg: playlist.img || '' });
                 if (!tracks.length) throw new Error('playlist_empty');
+                const totalResults = Number(data.pageInfo?.totalResults);
+                const hydratedPlaylist = Number.isFinite(totalResults) && totalResults > 0 ? { ...playlist, itemCount: totalResults } : playlist;
                 void reserveDiscoveredCandidates(tracks, { context: 'playlist', queryContext: `playlist:${playlist.url}` });
                 activePlaylistCatalog = {
-                    playlist,
+                    playlist: hydratedPlaylist,
                     tracks,
                     pageInfo: data.pageInfo || {},
                     nextPageToken: data.nextPageToken || '',
                     returnMode: activeBrowseMode,
                     returnQuery: searchQuery
                 };
+                if (hydratedPlaylist !== playlist) rememberPlaylist(hydratedPlaylist);
                 renderOpenedPlaylist();
+                if (options.playNow) startPrebuiltPlaylistPlayback(hydratedPlaylist, tracks, data.pageInfo || {}, data.nextPageToken || '');
             } catch (error) {
                 activePlaylistCatalog = null;
                 renderEmptyState('No pudimos abrir esta lista', 'La lista puede ser privada, estar vacía o no permitir reproducción. No mostramos videos de otra colección como reemplazo.');
@@ -4137,6 +4182,14 @@
             void reserveDiscoveredCandidates(nextTracks, { context: 'playlist', queryContext: `playlist:${state.playlist.url}` });
             state.pageInfo = data.pageInfo || state.pageInfo;
             state.nextPageToken = data.nextPageToken || '';
+            if (queuePlaybackMode === 'prebuilt_playlist' && queuePlaylistContext?.playlistId === String(state.playlist.url)) {
+                appendPrebuiltPlaylistTracks(nextTracks);
+                queuePlaylistContext.nextPageToken = state.nextPageToken;
+                queuePlaylistContext.totalResults = Number(state.pageInfo?.totalResults || queuePlaylistContext.totalResults || state.tracks.length);
+                persistQueueMode();
+                persistQueue();
+                renderQueue();
+            }
             renderOpenedPlaylist();
         }
 
@@ -4163,10 +4216,12 @@
                         <div class="orbit-spinner" style="--s:26px;--d:5px;"><i></i><i></i><i></i></div>
                         <span>Cargando</span>
                     </div>
+                    ${song.type !== 'search_trigger' ? `<button type="button" class="card-favorite${isFavoriteSong(song) ? ' active' : ''}" title="Guardar en favoritos" aria-label="Guardar en favoritos"><i class="${isFavoriteSong(song) ? 'fas' : 'far'} fa-heart"></i></button>
+                    <div class="card-actions" aria-label="Acciones rápidas">
+                        <button type="button" class="card-addq" title="Agregar a Playlist" aria-label="Agregar a Playlist"><i class="fas fa-list"></i></button>
+                        <button type="button" class="play-btn" title="Reproducir" aria-label="Reproducir"><i class="fas fa-play"></i></button>
+                    </div>` : ''}
                 </div>
-                ${song.type !== 'search_trigger' ? `<button type="button" class="card-favorite${isFavoriteSong(song) ? ' active' : ''}" title="Guardar en favoritos" aria-label="Guardar en favoritos"><i class="${isFavoriteSong(song) ? 'fas' : 'far'} fa-heart"></i></button>
-                <button type="button" class="card-addq" title="Agregar a Playlist" aria-label="Agregar a Playlist"><i class="fas fa-list"></i></button>
-                <div class="play-btn"><i class="fas fa-play"></i></div>` : ''}
                 <div class="card-title" title="${escapeHtml(song.title)}">${escapeHtml(song.title)}</div>
                 <div class="card-desc${artistClickable ? ' artist-link' : ''}">${escapeHtml(song.artist)}</div>
                 <div class="card-meta">${escapeHtml(contentMetaLabel(song))}${videoStatsLabel(song) ? `<span class="card-stats">${escapeHtml(videoStatsLabel(song))}</span>` : ''}</div>
@@ -4199,20 +4254,47 @@
         }
 
         function buildPlaylistCard(playlist, idx) {
-            const div = document.createElement('button');
-            div.type = 'button';
+            const div = document.createElement('div');
+            const count = Number(playlist?.itemCount);
+            const hasCount = Number.isFinite(count) && count > 0;
             div.className = 'card playlist-card';
+            div.dataset.playlistId = String(playlist?.url || '');
+            div.setAttribute('role', 'button');
+            div.tabIndex = 0;
+            div.setAttribute('aria-label', `Abrir lista ${playlist?.title || 'de YouTube'}`);
             div.style.animationDelay = `${Math.min(idx * 0.03, 0.5)}s`;
             div.innerHTML = `
                 <div class="card-img-wrap">
                     <span class="playlist-source-badge"><i class="fas fa-list"></i> Lista</span>
                     <img src="${escapeHtml(playlist.img || '')}" class="card-img loaded" loading="lazy" alt="" onerror="removeCardForMissingArtwork(this)">
+                    <div class="playlist-card-actions" aria-label="Acciones de la lista">
+                        <span class="playlist-count-badge" title="Cantidad de videos de la playlist"><i class="fas fa-film"></i> ${hasCount ? `${new Intl.NumberFormat('es-UY').format(count)} videos` : 'Cantidad pendiente'}</span>
+                        <button type="button" class="playlist-play-btn" title="Reproducir lista completa" aria-label="Reproducir lista completa"><i class="fas fa-play"></i></button>
+                    </div>
                 </div>
-                <div class="playlist-open"><i class="fas fa-list-music"></i> ${escapeHtml(contentMetaLabel(playlist))}</div>
+                <div class="playlist-open"><i class="fas fa-list-music"></i> Abrir lista de YouTube</div>
                 <div class="card-title" title="${escapeHtml(playlist.title)}">${escapeHtml(playlist.title)}</div>
                 <div class="card-desc">${escapeHtml(playlist.artist || 'Lista de YouTube')}</div>
                 ${descriptionExcerpt(playlist.description) ? `<p class="card-summary" title="${escapeHtml(playlist.description)}">${escapeHtml(descriptionExcerpt(playlist.description))}</p>` : ''}`;
             div.onclick = () => openPlaylist(playlist);
+            div.onkeydown = (event) => {
+                if (event.target !== div || !['Enter', ' '].includes(event.key)) return;
+                event.preventDefault();
+                openPlaylist(playlist);
+            };
+            div.querySelector('.playlist-play-btn').onclick = async (event) => {
+                event.stopPropagation();
+                const button = event.currentTarget;
+                button.disabled = true;
+                button.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+                try { await openPlaylist(playlist, { playNow: true }); }
+                finally {
+                    if (button.isConnected) {
+                        button.disabled = false;
+                        button.innerHTML = '<i class="fas fa-play"></i>';
+                    }
+                }
+            };
             return div;
         }
 
@@ -4677,9 +4759,111 @@
         function songKey(song) { return `${(song.title || '').toLowerCase().trim()}|${(song.artist || '').toLowerCase().trim()}`; }
         function withQid(song) { return { ...song, _qid: ++queueIdCounter }; }
 
+        function persistQueueMode() {
+            try {
+                localStorage.setItem(QUEUE_MODE_STORAGE_KEY, queuePlaybackMode);
+                if (queuePlaybackMode === 'prebuilt_playlist' && queuePlaylistContext) {
+                    localStorage.setItem(QUEUE_PLAYLIST_STORAGE_KEY, JSON.stringify(queuePlaylistContext));
+                } else {
+                    localStorage.removeItem(QUEUE_PLAYLIST_STORAGE_KEY);
+                }
+            } catch (error) { /* almacenamiento no disponible */ }
+        }
+
+        function setRadioQueueMode() {
+            queuePlaybackMode = 'radio';
+            queuePlaylistContext = null;
+            persistQueueMode();
+        }
+
+        function appendPrebuiltPlaylistTracks(tracks) {
+            const playable = (tracks || []).filter(track => track?.url);
+            if (!playable.length) return 0;
+            const queuedTracks = playable.map(withQid);
+            queue.push(...queuedTracks);
+            queuedTracks.forEach(track => queueSeenKeys.add(songKey(track)));
+            return queuedTracks.length;
+        }
+
+        function finishPrebuiltPlaylistPlayback(message = 'Terminó la playlist') {
+            clearAutomaticAdvance();
+            isPlaying = false;
+            stopSilentLoop();
+            persistVideoResumeSession(true);
+            updateIcon();
+            updatePlaybackState();
+            showToast(message, 'fa-circle-check');
+        }
+
+        async function loadNextPrebuiltPlaylistPage(targetQid) {
+            if (automaticQueueRecoveryInFlight || queuePlaybackMode !== 'prebuilt_playlist') return false;
+            const context = queuePlaylistContext;
+            const pageToken = String(context?.nextPageToken || '');
+            if (!context?.playlistId || !pageToken) return false;
+            automaticQueueRecoveryInFlight = true;
+            context.nextPageToken = '';
+            try {
+                const response = await fetch(`/api/search?type=youtube&action=playlistItems&playlistId=${encodeURIComponent(context.playlistId)}&pageToken=${encodeURIComponent(pageToken)}&maxResults=24`);
+                const data = await response.json();
+                if (!response.ok) throw new Error('playlist_page_unavailable');
+                const nextTracks = mapPlaylistVideoItems(data.items, {
+                    channelId: context.channelId || '', channelTitle: context.artist || '', img: context.img || '',
+                    collectionId: context.playlistId, collectionTitle: context.title, collectionImg: context.img || ''
+                }, queue.length);
+                if (!nextTracks.length) throw new Error('playlist_page_empty');
+                appendPrebuiltPlaylistTracks(nextTracks);
+                context.nextPageToken = data.nextPageToken || '';
+                context.totalResults = Number(data.pageInfo?.totalResults || context.totalResults || queue.length);
+                if (activePlaylistCatalog?.playlist?.url === context.playlistId) {
+                    activePlaylistCatalog.tracks = [...activePlaylistCatalog.tracks, ...nextTracks];
+                    activePlaylistCatalog.pageInfo = data.pageInfo || activePlaylistCatalog.pageInfo;
+                    activePlaylistCatalog.nextPageToken = context.nextPageToken;
+                }
+                void reserveDiscoveredCandidates(nextTracks, { context: 'playlist', queryContext: `playlist:${context.playlistId}` });
+                persistQueueMode();
+                persistQueue();
+                renderQueue();
+                if (activePlaylistCatalog?.playlist?.url === context.playlistId) renderOpenedPlaylist();
+                if (currentPlayingQid !== targetQid) return false;
+                const targetIndex = queue.findIndex(item => item._qid === targetQid);
+                const nextIndex = targetIndex + 1;
+                if (nextIndex >= 0 && nextIndex < queue.length) {
+                    playQueueAt(nextIndex);
+                    return true;
+                }
+                finishPrebuiltPlaylistPlayback('La playlist no tiene más videos reproducibles');
+                return false;
+            } catch (error) {
+                context.nextPageToken = '';
+                persistQueueMode();
+                persistQueue();
+                finishPrebuiltPlaylistPlayback('No pudimos cargar la siguiente página de esta playlist');
+                return false;
+            } finally {
+                automaticQueueRecoveryInFlight = false;
+            }
+        }
+
+        function advancePrebuiltPlaylist(targetQid) {
+            if (queuePlaybackMode !== 'prebuilt_playlist' || !targetQid) return false;
+            const index = queue.findIndex(item => item._qid === targetQid);
+            if (index < 0) return false;
+            const nextIndex = index + 1;
+            if (nextIndex < queue.length) {
+                playQueueAt(nextIndex);
+                return true;
+            }
+            if (queuePlaylistContext?.nextPageToken) {
+                void loadNextPrebuiltPlaylistPage(targetQid);
+                return true;
+            }
+            return false;
+        }
+
         // Elegir una canción NUEVA desde resultados/tarjetas: arranca una cola nueva de golpe,
         // reemplazando la anterior, y dispara la autogeneración (20 del mismo artista, luego similares...).
         function selectSong(song, sourceIdx) {
+            setRadioQueueMode();
             const q = withQid(song);
             queue = [q];
             queueSeenKeys = new Set([songKey(q)]);
@@ -4693,6 +4877,7 @@
         }
 
         function resumeSongFromWelcome(song, sourceIdx = 0) {
+            setRadioQueueMode();
             const resume = readVideoResumeSession();
             const matches = resume && String(resume.resourceId) === String(song?.url) && (!resume.type || resume.type === song?.type);
             if (!matches) { selectSong(song, sourceIdx); return; }
@@ -5334,6 +5519,7 @@
                 localStorage.setItem('nowarfy_queue', JSON.stringify(queue));
                 localStorage.setItem('nowarfy_queue_qid', currentPlayingQid == null ? '' : String(currentPlayingQid));
                 localStorage.setItem('nowarfy_queue_round', String(queueRound));
+                persistQueueMode();
             } catch (e) { /* almacenamiento no disponible */ }
         }
 
@@ -5341,7 +5527,13 @@
             try {
                 const savedQueue = JSON.parse(localStorage.getItem('nowarfy_queue'));
                 if (!Array.isArray(savedQueue) || !savedQueue.length) return;
-                queue = savedQueue.filter(isRadioMusicTrack);
+                const savedMode = localStorage.getItem(QUEUE_MODE_STORAGE_KEY);
+                const savedContext = savedMode === 'prebuilt_playlist' ? JSON.parse(localStorage.getItem(QUEUE_PLAYLIST_STORAGE_KEY) || 'null') : null;
+                queuePlaybackMode = savedMode === 'prebuilt_playlist' && savedContext?.playlistId ? 'prebuilt_playlist' : 'radio';
+                queuePlaylistContext = queuePlaybackMode === 'prebuilt_playlist' ? savedContext : null;
+                queue = queuePlaybackMode === 'prebuilt_playlist'
+                    ? savedQueue.filter(item => item?.type === 'yt' && item?.url)
+                    : savedQueue.filter(isRadioMusicTrack);
                 if (!queue.length) return;
                 queueSeenKeys = new Set(queue.map(songKey));
                 queueIdCounter = queue.reduce((max, s) => Math.max(max, s._qid || 0), 0);
@@ -5389,10 +5581,13 @@
             currentPlayingQid = current._qid;
             currentSourceIdx = null;
             queueRound = 1;
+            if (queuePlaybackMode === 'prebuilt_playlist' && queuePlaylistContext) queuePlaylistContext.nextPageToken = '';
             persistQueue();
             renderQueue();
-            showToast('Se quitaron las canciones siguientes; continúa la actual', 'fa-trash');
-            // La radio volverá a cargar canciones cuando el tema actual termine o quede poco por delante.
+            showToast(queuePlaybackMode === 'prebuilt_playlist'
+                ? 'Se quitaron los videos siguientes; continúa la playlist actual'
+                : 'Se quitaron las canciones siguientes; continúa la actual', 'fa-trash');
+            // En radio, la siguiente tanda se genera al terminar; en playlist prearmada se respeta el final de la lista.
         }
 
         function removeFromQueue(qid) {
@@ -5436,8 +5631,11 @@
             if (!list) return;
 
             if (badge) { badge.textContent = String(queue.length); badge.classList.toggle('show', queue.length > 0); }
+            const queueModeLabel = queuePlaybackMode === 'prebuilt_playlist'
+                ? `playlist de YouTube${queuePlaylistContext?.title ? ` · ${queuePlaylistContext.title}` : ''}`
+                : 'radio automática';
             if (sub) sub.textContent = queue.length
-                ? `${queue.length} canción${queue.length === 1 ? '' : 'es'} en la Playlist · ${continuousPlayback ? 'reproducción continua' : 'se detiene al terminar'}`
+                ? `${queue.length} canción${queue.length === 1 ? '' : 'es'} · ${queueModeLabel} · ${continuousPlayback ? 'reproducción continua' : 'se detiene al terminar'}`
                 : `La Playlist está vacía · ${continuousPlayback ? 'continua lista' : 'una pista por vez'}`;
 
             list.innerHTML = '';
@@ -5979,6 +6177,13 @@
         function nextSong(manual = false) {
             if (manual && nowarfyAuthUser && nowarfyRemoteSession && !nowarfyRemoteIsPlayer) { void sendNowarfyCommand('next'); return true; }
             if (queue.length === 0) return false;
+            if (queuePlaybackMode === 'prebuilt_playlist') {
+                const advanced = advancePrebuiltPlaylist(currentPlayingQid);
+                if (advanced) return true;
+                if (!manual) finishPrebuiltPlaylistPlayback('Terminó la playlist de YouTube');
+                else showToast('Ya estás en el último video de esta playlist', 'fa-flag-checkered');
+                return true;
+            }
             if (manual && shuffleMode) {
                 playQueueAt(Math.floor(Math.random() * queue.length));
                 return true;

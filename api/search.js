@@ -128,6 +128,30 @@ async function enrichVideoItems(items, apiKey) {
   });
 }
 
+async function enrichPlaylistItems(items, apiKey) {
+  const playlistIds = [...new Set((items || [])
+    .map(item => item?.id?.kind === 'youtube#playlist' ? item.id.playlistId : null)
+    .filter(Boolean))];
+  if (!playlistIds.length) return items || [];
+  const detailsParams = new URLSearchParams({
+    part: 'snippet,contentDetails',
+    id: playlistIds.join(','),
+    key: apiKey,
+    fields: 'items(id,contentDetails(itemCount),snippet(thumbnails))'
+  });
+  const { response, data } = await youtubeRequest('playlists', detailsParams);
+  if (!response.ok) return items || [];
+  const byId = new Map((data.items || []).map(item => [item.id, item]));
+  return (items || []).map(item => {
+    const playlistId = item?.id?.playlistId;
+    const detail = playlistId ? byId.get(playlistId) : null;
+    if (!detail) return item;
+    item.contentDetails = { ...item.contentDetails, ...detail.contentDetails };
+    if (detail.snippet?.thumbnails) item.snippet = { ...item.snippet, thumbnails: detail.snippet.thumbnails };
+    return item;
+  });
+}
+
 async function fetchPlaylistItems({ playlistId, pageToken, maxResults, apiKey }) {
   const params = new URLSearchParams({
     part: 'snippet,contentDetails',
@@ -265,6 +289,7 @@ export default async function handler(req, res) {
       const { response, data } = await youtubeRequest('search', params);
       if (!response.ok) return respondYouTubeError(res, response, data);
       data.items = await enrichVideoItems(data.items, apiKey);
+      data.items = await enrichPlaylistItems(data.items, apiKey);
       compactCache(res);
       return res.status(200).json(data);
     }
