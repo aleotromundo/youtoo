@@ -2966,6 +2966,40 @@
             }).slice(0, maxItems);
         }
 
+        // Clasificación editorial: los videos no musicales siguen disponibles, pero quedan fuera de la radio y de los carruseles musicales.
+        let videoClassificationReviewTimer = null;
+        function videoSearchText(item) {
+            return `${item?.title || ''} ${item?.artist || ''} ${item?.channelTitle || ''} ${item?.description || ''} ${item?.genre || ''}`.toLowerCase();
+        }
+        function isNonMusicalVideo(item) {
+            if (!item?.url || !['yt', 'freevideo'].includes(item.type)) return false;
+            if (item.type === 'freevideo') return true;
+            if (item.contentGroup === 'non_music_video' || item.metadata?.contentGroup === 'non_music_video') return true;
+            if (item.categoryId && String(item.categoryId) !== '10') return true;
+            const text = videoSearchText(item);
+            return /tutorial|how to|documentary|documental|vlog|podcast|interview|entrevista|news|noticias|review|reseña|reaction|reacción|gameplay|gaming|trailer|teaser|lecture|clase|curso|comedy|comedia|short film|cortometraje|live stream|streaming|sports|deportes|travel|viaje|cooking|cocina|technology|tecnología|unboxing|tutorial/.test(text);
+        }
+        function musicalVideoPool(items, limit = 120) {
+            return uniqueMediaByUrl((items || []).filter(item => item?.type === 'yt' && !isNonMusicalVideo(item)), limit);
+        }
+        function nonMusicalVideoPool(items, limit = 120) {
+            return uniqueMediaByUrl((items || []).filter(isNonMusicalVideo), limit);
+        }
+        function reviewVideoClassification() {
+            // La revisión es deliberadamente local: no dispara búsquedas ni consume cuota de API.
+            const pool = uniqueMediaByUrl([...(homeVideos || []), ...(homeMusicVideos || [])], 200);
+            pool.forEach(item => {
+                if (item?.type !== 'yt') return;
+                const group = isNonMusicalVideo(item) ? 'non_music_video' : 'music_video';
+                item.contentGroup = group;
+                item.metadata = { ...(item.metadata || {}), contentGroup: group };
+            });
+        }
+        function scheduleVideoClassificationReview() {
+            if (videoClassificationReviewTimer) return;
+            videoClassificationReviewTimer = window.setInterval(reviewVideoClassification, 5 * 60 * 1000);
+        }
+
         function normalizeTasteTrack(item) {
             if (!item?.url || !item?.type) return null;
             return {
@@ -3125,9 +3159,9 @@
             if (lastViewed) used.add(songKey(lastViewed));
             const resume = takeNovelItems(taste.plays.map(normalizeTasteTrack).filter(Boolean), used, 8);
             if (resume.length) renderLibraryRail(resume, 'Seguí desde donde quedaste', "<i class='fas fa-clock-rotate-left'></i>", false, { hint: 'Tu actividad reciente · sin repetir en otras sesiones', showControls: true, className: 'home-resume-rail' });
-            const recommended = takeNovelItems(homeRecommended, used, 8);
+            const recommended = takeNovelItems(homeRecommended.filter(item => !isNonMusicalVideo(item)), used, 8);
             if (recommended.length) renderLibraryRail(recommended, taste.personalization && getTasteSeed() ? 'Recomendado para vos' : 'Para empezar ahora', "<i class='fas fa-wand-magic-sparkles'></i>", false, { hint: taste.personalization && getTasteSeed() ? 'Según tu actividad local · selección nueva' : 'Selección inicial · contenido no repetido', showControls: true, className: 'home-recommended-rail' });
-            const edition = getFeaturedEdition(homeVideos);
+            const edition = getFeaturedEdition(musicalVideoPool(homeVideos));
             const featured = takeNovelItems(edition.items, used, 8);
             if (featured.length >= 3) {
                 renderLibraryRail(featured, 'Videos destacados', "<i class='fas fa-clapperboard'></i>", false, {
@@ -3137,7 +3171,7 @@
                     showControls: true
                 });
             }
-            const musicVideos = takeNovelItems(homeMusicVideos, used, 8);
+            const musicVideos = takeNovelItems(musicalVideoPool(homeMusicVideos), used, 8);
             if (musicVideos.length >= 3) renderLibraryRail(musicVideos, 'Música para escuchar', "<i class='fab fa-youtube'></i>", false, { hint: 'Videoclips nuevos · sin repetir las sesiones anteriores', showControls: true });
             const playlists = takeNovelItems(homePlaylists.filter(hasUsablePlaylistItems), used, 12);
             if (playlists.length >= 2) renderLibraryRail(playlists, 'Listas y álbumes', "<i class='fas fa-layer-group'></i>", true, { hint: 'Colecciones diferentes para seguir explorando', showControls: true });
@@ -3427,6 +3461,27 @@
             return rows.flatMap(row => row.videos);
         }
 
+        async function renderVideosSection({ silent = false } = {}) {
+            const ready = await ensureHomeCatalog();
+            reviewVideoClassification();
+            if (!ready) return;
+            const container = document.getElementById('dynamicSections');
+            container.innerHTML = '';
+            document.getElementById('loader').style.display = 'none';
+            const allYouTubeVideos = uniqueMediaByUrl([...(homeVideos || []), ...(homeMusicVideos || [])], 160);
+            const musicalVideos = musicalVideoPool(allYouTubeVideos, 120);
+            const nonMusicalVideos = nonMusicalVideoPool(allYouTubeVideos, 120);
+            currentList = [...musicalVideos, ...nonMusicalVideos];
+            if (musicalVideos.length) renderGrid(musicalVideos, 'Videos musicales', "<i class='fab fa-youtube'></i>");
+            if (nonMusicalVideos.length) renderGrid(nonMusicalVideos, 'Videos no musicales · descubrimientos', "<i class='fas fa-clapperboard'></i>");
+            const freeVideos = await appendFreeVideoCollections();
+            currentList = uniqueMediaByUrl([...currentList, ...freeVideos], 160);
+            if (!musicalVideos.length && !nonMusicalVideos.length && !freeVideos.length) renderEmptyState('No hay videos disponibles ahora', 'Probá buscar un artista o tema.');
+            if (!silent && nonMusicalVideos.length) showToast(`${nonMusicalVideos.length} videos quedaron en “No musicales”`, 'fa-filter');
+        }
+
+        scheduleVideoClassificationReview();
+
         function renderPlaybackHistory() {
             const taste = readTaste();
             const playable = taste.plays.filter(item => item?.url && item?.type);
@@ -3504,11 +3559,7 @@
                 return;
             }
             if (section === 'videos') {
-                currentList = homeVideos;
-                if (homeVideos.length) renderGrid(homeVideos, 'Videos de YouTube', "<i class='fas fa-clapperboard'></i>");
-                const freeVideos = await appendFreeVideoCollections();
-                currentList = uniqueMediaByUrl([...homeVideos, ...freeVideos], 120);
-                if (!homeVideos.length && !freeVideos.length) renderEmptyState('No hay videos disponibles ahora', 'Probá buscar un artista o tema.');
+                await renderVideosSection();
                 return;
             }
             if (section === 'music') {
@@ -3966,6 +4017,7 @@
                 sourceId: String(song.sourceId || song.url),
                 styleKey,
                 radioEligible: (song.type === 'mp3' || song.resourceKind === 'youtube#video') && typeof isRadioMusicTrack === 'function' ? isRadioMusicTrack(song) : false,
+                contentGroup: song.type === 'yt' ? (isNonMusicalVideo(song) ? 'non_music_video' : 'music_video') : 'music_audio',
                 context,
                 queryContext: String(song.queryContext || queryContext || '').trim(),
                 metadata: {
@@ -3979,7 +4031,8 @@
                     likeCount: song.likeCount || '',
                     commentCount: song.commentCount || '',
                     definition: song.definition || '',
-                    captionsAvailable: Boolean(song.captionsAvailable)
+                    captionsAvailable: Boolean(song.captionsAvailable),
+                    contentGroup: song.type === 'yt' ? (isNonMusicalVideo(song) ? 'non_music_video' : 'music_video') : 'music_audio'
                 },
                 discoveredAt: Number(song.discoveredAt || Date.now()),
                 lastSeenAt: Date.now(),
@@ -4722,6 +4775,7 @@
             // La radio automática debe ser musical: YouTube categoryId 10 es Music.
             // Las búsquedas manuales siguen pudiendo mostrar cualquier categoría.
             if (song.type === 'yt' && song.categoryId && String(song.categoryId) !== '10') return false;
+            if (song.type === 'yt' && typeof isNonMusicalVideo === 'function' && isNonMusicalVideo(song)) return false;
             // Evitar clips, intros y piezas de pocos segundos que rompen la continuidad.
             if (song.type === 'yt' && Number(song.duration) > 0 && Number(song.duration) < 60) return false;
             return true;
