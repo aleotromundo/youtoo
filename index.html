@@ -695,7 +695,8 @@
         body.mode-youtoo .sidebar::after { content: 'VIDEO · AUDIO · CREADORES'; color: #72738f; font-weight: 800; font-size: .58rem; letter-spacing: .13em; margin-top: auto; padding: 0 10px 6px; }
         body.mode-youtoo .logo { font-size: 1.5rem; padding: 0 10px; }
         body.mode-youtoo .brand-nowarfi { display: none; }
-        .brand-youtoo { display: none; align-items: center; min-width: 0; }
+        .brand-youtoo { display: none; align-items: center; min-width: 0; border: 0; padding: 0; margin: 0; background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+        .brand-youtoo:focus-visible { outline: 2px solid var(--accent-2); outline-offset: 5px; border-radius: 8px; }
         .brand-lockup { display: inline-flex; align-items: center; gap: 8px; min-width: 0; color: #fff; white-space: nowrap; }
         .brand-lockup-mark { width: 42px; height: 42px; flex: 0 0 42px; display: block; object-fit: contain; filter: drop-shadow(0 0 9px rgba(239,68,68,.2)); }
         .brand-lockup-text { display: inline-flex; align-items: baseline; gap: 5px; color: #fff; font: 700 1.08rem/1 'Manrope', sans-serif; letter-spacing: -.045em; }
@@ -1173,7 +1174,7 @@
     <div class="main-container">
         <!-- SIDEBAR -->
         <aside class="sidebar" aria-label="Navegación principal de Nowarfy">
-            <div class="logo"><span class="brand-nowarfi"><img class="brand-nowarfi-mark" src="assets/nowarfy-logo-red-solid.png" alt=""> Nowarfy<sup class="brand-registered">®</sup></span><span class="brand-youtoo"><span class="brand-lockup"><img class="brand-lockup-mark" src="assets/nowarfy-logo-red-solid.png" alt=""><span class="brand-lockup-text"><strong>Nowarfy</strong><span>YouToo</span><sup class="brand-registered">®</sup></span></span></span></div>
+            <div class="logo"><span class="brand-nowarfi"><img class="brand-nowarfi-mark" src="assets/nowarfy-logo-red-solid.png" alt=""> Nowarfy<sup class="brand-registered">®</sup></span><button type="button" class="brand-youtoo" onclick="hardResetNowarfy(event)" aria-label="Reiniciar y actualizar Nowarfy" title="Reiniciar y actualizar Nowarfy"><span class="brand-lockup"><img class="brand-lockup-mark" src="assets/nowarfy-logo-red-solid.png" alt=""><span class="brand-lockup-text"><strong>Nowarfy</strong><span>YouToo</span><sup class="brand-registered">®</sup></span></span></button></div>
             <button type="button" class="nowarfy-mobile-action nowarfy-mobile-menu-toggle" id="nowarfyMobileMenuToggle" onclick="toggleNowarfyMobileNav()" aria-label="Abrir menú" aria-expanded="false"><i class="fas fa-bars"></i><span class="nowarfy-mobile-action-text">Menú</span></button>
             <button type="button" class="nowarfy-mobile-action nowarfy-mobile-account-toggle" onclick="openNowarfyAuth()" aria-label="Abrir cuenta"><i class="fas fa-user"></i><span class="nowarfy-mobile-action-text">Cuenta</span></button>
             <div class="nowarfy-nav-groups">
@@ -2232,7 +2233,8 @@
 
         function selectTasteTopic(topic) {
             if (topic.kind === 'home') { resetView(); return; }
-            channelFilter = null;
+            // Al elegir un tema de interés se mantiene el filtro de canal si existe,
+            // permitiendo buscar ese tema dentro del canal actual.
             searchInput.value = topic.query;
             searchClearBtn.classList.add('show');
             performSmartSearch(topic.query);
@@ -2299,6 +2301,7 @@
             try {
                 const data = await globalReserveRequest(`${GLOBAL_RESERVE_ENDPOINT}?action=stats`);
                 if (!data) throw new Error('stats_unavailable');
+                const recent = Array.isArray(data.recent) ? data.recent.filter(item => item && item.title) : [];
                 container.innerHTML = `
                     <section class="taste-data-panel" aria-label="Base de conocimiento global">
                         <div class="section-header-back">
@@ -2313,18 +2316,18 @@
                         <div class="knowledge-recent">
                             <h3>Descubrimientos recientes</h3>
                             <div class="knowledge-list">
-                                ${data.recent.map(item => `
+                                ${recent.length ? recent.map(item => `
                                     <div class="knowledge-item">
                                         <div class="knowledge-item-main">
                                             <strong>${escapeHtml(item.title)}</strong>
-                                            <span>${escapeHtml(item.artist)}</span>
+                                            <span>${escapeHtml(item.artist || 'Artista no informado')}</span>
                                         </div>
                                         <div class="knowledge-item-meta">
-                                            <span class="source-tag source-${item.source}">${item.source}</span>
-                                            <span class="time-tag">${new Date(item.discovered_at).toLocaleDateString()}</span>
+                                            <span class="source-tag source-${escapeHtml(item.source || 'unknown')}" >${escapeHtml(item.source || 'desconocido')}</span>
+                                            <span class="time-tag">${item.discovered_at ? new Date(item.discovered_at).toLocaleDateString() : 'Sin fecha'}</span>
                                         </div>
                                     </div>
-                                `).join('')}
+                                `).join('') : '<div class="empty-state"><strong>Aún no hay descubrimientos recientes</strong><span>Las próximas búsquedas válidas aparecerán aquí.</span></div>'}
                             </div>
                         </div>
                         <div class="taste-actions">
@@ -3067,7 +3070,7 @@
                 const cached = JSON.parse(localStorage.getItem(CONTENT_CATALOG_CACHE_KEY));
                 if (!cached || Date.now() - Number(cached.savedAt || 0) > CONTENT_CATALOG_CACHE_MAX_AGE_MS) return false;
                 homeVideos = uniqueMediaByUrl(cached.videos || [], 24);
-                homeMusicVideos = uniqueMediaByUrl(cached.musicVideos || [], 24);
+                homeMusicVideos = uniqueMediaByUrl(musicalVideoPool(cached.musicVideos || cached.videos || []), 24);
                 homePlaylists = uniqueMediaByUrl(cached.playlists || [], 20);
                 homeMusic = uniqueMediaByUrl(cached.music || [], 24);
                 return homeVideos.length + homeMusicVideos.length + homePlaylists.length + homeMusic.length > 0;
@@ -3096,14 +3099,15 @@
                 const localReserve = await readLocalReserveCandidates(120);
                 const reservedVideos = localReserve.filter(item => item.type === 'yt' || item.resourceKind === 'youtube#video');
                 const reservedAudio = localReserve.filter(item => item.type === 'mp3');
-                homeVideos = uniqueMediaByUrl([...reservedVideos, ...EMERGENCY_VIDEO_CATALOG], 24);
-                homeMusicVideos = uniqueMediaByUrl([...reservedVideos, ...EMERGENCY_VIDEO_CATALOG], 24);
+                const catalogVideos = uniqueMediaByUrl([...reservedVideos, ...EMERGENCY_VIDEO_CATALOG], 48);
+                homeVideos = catalogVideos.slice(0, 24);
+                homeMusicVideos = uniqueMediaByUrl(musicalVideoPool(catalogVideos), 24);
                 homePlaylists = [];
                 homeMusic = uniqueMediaByUrl(reservedAudio, 24);
                 persistCatalogCache();
             }
             if (!homeVideos.length) homeVideos = uniqueMediaByUrl(EMERGENCY_VIDEO_CATALOG, 24);
-            if (!homeMusicVideos.length) homeMusicVideos = uniqueMediaByUrl([...homeVideos, ...EMERGENCY_VIDEO_CATALOG], 24);
+            if (!homeMusicVideos.length) homeMusicVideos = uniqueMediaByUrl(musicalVideoPool([...homeVideos, ...EMERGENCY_VIDEO_CATALOG]), 24);
             if (!homePlaylists.length) homePlaylists = uniqueMediaByUrl(EMERGENCY_PLAYLISTS, 20);
             homeChannels = deriveChannels(uniqueMediaByUrl([...homeVideos, ...homeMusicVideos], 24));
             buildHomeRecommendations();
@@ -3209,6 +3213,16 @@
             const lastViewed = normalizeTasteTrack(taste.plays[0]);
             renderHomeWelcome(lastViewed);
             if (lastViewed) used.add(songKey(lastViewed));
+
+            const recentArtists = [...new Set(taste.plays.map(item => String(item.artist || '').trim()).filter(Boolean))].slice(0, 10);
+            if (recentArtists.length) {
+                const artistItems = recentArtists.map(artist => {
+                    const lastPlay = taste.plays.find(p => String(p.artist || '').trim() === artist);
+                    return { title: artist, artist: 'Artista escuchado recientemente', img: lastPlay?.img || 'assets/nowarfy-icon-512.png', url: artist, type: 'search_trigger', query: artist };
+                });
+                renderLibraryRail(artistItems, 'Tus artistas recientes', "<i class='fas fa-microphone-lines'></i>", false, { hint: 'Basado en tu historial · tocá para buscar más', showControls: true, className: 'home-artists-rail' });
+            }
+
             const recentVideos = uniqueMediaByUrl(taste.plays.map(normalizeTasteTrack).filter(item => item && (item.type === 'yt' || item.type === 'freevideo')), 3);
             if (recentVideos.length) renderLibraryRail(recentVideos, 'Últimos videos reproducidos', "<i class='fas fa-clock-rotate-left'></i>", false, { hint: 'Búsquedas y playlists · los 3 más recientes', showControls: true, className: 'home-mobile-recent-rail' });
             const resume = takeNovelItems(taste.plays.map(normalizeTasteTrack).filter(Boolean), used, 8);
@@ -3362,48 +3376,6 @@
             container.appendChild(grid);
         }
 
-        function buildCollectionRows(collections) {
-            const catalog = uniqueMediaByUrl([...homeRecommended, ...homeVideos, ...homeMusicVideos, ...EMERGENCY_VIDEO_CATALOG], 60)
-                .filter(item => item?.type === 'yt' && item?.url);
-            const rows = [];
-            let cursor = 0;
-            for (const collection of collections) {
-                const videos = catalog.slice(cursor, cursor + 6);
-                cursor += videos.length;
-                if (videos.length) rows.push({ collection, videos });
-            }
-            return rows;
-        }
-
-        async function renderDirectVideoCollections({ title, intro, icon, collections, className }) {
-            const container = document.getElementById('dynamicSections');
-            const loader = document.getElementById('loader');
-            container.innerHTML = '';
-            currentList = [];
-            loader.style.display = 'flex';
-            try {
-                await ensureHomeCatalog();
-                const rows = buildCollectionRows(collections);
-                if (!rows.length) {
-                    renderEmptyState('No pudimos cargar videos en este momento', 'Probá volver a Inicio o recargá dentro de unos segundos.');
-                    return;
-                }
-                const heading = document.createElement('div');
-                heading.innerHTML = `<div class="section-title"><i class="fas ${icon}"></i> ${escapeHtml(title)}</div><p class="discovery-intro">${escapeHtml(intro)}</p>`;
-                container.appendChild(heading);
-                currentList = uniqueMediaByUrl(rows.flatMap(row => row.videos), 84);
-                rows.forEach(({ collection, videos }) => {
-                    renderLibraryRail(videos, collection.title, `<i class="fas ${collection.icon}"></i>`, false, {
-                        hint: `${collection.description} · 5 visibles`,
-                        showControls: true,
-                        className
-                    });
-                });
-            } finally {
-                loader.style.display = 'none';
-            }
-        }
-
         function channelEntityFromTaste(channel) {
             return {
                 ...channel,
@@ -3414,6 +3386,9 @@
                 channelTitle: channel.title,
                 artist: 'Canal de YouTube'
             };
+        }
+        function channelStableKey(channel) {
+            return String(channel?.channelId || channel?.id || channel?.url || '').trim();
         }
         function renderChannelHistoryRail() {
             const history = readTaste().channels
@@ -3441,9 +3416,15 @@
             container.appendChild(section);
             return true;
         }
-        async function renderGlobalChannelRail(title, hint, { styleKey = '', limit = 24 } = {}) {
+        async function renderGlobalChannelRail(title, hint, { styleKey = '', limit = 24, seen = null } = {}) {
             const channels = await reserveGetGlobalCandidates({ source: 'youtube', kind: 'youtube#channel', styleKey, scope: 'search', limit });
-            const visible = itemsWithArtwork(uniqueMediaByUrl(channels, limit));
+            const visible = itemsWithArtwork(uniqueMediaByUrl(channels, limit)).filter(channel => {
+                const key = channelStableKey(channel);
+                if (!seen || !key) return true;
+                if (seen.has(key)) return false;
+                seen.add(key);
+                return true;
+            });
             if (!visible.length) return 0;
             renderChannelRow(visible, title, hint);
             return visible.length;
@@ -3459,10 +3440,11 @@
                 heading.innerHTML = `<div class="section-title"><i class="fas fa-satellite-dish"></i> Canales</div><p class="discovery-intro">Canales reales organizados por historial, escucha actual y escenas musicales. Abrí uno para ver su descripción, estadísticas, listas y videos publicados.</p>`;
                 container.appendChild(heading);
                 const hasHistory = renderChannelHistoryRail();
+                const renderedChannelKeys = new Set(readTaste().channels.map(channelStableKey).filter(Boolean));
                 const seed = currentList[0] || queue.find(item => item?._qid === currentPlayingQid) || homeVideos[0] || homeMusicVideos[0] || { title: getTasteSeed(), artist: getTasteSeed(), genre: currentMood || 'rock metal' };
                 const relatedStyle = getRadioStyle(seed);
                 let rendered = hasHistory ? 1 : 0;
-                rendered += await renderGlobalChannelRail(`Canales relacionados · ${relatedStyle}`, 'Según tu escucha actual y la reserva global', { styleKey: relatedStyle, limit: 24 });
+                rendered += await renderGlobalChannelRail(`Canales relacionados · ${relatedStyle}`, 'Según tu escucha actual y la reserva global', { styleKey: relatedStyle, limit: 24, seen: renderedChannelKeys });
                 const settled = await Promise.allSettled(GENRE_CHANNEL_LISTS.map(async collection => {
                     const saved = await reserveGetGlobalCandidates({ source: 'youtube', kind: 'youtube#channel', styleKey: collection.styleKey, scope: 'search', limit: 24 });
                     if (saved.length >= 6) return saved;
@@ -3470,7 +3452,12 @@
                     return uniqueMediaByUrl([...saved, ...fresh.filter(item => item?.resourceKind === 'youtube#channel')], 24);
                 }));
                 settled.forEach((result, index) => {
-                    const channels = result.status === 'fulfilled' ? itemsWithArtwork(uniqueMediaByUrl(result.value, 24)) : [];
+                    const channels = result.status === 'fulfilled' ? itemsWithArtwork(uniqueMediaByUrl(result.value, 24)).filter(channel => {
+                        const key = channelStableKey(channel);
+                        if (!key || renderedChannelKeys.has(key)) return false;
+                        renderedChannelKeys.add(key);
+                        return true;
+                    }) : [];
                     if (!channels.length) return;
                     rendered += channels.length;
                     renderChannelRow(channels, GENRE_CHANNEL_LISTS[index].title, GENRE_CHANNEL_LISTS[index].description);
@@ -3481,14 +3468,8 @@
             }
         }
 
-        async function renderExploreCollections() {
-            return renderDirectVideoCollections({
-                title: 'Explorar',
-                intro: 'Videos listos para elegir por tipo de experiencia: shows, videoclips, archivo, novedades, covers y medios.',
-                icon: 'fa-compass',
-                collections: EXPLORE_COLLECTIONS,
-                className: 'explore-video-rail'
-            });
+        function renderExploreCollections() {
+            renderDiscoveryCards('Explorar', 'Elegí una colección para ejecutar una búsqueda real y ver resultados nuevos, sin reciclar los mismos videos de Inicio.', EXPLORE_COLLECTIONS);
         }
 
         async function appendFreeMusicCollections() {
@@ -3818,22 +3799,8 @@
                 };
                 renderOpenedPlaylist();
             } catch (error) {
-                const fallback = uniqueMediaByUrl(EMERGENCY_VIDEO_CATALOG, EMERGENCY_VIDEO_CATALOG.length);
-                const offset = Number(playlist?.fallbackOffset || 0) % Math.max(fallback.length, 1);
-                const tracks = fallback.slice(offset).concat(fallback.slice(0, offset)).map((item, index) => ({
-                    ...item,
-                    sourceIndex: index,
-                    collectionId: playlist?.url || '',
-                    collectionTitle: playlist?.title || 'Lista de reproducción',
-                    collectionImg: playlist?.img || item.img
-                }));
-                if (!tracks.length) {
-                    renderEmptyState('No pudimos abrir esta lista', 'La lista puede ser privada, estar vacía o no permitir reproducción.');
-                    return;
-                }
-                activePlaylistCatalog = { playlist, tracks, pageInfo: { totalResults: tracks.length }, nextPageToken: '', returnMode: activeBrowseMode, returnQuery: searchQuery, fallback: true };
-                showToast('Mostramos una selección disponible mientras YouTube recupera la lista', 'fa-list-music');
-                renderOpenedPlaylist();
+                activePlaylistCatalog = null;
+                renderEmptyState('No pudimos abrir esta lista', 'La lista puede ser privada, estar vacía o no permitir reproducción. No mostramos videos de otra colección como reemplazo.');
             } finally {
                 loader.style.display = 'none';
             }
@@ -3867,7 +3834,7 @@
             div.classList.toggle('audio-card', isDirectAudio);
             div.innerHTML = `
                 <div class="card-img-wrap">
-                    ${isVideo ? `<span class="video-source-badge"><i class="fas ${isFreeVideo ? 'fa-leaf' : 'fa-play'}"></i> ${isFreeVideo ? 'Libre' : 'Video'}</span><span class="card-duration">${formatContentDuration(song.duration)}</span>` : ''}
+                    ${isVideo && song.type !== 'search_trigger' ? `<span class="video-source-badge"><i class="fas ${isFreeVideo ? 'fa-leaf' : 'fa-play'}"></i> ${isFreeVideo ? 'Libre' : 'Video'}</span><span class="card-duration">${formatContentDuration(song.duration)}</span>` : ''}
                     <div class="skeleton"></div>
                     <img src="${escapeHtml(song.img || '')}" class="card-img" loading="lazy"
                          onload="this.classList.add('loaded')"
@@ -3877,22 +3844,31 @@
                         <span>Cargando</span>
                     </div>
                 </div>
-                <button type="button" class="card-favorite${isFavoriteSong(song) ? ' active' : ''}" title="Guardar en favoritos" aria-label="Guardar en favoritos"><i class="${isFavoriteSong(song) ? 'fas' : 'far'} fa-heart"></i></button>
+                ${song.type !== 'search_trigger' ? `<button type="button" class="card-favorite${isFavoriteSong(song) ? ' active' : ''}" title="Guardar en favoritos" aria-label="Guardar en favoritos"><i class="${isFavoriteSong(song) ? 'fas' : 'far'} fa-heart"></i></button>
                 <button type="button" class="card-addq" title="Agregar a Playlist" aria-label="Agregar a Playlist"><i class="fas fa-list"></i></button>
-                <div class="play-btn"><i class="fas fa-play"></i></div>
+                <div class="play-btn"><i class="fas fa-play"></i></div>` : ''}
                 <div class="card-title" title="${escapeHtml(song.title)}">${escapeHtml(song.title)}</div>
                 <div class="card-desc${artistClickable ? ' artist-link' : ''}">${escapeHtml(song.artist)}</div>
                 <div class="card-meta">${escapeHtml(contentMetaLabel(song))}${videoStatsLabel(song) ? `<span class="card-stats">${escapeHtml(videoStatsLabel(song))}</span>` : ''}</div>
                 ${descriptionExcerpt(song.description) ? `<p class="card-summary" title="${escapeHtml(song.description)}">${escapeHtml(descriptionExcerpt(song.description))}</p>` : ''}`;
-            div.onclick = () => selectSong(song, song.sourceIndex ?? idx);
-            div.querySelector('.card-favorite').onclick = (e) => {
-                e.stopPropagation();
-                toggleFavoriteSong(song, e.currentTarget);
+            div.onclick = () => {
+                if (song.type === 'search_trigger' && song.query) {
+                    // Al tocar un artista reciente se mantiene el filtro de canal si existe.
+                    performSmartSearch(song.query);
+                    return;
+                }
+                selectSong(song, song.sourceIndex ?? idx);
             };
-            div.querySelector('.card-addq').onclick = (e) => {
-                e.stopPropagation();
-                addToQueue(song);
-            };
+            if (song.type !== 'search_trigger') {
+                div.querySelector('.card-favorite').onclick = (e) => {
+                    e.stopPropagation();
+                    toggleFavoriteSong(song, e.currentTarget);
+                };
+                div.querySelector('.card-addq').onclick = (e) => {
+                    e.stopPropagation();
+                    addToQueue(song);
+                };
+            }
             if (artistClickable) {
                 div.querySelector('.card-desc').onclick = (e) => {
                     e.stopPropagation();
@@ -4060,18 +4036,18 @@
             return typeof getRadioStyle === 'function' ? getRadioStyle(seed || song) : 'rock metal';
         }
         function normalizeReserveCandidate(song, { context = 'manual', seed = null, queryContext = '' } = {}) {
-            if (!song?.url || !['yt', 'mp3'].includes(song.type)) return null;
+            if (!song?.url || !['yt', 'mp3', 'freevideo'].includes(song.type)) return null;
             const candidateKey = reserveCandidateKey(song);
             if (!candidateKey) return null;
             const styleKey = reserveStyleKey(song, seed);
             return {
                 ...song,
                 candidateKey,
-                source: song.source || (song.type === 'yt' ? 'youtube' : 'openverse'),
+                source: song.source || (song.type === 'yt' ? 'youtube' : song.type === 'freevideo' ? 'commons' : 'openverse'),
                 sourceId: String(song.sourceId || song.url),
                 styleKey,
                 radioEligible: (song.type === 'mp3' || song.resourceKind === 'youtube#video') && typeof isRadioMusicTrack === 'function' ? isRadioMusicTrack(song) : false,
-                contentGroup: song.type === 'yt' ? (isNonMusicalVideo(song) ? 'non_music_video' : 'music_video') : 'music_audio',
+                contentGroup: song.type === 'yt' ? (isNonMusicalVideo(song) ? 'non_music_video' : 'music_video') : (song.type === 'freevideo' ? 'free_video' : 'music_audio'),
                 context,
                 queryContext: String(song.queryContext || queryContext || '').trim(),
                 metadata: {
@@ -4086,7 +4062,7 @@
                     commentCount: song.commentCount || '',
                     definition: song.definition || '',
                     captionsAvailable: Boolean(song.captionsAvailable),
-                    contentGroup: song.type === 'yt' ? (isNonMusicalVideo(song) ? 'non_music_video' : 'music_video') : 'music_audio'
+                    contentGroup: song.type === 'yt' ? (isNonMusicalVideo(song) ? 'non_music_video' : 'music_video') : (song.type === 'freevideo' ? 'free_video' : 'music_audio')
                 },
                 discoveredAt: Number(song.discoveredAt || Date.now()),
                 lastSeenAt: Date.now(),
@@ -6004,6 +5980,33 @@
             deferredInstallPrompt = null;
             installButton.hidden = true;
             showToast(result.outcome === 'accepted' ? 'Nowarfy se instaló en este dispositivo' : 'Instalación cancelada', result.outcome === 'accepted' ? 'fa-circle-check' : 'fa-circle-xmark');
+        }
+
+        let nowarfyHardResetInFlight = false;
+        async function hardResetNowarfy(event) {
+            event?.preventDefault?.();
+            if (nowarfyHardResetInFlight) return;
+            nowarfyHardResetInFlight = true;
+            const button = event?.currentTarget?.closest?.('.brand-youtoo') || document.querySelector('.brand-youtoo');
+            button?.setAttribute('aria-busy', 'true');
+            try {
+                // Elimina únicamente cachés de Nowarfy. No toca localStorage, IndexedDB,
+                // favoritos, historial, cola ni preferencias del usuario.
+                if ('caches' in window) {
+                    const cacheNames = await caches.keys();
+                    await Promise.all(cacheNames.filter(name => /^nowarfy(?:-|$)/i.test(name)).map(name => caches.delete(name)));
+                }
+                if ('serviceWorker' in navigator) {
+                    const registrations = await navigator.serviceWorker.getRegistrations();
+                    await Promise.all(registrations.map(registration => registration.update().catch(() => null)));
+                }
+                const freshUrl = new URL(window.location.href);
+                freshUrl.searchParams.set('_nowarfy_reload', String(Date.now()));
+                window.location.replace(freshUrl.toString());
+            } catch (error) {
+                // Fallback para navegadores que no exponen Cache Storage o Service Worker.
+                window.location.reload();
+            }
         }
 
         function setupInstallableApp() {
