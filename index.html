@@ -677,8 +677,10 @@
         .brand-youtoo { display: none; align-items: center; min-width: 0; }
         .brand-lockup { display: inline-flex; align-items: center; gap: 8px; min-width: 0; color: #fff; white-space: nowrap; }
         .brand-lockup-mark { width: 42px; height: 42px; flex: 0 0 42px; display: block; object-fit: contain; filter: drop-shadow(0 0 9px rgba(239,68,68,.2)); }
-        .brand-lockup-text { display: inline-flex; align-items: baseline; gap: 5px; color: #fff; font: 800 1.08rem/1 'Manrope', sans-serif; letter-spacing: -.055em; }
-        .brand-lockup-text span { color: #f3f4f6; font-size: .72em; letter-spacing: -.04em; }
+        .brand-lockup-text { display: inline-flex; align-items: baseline; gap: 5px; color: #fff; font: 700 1.08rem/1 'Manrope', sans-serif; letter-spacing: -.045em; }
+        .brand-lockup-text strong { color: #fff; font: 800 1em/1 'Sora', sans-serif; letter-spacing: -.065em; }
+        .brand-lockup-text span { color: #f3f4f6; font: 700 .72em/1 'Manrope', sans-serif; letter-spacing: -.035em; }
+        .brand-registered { display: inline-block; margin-left: 0; color: rgba(255,255,255,.78); font: 700 .46em/1 'Manrope', sans-serif; letter-spacing: 0; transform: translateY(-.72em); }
         body.mode-youtoo .brand-youtoo { display: flex; }
         body.mode-youtoo .nav-links li { border-radius: 11px; padding: 11px 13px; }
         body.mode-youtoo .nav-links li.active { background: linear-gradient(90deg, rgba(167,139,250,.2), rgba(94,234,212,.05)); }
@@ -1151,7 +1153,7 @@
     <div class="main-container">
         <!-- SIDEBAR -->
         <aside class="sidebar" aria-label="Navegación principal de Nowarfy">
-            <div class="logo"><span class="brand-nowarfi"><img class="brand-nowarfi-mark" src="assets/nowarfy-logo-red-solid.png" alt=""> Nowarfy</span><span class="brand-youtoo"><span class="brand-lockup"><img class="brand-lockup-mark" src="assets/nowarfy-logo-red-solid.png" alt=""><span class="brand-lockup-text"><strong>Nowarfy</strong><span>YouToo</span></span></span></span></div>
+            <div class="logo"><span class="brand-nowarfi"><img class="brand-nowarfi-mark" src="assets/nowarfy-logo-red-solid.png" alt=""> Nowarfy<sup class="brand-registered">®</sup></span><span class="brand-youtoo"><span class="brand-lockup"><img class="brand-lockup-mark" src="assets/nowarfy-logo-red-solid.png" alt=""><span class="brand-lockup-text"><strong>Nowarfy</strong><span>YouToo</span><sup class="brand-registered">®</sup></span></span></span></div>
             <button type="button" class="nowarfy-mobile-action nowarfy-mobile-menu-toggle" id="nowarfyMobileMenuToggle" onclick="toggleNowarfyMobileNav()" aria-label="Abrir menú" aria-expanded="false"><i class="fas fa-bars"></i><span class="nowarfy-mobile-action-text">Menú</span></button>
             <button type="button" class="nowarfy-mobile-action nowarfy-mobile-account-toggle" onclick="openNowarfyAuth()" aria-label="Abrir cuenta"><i class="fas fa-user"></i><span class="nowarfy-mobile-action-text">Cuenta</span></button>
             <div class="nowarfy-nav-groups">
@@ -3105,10 +3107,10 @@
             welcome.type = 'button';
             welcome.className = 'home-welcome';
             if (lastViewed?.title) {
-                welcome.innerHTML = `<span class="home-welcome-copy"><span class="home-welcome-logo"><img class="brand-lockup-mark" src="assets/nowarfy-logo-red-solid.png" alt=""><span class="brand-lockup-text"><strong>Nowarfy</strong><span>YouToo</span></span></span><span class="home-welcome-kicker">Bienvenido de nuevo</span><h1>Seguimos desde donde quedaste</h1><p>Lo último que viste fue <strong>${escapeHtml(lastViewed.title)}</strong>${lastViewed.artist ? ` · ${escapeHtml(lastViewed.artist)}` : ''}. El reproductor empieza detenido: tocá esta tarjeta o el botón de reproducir cuando quieras continuar.</p></span>${lastViewed.img ? `<img class="home-welcome-art" src="${escapeHtml(lastViewed.img)}" alt="" loading="lazy">` : ''}`;
+                welcome.innerHTML = `<span class="home-welcome-copy"><span class="home-welcome-logo"><img class="brand-lockup-mark" src="assets/nowarfy-logo-red-solid.png" alt=""><span class="brand-lockup-text"><strong>Nowarfy</strong><span>YouToo</span><sup class="brand-registered">®</sup></span></span><span class="home-welcome-kicker">Bienvenido de nuevo</span><h1>Seguimos desde donde quedaste</h1><p>Lo último que viste fue <strong>${escapeHtml(lastViewed.title)}</strong>${lastViewed.artist ? ` · ${escapeHtml(lastViewed.artist)}` : ''}. El reproductor empieza detenido: tocá esta tarjeta o el botón de reproducir cuando quieras continuar.</p></span>${lastViewed.img ? `<img class="home-welcome-art" src="${escapeHtml(lastViewed.img)}" alt="" loading="lazy">` : ''}`;
                 welcome.addEventListener('click', () => selectSong(lastViewed, 0));
             } else {
-                welcome.innerHTML = `<span class="home-welcome-copy"><span class="home-welcome-logo"><img class="brand-lockup-mark" src="assets/nowarfy-logo-red-solid.png" alt=""><span class="brand-lockup-text"><strong>Nowarfy</strong><span>YouToo</span></span></span><span class="home-welcome-kicker">Bienvenido a Nowarfy · YouToo</span><h1>Descubrí música real, sin límites</h1><p>Explorá artistas, canales y fuentes musicales. El reproductor empieza detenido para que vos elijas cuándo comenzar.</p></span>`;
+                welcome.innerHTML = `<span class="home-welcome-copy"><span class="home-welcome-logo"><img class="brand-lockup-mark" src="assets/nowarfy-logo-red-solid.png" alt=""><span class="brand-lockup-text"><strong>Nowarfy</strong><span>YouToo</span><sup class="brand-registered">®</sup></span></span><span class="home-welcome-kicker">Bienvenido a Nowarfy · YouToo</span><h1>Descubrí música real, sin límites</h1><p>Explorá artistas, canales y fuentes musicales. El reproductor empieza detenido para que vos elijas cuándo comenzar.</p></span>`;
             }
             container.appendChild(welcome);
         }
