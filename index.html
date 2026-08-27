@@ -2062,7 +2062,7 @@
         let automaticAdvanceTargetQid = null;
         let automaticQueueRecoveryInFlight = false;
         const PLAYBACK_CONTINUITY_CHECK_MS = 9000;
-        const EXTERNAL_AUDIO_GRACE_MS = 45000;
+        const EXTERNAL_AUDIO_RESUME_DELAY_MS = 900;
         const YT_PLAY_RETRY_THROTTLE_MS = 750;
         const YT_END_EARLY_TOLERANCE_SECONDS = 1.5;
         let channelFilter = null; // { id, title } cuando el usuario entra a ver el contenido de un canal
@@ -6510,18 +6510,21 @@
             }
         }
 
-        function armYouTubeStartupWatchdog(expectedUrl) {
+        function armYouTubeStartupWatchdog(expectedUrl, attempt = 0) {
             clearTimeout(ytStartupTimer);
             ytStartupTimer = setTimeout(() => {
-                if (currentQueueSong()?.url !== expectedUrl || playbackStoppedByUser || !ytPlayer?.getPlayerState) return;
-                requestYouTubePlayback('startup-timeout-retry');
-                const state = ytPlayer.getPlayerState();
-                if (state !== YT.PlayerState.PLAYING) {
-                    setTrackLoading(false);
-                    document.getElementById('videoStage')?.classList.add('is-error');
-                    showToast('YouTube no pudo iniciar este video; intentaremos continuar', 'fa-forward');
-                    queueAutomaticAdvance('youtube-start-timeout');
+                if (currentQueueSong()?.url !== expectedUrl || playbackStoppedByUser || externalAudioFocusInterrupted || !ytPlaybackIntent || !ytPlayer?.getPlayerState) return;
+                requestYouTubePlayback(`startup-timeout-retry-${attempt + 1}`);
+                let state = null;
+                try { state = ytPlayer.getPlayerState(); } catch (error) { return; }
+                if (state === window.YT?.PlayerState?.PLAYING) return;
+                if (attempt < 3 || String(externalAudioFocusLastState).startsWith('probable:')) {
+                    armYouTubeStartupWatchdog(expectedUrl, attempt < 3 ? attempt + 1 : 0);
+                    return;
                 }
+                setTrackLoading(false);
+                document.getElementById('videoStage')?.classList.add('is-error');
+                showToast('YouTube está tardando en responder; no cambiamos de pista todavía', 'fa-hourglass-half');
             }, 12000);
         }
 
@@ -6560,6 +6563,7 @@
                     try { ytPlayer?.pauseVideo?.(); } catch (error) { /* El IFrame puede estar transicionando */ }
                     return;
                 }
+                externalAudioFocusLastState = '';
                 if (isNativeYouTubePlaylistPlayback()) syncNativeYouTubePlaylistPosition();
                 clearTimeout(ytStartupTimer);
                 ytStartupTimer = null;
@@ -6606,6 +6610,7 @@
         }
         function onYTError(event) {
             if (event?.target && event.target !== ytPlayer) return;
+            if (externalAudioFocusInterrupted) return;
             clearTimeout(ytStartupTimer);
             ytStartupTimer = null;
             clearVideoResumeSession();
@@ -6994,6 +6999,7 @@
             const shouldResume = externalAudioFocusResumePending && !playbackStoppedByUser && !!currentPlayingQid;
             externalAudioFocusInterrupted = false;
             externalAudioFocusResumePending = false;
+            externalAudioFocusLastState = '';
             if (!shouldResume) { updatePlaybackState(); return; }
             const song = currentQueueSong();
             if (!song) return;
@@ -7025,11 +7031,16 @@
             updateIcon();
             updatePlaybackState();
             clearTimeout(externalAudioFocusRecoveryTimer);
+            externalAudioFocusRecoveryTimer = null;
+        }
+
+        function scheduleExternalAudioResume(reason = 'focus-return') {
+            if (!externalAudioFocusInterrupted || navigator.audioSession?.state === 'interrupted') return;
+            clearTimeout(externalAudioFocusRecoveryTimer);
             externalAudioFocusRecoveryTimer = window.setTimeout(() => {
                 externalAudioFocusRecoveryTimer = null;
-                if (navigator.audioSession?.state === 'interrupted') return;
                 resumeNowarfyAfterExternalAudio();
-            }, EXTERNAL_AUDIO_GRACE_MS);
+            }, EXTERNAL_AUDIO_RESUME_DELAY_MS);
         }
 
         function handleAudioSessionStateChange() {
@@ -7137,19 +7148,19 @@
             // congela los temporizadores de JavaScript. Inspecciona estado, tiempo restante
             // y reintenta playVideo solo si el usuario aún quería seguir reproduciendo.
             silentAudioLoop?.addEventListener('timeupdate', inspectCurrentPlayback);
-            silentAudioLoop?.addEventListener('playing', () => {
-                if (externalAudioFocusInterrupted && String(externalAudioFocusLastState).startsWith('probable:')) {
-                    resumeNowarfyAfterExternalAudio();
-                    return;
-                }
-                inspectCurrentPlayback();
-            });
+            silentAudioLoop?.addEventListener('playing', inspectCurrentPlayback);
             silentAudioLoop?.addEventListener('pause', () => {
                 if (mediaTransitionInProgress || externalAudioFocusInterrupted || playbackStoppedByUser || document.visibilityState !== 'hidden') return;
                 schedulePossibleExternalAudioYield('anchor-paused-out-of-focus');
             });
-            document.addEventListener('visibilitychange', () => inspectCurrentPlayback());
-            window.addEventListener('focus', inspectCurrentPlayback);
+            document.addEventListener('visibilitychange', () => {
+                if (document.visibilityState === 'visible' && externalAudioFocusInterrupted) scheduleExternalAudioResume('visibility-return');
+                inspectCurrentPlayback();
+            });
+            window.addEventListener('focus', () => {
+                if (externalAudioFocusInterrupted) scheduleExternalAudioResume('focus-return');
+                inspectCurrentPlayback();
+            });
         }
 
         function setupBackgroundPersistence() {

@@ -6,7 +6,7 @@ La API experimental `navigator.audioSession` sí modela una interrupción de pla
 
 La implementación de Nowarfy usa el tipo `playback` cuando la API está disponible. Al recibir `interrupted`, guarda la intención y la posición, pausa el IFrame oficial o el audio local y detiene el anclaje casi inaudible. Cuando la interrupción termina, reanuda solo si la pista seguía activa y el usuario no había pulsado pausa. El watchdog queda bloqueado durante la interrupción para no reclamar el foco.
 
-No se usa `blur` como sustituto automático de foco externo: cambiar de ventana es precisamente uno de los casos legítimos de reproducción en segundo plano que Nowarfy debe preservar, y `blur` no prueba que WhatsApp haya comenzado un audio. Si ChromeOS no entrega `navigator.audioSession.state = "interrupted"`, una PWA no puede saberlo con certeza sin una acción explícita del usuario.
+No se usa `blur` como sustituto automático de foco externo: cambiar de ventana es precisamente uno de los casos legítimos de reproducción en segundo plano que Nowarfy debe preservar, y `blur` no prueba que WhatsApp haya comenzado un audio. Cuando la plataforma no expone `navigator.audioSession.state = "interrupted"`, Nowarfy usa una cesión conservadora solo si recibe una pausa inesperada fuera de foco; al regresar la ventana, espera un instante breve y reintenta. Si la PWA permanece oculta y el navegador no entrega ningún evento de foco, no existe un mecanismo web oficial para saber exactamente cuándo terminó el audio de WhatsApp.
 
 ## Referencias
 
