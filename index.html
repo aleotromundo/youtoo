@@ -763,6 +763,18 @@
         .video-frame-poster { position: absolute; inset: 0; z-index: 2; width: 100%; height: 100%; object-fit: cover; opacity: 0; pointer-events: none; transition: opacity .18s var(--ease); }
         .video-frame-poster.is-restoring { opacity: 1; }
         .video-frame-poster[hidden] { display: none; }
+        .video-embed-fallback { position: absolute; inset: 0; z-index: 5; display: grid; place-items: center; overflow: auto; padding: 24px; background: linear-gradient(135deg, rgba(8,8,18,.9), rgba(13,19,35,.86)); text-align: center; }
+        .video-embed-fallback[hidden] { display: none; }
+        .video-embed-fallback-card { width: min(100%, 430px); padding: 20px; border: 1px solid rgba(94,234,212,.35); border-radius: 16px; background: rgba(9,12,26,.88); box-shadow: 0 20px 40px rgba(0,0,0,.34), inset 0 1px 0 rgba(255,255,255,.08); backdrop-filter: blur(10px); }
+        .video-embed-fallback-badge { display: inline-flex; align-items: center; gap: 6px; color: #5eead4; font-size: .66rem; font-weight: 900; letter-spacing: .08em; text-transform: uppercase; }
+        .video-embed-fallback-badge i { color: #ff667f; }
+        .video-embed-fallback h3 { margin: 9px 0 7px; color: #f7f5ff; font: 800 clamp(1rem, 2.4vw, 1.3rem) 'Sora', sans-serif; line-height: 1.18; }
+        .video-embed-fallback p { margin: 0 auto; max-width: 370px; color: #b6b7c9; font-size: .75rem; line-height: 1.5; }
+        .video-embed-fallback-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin-top: 16px; }
+        .video-embed-fallback-actions button, .video-embed-fallback-actions a { display: inline-flex; align-items: center; justify-content: center; gap: 7px; min-height: 38px; padding: 9px 12px; border: 1px solid rgba(94,234,212,.42); border-radius: 10px; color: #071016; background: linear-gradient(135deg, #5eead4, #a7f3d0); font: 900 .72rem 'Manrope', sans-serif; text-decoration: none; cursor: pointer; transition: transform .16s var(--ease), filter .16s var(--ease), border-color .16s var(--ease); }
+        .video-embed-fallback-actions button:hover, .video-embed-fallback-actions a:hover { filter: brightness(1.08); transform: translateY(-1px); }
+        .video-embed-fallback-actions .video-embed-fallback-secondary { color: #e9e8ff; background: rgba(255,255,255,.06); border-color: rgba(190,188,255,.24); }
+        .video-embed-fallback-footnote { display: block; margin-top: 12px; color: #85879d; font-size: .61rem; line-height: 1.35; }
         #freeVideoPlayer { display: block; width: 100%; height: 100%; min-height: 270px; object-fit: contain; background: #05050d; }
         #freeVideoPlayer[hidden] { display: none; }
         .video-stage-info { padding: 22px; display: flex; flex-direction: column; justify-content: space-between; gap: 16px; }
@@ -811,7 +823,7 @@
         #videoStageToggleBtn.video-minimized .video-mini-indicator { position: absolute; right: 12px; top: -5px; display: block; width: 9px; height: 9px; border: 2px solid #15162a; border-radius: 50%; background: #ff6d85; box-shadow: 0 0 0 3px rgba(255,109,133,.2); }
         @keyframes mini-video-attention { 0%, 55%, 100% { box-shadow: 0 15px 28px rgba(0,0,0,.28), 0 0 0 5px rgba(94,234,212,.1); } 72% { box-shadow: 0 15px 28px rgba(0,0,0,.28), 0 0 0 12px rgba(94,234,212,0); } }
         @keyframes video-toggle-ripple { 0% { transform: scale(.92); opacity: 0; } 18% { opacity: .78; } 72%, 100% { transform: scale(1.22); opacity: 0; } }
-        .video-stage.is-error .video-frame::after { content: 'Este video no permite reproducción embebida. Elegí otro resultado.'; position: absolute; inset: 0; display: grid; place-items: center; padding: 32px; text-align: center; color: #f0d1d9; background: rgba(19,11,19,.88); font-size: .9rem; z-index: 4; }
+        .video-stage.is-error .video-frame { border-color: rgba(255,109,133,.55); }
         .video-suggestions { display: none; border-top: 1px solid rgba(190,188,255,.14); padding: 18px 20px 20px; }
         .video-suggestions.visible { display: block; }
         .video-suggestions-header { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
@@ -1333,7 +1345,7 @@
 
             <section class="video-stage" id="videoStage" aria-live="polite" aria-label="Reproductor de video">
                 <div class="video-stage-layout">
-                    <div class="video-frame"><img class="video-frame-poster" id="videoFramePoster" alt="" aria-hidden="true" hidden><div id="yt-player-container"></div><video id="freeVideoPlayer" controls playsinline preload="metadata" hidden></video></div>
+                    <div class="video-frame"><img class="video-frame-poster" id="videoFramePoster" alt="" aria-hidden="true" hidden><div id="yt-player-container"></div><video id="freeVideoPlayer" controls playsinline preload="metadata" hidden></video><div class="video-embed-fallback" id="videoEmbedFallback" role="alert" hidden><div class="video-embed-fallback-card"><span class="video-embed-fallback-badge"><i class="fab fa-youtube"></i> Reproducción oficial</span><h3 id="videoEmbedFallbackTitle">Este video necesita YouTube</h3><p id="videoEmbedFallbackMessage">El creador no permite mostrarlo dentro de Nowarfy. Podés abrirlo en YouTube sin perder esta Playlist.</p><div class="video-embed-fallback-actions"><button type="button" id="videoEmbedPopupBtn" onclick="openYouTubeCompactWindow()"><i class="fas fa-up-right-and-down-left-from-center"></i> Abrir flotante</button><a id="videoEmbedOpenBtn" class="video-embed-fallback-secondary" href="#" target="_blank" rel="noopener noreferrer"><i class="fas fa-arrow-up-right-from-square"></i> Ver en YouTube</a></div><small class="video-embed-fallback-footnote">La ventana compacta depende de la configuración de Chrome; Nowarfy queda abierto en la PWA.</small></div></div></div>
                     <div class="video-stage-info">
                         <div><p class="video-stage-kicker">Reproduciendo desde YouTube</p><h2 class="video-stage-title" id="videoStageTitle">Elegí un video</h2><p class="video-stage-artist" id="videoStageArtist"></p><div class="video-stage-meta" id="videoStageMeta"></div><div class="video-stage-description-wrap"><div class="video-stage-description-label"><span>Descripción</span><button type="button" class="lyrics-toggle" id="lyricsToggleBtn" onclick="toggleLyricsPanel()" aria-expanded="false" hidden><i class="fas fa-music"></i> Ver letra</button></div><p class="video-stage-description" id="videoStageDescription"></p>            <section class="lyrics-panel" id="lyricsPanel" aria-label="Letra de la canción" hidden><div class="lyrics-toolbar"><span class="lyrics-toolbar-status" id="lyricsToolbarStatus">Letra verificada</span><div class="lyrics-toolbar-controls"><button type="button" class="lyrics-zoom-btn" onclick="changeLyricsZoom(-0.1)" aria-label="Reducir tamaño de letra" title="Reducir tamaño"><i class="fas fa-minus"></i></button><span class="lyrics-zoom-value" id="lyricsZoomValue">100%</span><button type="button" class="lyrics-zoom-btn" onclick="changeLyricsZoom(0.1)" aria-label="Aumentar tamaño de letra" title="Aumentar tamaño"><i class="fas fa-plus"></i></button><button type="button" class="lyrics-zoom-btn" onclick="resetLyricsZoom()" aria-label="Restablecer tamaño de letra" title="Restablecer tamaño"><i class="fas fa-rotate-left"></i></button></div></div><div class="lyrics-scroll" id="lyricsScroll" tabindex="0"><pre class="lyrics-content" id="lyricsContent"></pre></div><div class="lyrics-source"><span id="lyricsSourceLabel">Coincidencia corroborada por artista, título y duración.</span><a id="lyricsSourceLink" href="https://lrclib.net/" target="_blank" rel="noopener noreferrer">Fuente</a></div></section></div></div>
                         <div><p class="video-stage-note">Datos extraídos de la ficha pública del video. Algunos videos pueden estar restringidos por su creador, región o YouTube.</p><div class="video-stage-actions"><button type="button" class="video-stage-channel" id="videoStageChannelBtn" onclick="openVideoStageChannel()" hidden><i class="fas fa-satellite-dish"></i> Ver canal</button><button type="button" class="video-stage-close video-stage-close-primary" onclick="hideVideoStage(false, { manual: true })" aria-label="Ocultar video y conservar solo el audio"><i class="fas fa-eye-slash"></i><span>Ocultar video</span><small>ahorrar carga visual</small></button></div></div>
@@ -2057,6 +2069,8 @@
         let videoStageManualMinimized = false;
         let videoStageNeedsVisualRefresh = false;
         let videoFrameRefreshTimer = null;
+        let youtubeCompactWindow = null;
+        let youtubeEmbedFallbackUrl = '';
         let mediaTransitionInProgress = false;
         let automaticAdvanceTimer = null;
         let automaticAdvanceTargetQid = null;
@@ -6321,9 +6335,62 @@
             }
         }
 
+        function clearYouTubeEmbedFallback() {
+            const fallback = document.getElementById('videoEmbedFallback');
+            const openButton = document.getElementById('videoEmbedOpenBtn');
+            const popupButton = document.getElementById('videoEmbedPopupBtn');
+            youtubeEmbedFallbackUrl = '';
+            if (fallback) fallback.hidden = true;
+            if (openButton) { openButton.href = '#'; openButton.removeAttribute('aria-disabled'); }
+            if (popupButton) popupButton.disabled = false;
+        }
+
+        function showYouTubeEmbedFallback(song, errorCode = '') {
+            const fallback = document.getElementById('videoEmbedFallback');
+            const title = document.getElementById('videoEmbedFallbackTitle');
+            const message = document.getElementById('videoEmbedFallbackMessage');
+            const openButton = document.getElementById('videoEmbedOpenBtn');
+            const popupButton = document.getElementById('videoEmbedPopupBtn');
+            const stage = document.getElementById('videoStage');
+            const url = getCurrentContentLink(song);
+            if (!fallback || !title || !message || !openButton || !popupButton || !stage || !url) return;
+            youtubeEmbedFallbackUrl = url;
+            title.textContent = song?.title || 'Este video necesita YouTube';
+            const reason = Number(errorCode) === 101 || Number(errorCode) === 150
+                ? 'El creador no permite la reproducción dentro de otras páginas.'
+                : 'YouTube no pudo reproducirlo dentro del reproductor integrado.';
+            message.textContent = `${reason} Podés abrirlo en una ventana compacta oficial sin cerrar Nowarfy.`;
+            openButton.href = url;
+            openButton.setAttribute('aria-label', `Ver ${song?.title || 'este video'} en YouTube`);
+            popupButton.disabled = false;
+            fallback.hidden = false;
+            stage.classList.add('is-error');
+        }
+
+        function openYouTubeCompactWindow() {
+            const song = currentQueueSong();
+            const url = youtubeEmbedFallbackUrl || getCurrentContentLink(song);
+            if (!url || song?.type !== 'yt') return;
+            const features = 'popup=yes,width=640,height=390,resizable=yes,scrollbars=yes,toolbar=no,menubar=no,location=yes,status=no';
+            let popup = null;
+            try { popup = window.open(url, 'nowarfy-youtube-compact', features); } catch (error) { popup = null; }
+            if (!popup) {
+                showToast('Chrome bloqueó la ventana; permití ventanas emergentes para abrir YouTube en flotante', 'fa-up-right-and-down-left-from-center');
+                return;
+            }
+            youtubeCompactWindow = popup;
+            try { popup.focus(); } catch (error) { /* La ventana puede estar en otra superficie */ }
+            showToast('YouTube se abrió en una ventana compacta; Nowarfy sigue abierto', 'fab fa-youtube');
+        }
+
         function showVideoStage(song, options = {}) {
             const stage = document.getElementById('videoStage');
-            stage.classList.remove('is-error');
+            const fallback = document.getElementById('videoEmbedFallback');
+            const keepFallback = !!(fallback && !fallback.hidden && youtubeEmbedFallbackUrl && youtubeEmbedFallbackUrl === getCurrentContentLink(song));
+            if (!keepFallback) {
+                clearYouTubeEmbedFallback();
+                stage.classList.remove('is-error');
+            }
             setVideoFramePoster(song, false);
             const hiddenDocument = document.visibilityState === 'hidden';
             stage.classList.toggle('visible', !hiddenDocument);
@@ -6536,6 +6603,7 @@
             if (song?.type === 'yt' && ytPlayer.getDuration) {
                 renderVideoStageDetails({ ...song, duration: song.duration || ytPlayer.getDuration() });
             }
+            clearYouTubeEmbedFallback();
             const resume = pendingVideoResumeSession;
             pendingVideoResumeSession = null;
             if (resume && song?.type === 'yt' && String(resume.resourceId) === String(song.url)) {
@@ -6613,12 +6681,13 @@
             if (externalAudioFocusInterrupted) return;
             clearTimeout(ytStartupTimer);
             ytStartupTimer = null;
-            clearVideoResumeSession();
+            ytPlaybackIntent = false;
+            stopSilentLoop();
             setTrackLoading(false);
             isPlaying = false;
-            document.getElementById('videoStage').classList.add('is-error');
-            showToast('Este video no permite reproducción embebida; seguimos con el siguiente', 'fa-triangle-exclamation');
-            queueAutomaticAdvance('youtube-error');
+            const song = currentQueueSong();
+            showYouTubeEmbedFallback(song, event?.data);
+            showToast('YouTube no permite este video dentro del IFrame; podés abrirlo desde aquí', 'fab fa-youtube');
             updateIcon();
             updatePlaybackState();
         }
