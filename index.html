@@ -760,6 +760,9 @@
         .video-stage.visible { display: block; }
         .video-stage-layout { display: grid; grid-template-columns: minmax(0, 1.65fr) minmax(230px, .8fr); }
         .video-frame { position: relative; min-height: 270px; aspect-ratio: 16 / 9; background: #07070e; }
+        .video-frame-poster { position: absolute; inset: 0; z-index: 2; width: 100%; height: 100%; object-fit: cover; opacity: 0; pointer-events: none; transition: opacity .18s var(--ease); }
+        .video-frame-poster.is-restoring { opacity: 1; }
+        .video-frame-poster[hidden] { display: none; }
         #freeVideoPlayer { display: block; width: 100%; height: 100%; min-height: 270px; object-fit: contain; background: #05050d; }
         #freeVideoPlayer[hidden] { display: none; }
         .video-stage-info { padding: 22px; display: flex; flex-direction: column; justify-content: space-between; gap: 16px; }
@@ -799,13 +802,15 @@
         .lyrics-content { margin: 0; color: #f2f0ff; font-size: 1rem; line-height: 1.8; white-space: pre-wrap; overflow-wrap: anywhere; transform-origin: top left; }
         .lyrics-source { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 18px 11px; border-top: 1px solid rgba(190,188,255,.1); color: #7f819d; font-size: .6rem; line-height: 1.35; }
         .lyrics-source a { color: #8deee1; text-decoration: underline; text-underline-offset: 2px; }
-        #videoStageToggleBtn.video-minimized { position: fixed; right: 24px; bottom: calc(var(--player-height) + 18px); z-index: 850; display: inline-flex; align-items: center; justify-content: center; gap: 9px; min-width: 164px; min-height: 48px; padding: 9px 14px 9px 12px; border: 1px solid rgba(94,234,212,.72); border-radius: 14px; color: #071016; background: linear-gradient(135deg, #5eead4, #a7f3d0); box-shadow: 0 15px 28px rgba(0,0,0,.28), 0 0 0 5px rgba(94,234,212,.1); font: 900 .73rem 'Manrope', sans-serif; animation: mini-video-attention 2.4s ease-out infinite; }
+        #videoStageToggleBtn.video-minimized { position: fixed; right: 24px; bottom: calc(var(--player-height) + 18px); z-index: 850; isolation: isolate; display: inline-flex; align-items: center; justify-content: center; gap: 9px; min-width: 164px; min-height: 48px; padding: 9px 14px 9px 12px; border: 1px solid rgba(94,234,212,.72); border-radius: 14px; color: #071016; background: linear-gradient(135deg, #5eead4, #a7f3d0); box-shadow: 0 15px 28px rgba(0,0,0,.28), 0 0 0 5px rgba(94,234,212,.1); font: 900 .73rem 'Manrope', sans-serif; animation: mini-video-attention 2.4s ease-out infinite; }
+        #videoStageToggleBtn.video-minimized::before, #videoStageToggleBtn.video-minimized::after { content: ''; position: absolute; inset: -9px; z-index: -1; border: 2px solid rgba(94,234,212,.72); border-radius: 20px; pointer-events: none; opacity: 0; animation: video-toggle-ripple 2.4s ease-out infinite; }
+        #videoStageToggleBtn.video-minimized::after { animation-delay: 1.2s; }
         #videoStageToggleBtn.video-minimized i { font-size: .92rem; }
         #videoStageToggleBtn.video-minimized .video-stage-toggle-copy { display: grid; gap: 1px; text-align: left; }
         #videoStageToggleBtn.video-minimized .video-stage-toggle-copy small { color: rgba(7,16,22,.7); font-size: .58rem; font-weight: 800; }
-        #videoStageToggleBtn.video-minimized::after { content: ''; position: absolute; right: 12px; top: -5px; width: 9px; height: 9px; border: 2px solid #15162a; border-radius: 50%; background: #ff6d85; box-shadow: 0 0 0 3px rgba(255,109,133,.2); }
-        #videoStageToggleBtn .video-mini-indicator { display: none; }
+        #videoStageToggleBtn.video-minimized .video-mini-indicator { position: absolute; right: 12px; top: -5px; display: block; width: 9px; height: 9px; border: 2px solid #15162a; border-radius: 50%; background: #ff6d85; box-shadow: 0 0 0 3px rgba(255,109,133,.2); }
         @keyframes mini-video-attention { 0%, 55%, 100% { box-shadow: 0 15px 28px rgba(0,0,0,.28), 0 0 0 5px rgba(94,234,212,.1); } 72% { box-shadow: 0 15px 28px rgba(0,0,0,.28), 0 0 0 12px rgba(94,234,212,0); } }
+        @keyframes video-toggle-ripple { 0% { transform: scale(.92); opacity: 0; } 18% { opacity: .78; } 72%, 100% { transform: scale(1.22); opacity: 0; } }
         .video-stage.is-error .video-frame::after { content: 'Este video no permite reproducción embebida. Elegí otro resultado.'; position: absolute; inset: 0; display: grid; place-items: center; padding: 32px; text-align: center; color: #f0d1d9; background: rgba(19,11,19,.88); font-size: .9rem; z-index: 4; }
         .video-suggestions { display: none; border-top: 1px solid rgba(190,188,255,.14); padding: 18px 20px 20px; }
         .video-suggestions.visible { display: block; }
@@ -828,7 +833,7 @@
         @media (max-width: 1050px) { .video-suggestions-list { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
         @media (max-width: 560px) { .video-suggestions { padding: 15px; } .video-suggestions-list { grid-template-columns: 1fr; } .video-suggestion { grid-template-columns: 105px minmax(0, 1fr); } .video-suggestion-thumb { width: 105px; } .lyrics-toolbar { align-items: flex-start; } .lyrics-scroll { max-height: 50vh; padding: 15px 14px 18px; } .lyrics-content { font-size: .95rem; line-height: 1.75; } .lyrics-source { padding-left: 14px; padding-right: 14px; } }
         @media (max-width: 768px) { #videoStageToggleBtn.video-minimized { right: 12px; bottom: calc(var(--player-height) + 12px); min-width: 151px; min-height: 45px; padding: 8px 11px; } .video-stage-close.video-stage-close-primary { width: 100%; justify-content: center; } .video-stage-close.video-stage-close-primary small { display: none; } }
-        @media (prefers-reduced-motion: reduce) { #videoStageToggleBtn.video-minimized { animation: none; } }
+        @media (prefers-reduced-motion: reduce) { #videoStageToggleBtn.video-minimized, #videoStageToggleBtn.video-minimized::before, #videoStageToggleBtn.video-minimized::after { animation: none; } }
         .video-source-badge { position: absolute; top: 9px; left: 9px; z-index: 3; padding: 5px 7px; border-radius: 6px; background: rgba(8,8,18,.78); color: #e6e1ff; font-size: .58rem; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; }
         .video-source-badge i { color: #ff7b90; margin-right: 4px; }
         .card-duration { position: absolute; left: 9px; right: auto; bottom: 9px; z-index: 3; padding: 4px 6px; border-radius: 5px; background: rgba(8,8,18,.82); color: #fff; font-size: .66rem; font-weight: 800; font-variant-numeric: tabular-nums; }
@@ -1328,7 +1333,7 @@
 
             <section class="video-stage" id="videoStage" aria-live="polite" aria-label="Reproductor de video">
                 <div class="video-stage-layout">
-                    <div class="video-frame"><div id="yt-player-container"></div><video id="freeVideoPlayer" controls playsinline preload="metadata" hidden></video></div>
+                    <div class="video-frame"><img class="video-frame-poster" id="videoFramePoster" alt="" aria-hidden="true" hidden><div id="yt-player-container"></div><video id="freeVideoPlayer" controls playsinline preload="metadata" hidden></video></div>
                     <div class="video-stage-info">
                         <div><p class="video-stage-kicker">Reproduciendo desde YouTube</p><h2 class="video-stage-title" id="videoStageTitle">Elegí un video</h2><p class="video-stage-artist" id="videoStageArtist"></p><div class="video-stage-meta" id="videoStageMeta"></div><div class="video-stage-description-wrap"><div class="video-stage-description-label"><span>Descripción</span><button type="button" class="lyrics-toggle" id="lyricsToggleBtn" onclick="toggleLyricsPanel()" aria-expanded="false" hidden><i class="fas fa-music"></i> Ver letra</button></div><p class="video-stage-description" id="videoStageDescription"></p>            <section class="lyrics-panel" id="lyricsPanel" aria-label="Letra de la canción" hidden><div class="lyrics-toolbar"><span class="lyrics-toolbar-status" id="lyricsToolbarStatus">Letra verificada</span><div class="lyrics-toolbar-controls"><button type="button" class="lyrics-zoom-btn" onclick="changeLyricsZoom(-0.1)" aria-label="Reducir tamaño de letra" title="Reducir tamaño"><i class="fas fa-minus"></i></button><span class="lyrics-zoom-value" id="lyricsZoomValue">100%</span><button type="button" class="lyrics-zoom-btn" onclick="changeLyricsZoom(0.1)" aria-label="Aumentar tamaño de letra" title="Aumentar tamaño"><i class="fas fa-plus"></i></button><button type="button" class="lyrics-zoom-btn" onclick="resetLyricsZoom()" aria-label="Restablecer tamaño de letra" title="Restablecer tamaño"><i class="fas fa-rotate-left"></i></button></div></div><div class="lyrics-scroll" id="lyricsScroll" tabindex="0"><pre class="lyrics-content" id="lyricsContent"></pre></div><div class="lyrics-source"><span id="lyricsSourceLabel">Coincidencia corroborada por artista, título y duración.</span><a id="lyricsSourceLink" href="https://lrclib.net/" target="_blank" rel="noopener noreferrer">Fuente</a></div></section></div></div>
                         <div><p class="video-stage-note">Datos extraídos de la ficha pública del video. Algunos videos pueden estar restringidos por su creador, región o YouTube.</p><div class="video-stage-actions"><button type="button" class="video-stage-channel" id="videoStageChannelBtn" onclick="openVideoStageChannel()" hidden><i class="fas fa-satellite-dish"></i> Ver canal</button><button type="button" class="video-stage-close video-stage-close-primary" onclick="hideVideoStage(false, { manual: true })" aria-label="Ocultar video y conservar solo el audio"><i class="fas fa-eye-slash"></i><span>Ocultar video</span><small>ahorrar carga visual</small></button></div></div>
@@ -2045,10 +2050,19 @@
         let restoreVideoMinimizedAfterReady = false;
         let lastVideoResumeSaveAt = 0;
         let playbackStoppedByUser = false;
+        let externalAudioFocusInterrupted = false;
+        let externalAudioFocusResumePending = false;
+        let externalAudioFocusLastState = '';
+        let externalAudioFocusRecoveryTimer = null;
+        let videoStageManualMinimized = false;
+        let videoStageNeedsVisualRefresh = false;
+        let videoFrameRefreshTimer = null;
+        let mediaTransitionInProgress = false;
         let automaticAdvanceTimer = null;
         let automaticAdvanceTargetQid = null;
         let automaticQueueRecoveryInFlight = false;
         const PLAYBACK_CONTINUITY_CHECK_MS = 9000;
+        const EXTERNAL_AUDIO_GRACE_MS = 45000;
         const YT_PLAY_RETRY_THROTTLE_MS = 750;
         const YT_END_EARLY_TOLERANCE_SECONDS = 1.5;
         let channelFilter = null; // { id, title } cuando el usuario entra a ver el contenido de un canal
@@ -2085,7 +2099,6 @@
         let currentLyrics = null;
         let lyricsLoadingKey = '';
         let videoStageAutoHiddenReason = '';
-        let videoStageManualMinimized = false;
 
         const audioEl = document.getElementById('audio-element');
         const nextAudioEl = document.getElementById('audio-element-next');
@@ -5259,6 +5272,10 @@
             };
             audio.onpause = () => {
                 if (audio !== activeAudioEl || audio.ended || crossfadeInProgress || String(audio.dataset.queueId || '') !== String(currentPlayingQid || '')) return;
+                if (document.visibilityState === 'hidden' && !playbackStoppedByUser && !externalAudioFocusInterrupted && isPlaying) {
+                    schedulePossibleExternalAudioYield('direct-audio-paused');
+                    return;
+                }
                 isPlaying = false;
                 persistVideoResumeSession(true);
                 updateIcon();
@@ -5268,6 +5285,7 @@
             audio.onwaiting = () => { if (audio === activeAudioEl) setTrackLoading(true, currentSourceIdx); };
             audio.onplaying = () => {
                 if (audio !== activeAudioEl) return;
+                if (externalAudioFocusInterrupted) { audio.pause(); return; }
                 playbackStoppedByUser = false;
                 isPlaying = true;
                 updateIcon();
@@ -5366,20 +5384,23 @@
             updateNowPlaying(song);
             rememberPlay(song);
             void reserveMarkUsed(song);
+            mediaTransitionInProgress = true;
             stopAll({ preserveYouTubePlayer: reuseYouTubePlayer });
+            mediaTransitionInProgress = false;
             updateMediaSession(song);
             setTrackLoading(true, currentSourceIdx);
             persistQueue();
             renderQueue();
 
             if (song.type === 'yt') {
-                if (!options.deferAutoplay && resumeSession?.wasPlaying !== false) startSilentLoop();
+                const deferYTAutoplay = !!options.deferAutoplay || externalAudioFocusInterrupted;
+                if (!deferYTAutoplay && resumeSession?.wasPlaying !== false) startSilentLoop();
                 freeVideoEl.pause();
                 freeVideoEl.removeAttribute('src');
                 freeVideoEl.hidden = true;
                 showVideoStage(song);
                 if (reuseYouTubePlayer) {
-                    ytPlaybackIntent = !options.deferAutoplay && resumeSession?.wasPlaying !== false;
+                    ytPlaybackIntent = !deferYTAutoplay && resumeSession?.wasPlaying !== false;
                     const startSeconds = resumeSession && Number(resumeSession.position) > 0 ? Number(resumeSession.position) : 0;
                     try {
                         if (ytPlaybackIntent) ytPlayer.loadVideoById({ videoId: song.url, startSeconds });
@@ -5392,13 +5413,13 @@
                     } catch (error) {
                         console.debug('No se pudo reutilizar el IFrame de YouTube', error);
                         stopAll();
-                        initYTPlayer(song.url, song.isPlaylist, resumeSession, !!options.deferAutoplay);
+                            initYTPlayer(song.url, song.isPlaylist, resumeSession, deferYTAutoplay);
                     }
                 } else                 if (ytApiReady && window.YT && window.YT.Player) {
                     const nativePlaylistId = options.playlistId || (isNativeYouTubePlaylistPlayback() && queuePlaylistContext?.playlistId);
-                    initYTPlayer(nativePlaylistId || song.url, !!nativePlaylistId || song.isPlaylist, resumeSession, !!options.deferAutoplay);
+                    initYTPlayer(nativePlaylistId || song.url, !!nativePlaylistId || song.isPlaylist, resumeSession, deferYTAutoplay);
                 } else {
-                    pendingYTRequest = { resourceId: song.url, isPlaylist: song.isPlaylist, resumeSession, deferAutoplay: !!options.deferAutoplay };
+                    pendingYTRequest = { resourceId: song.url, isPlaylist: song.isPlaylist, resumeSession, deferAutoplay: deferYTAutoplay };
                     loadYouTubeAPI();
                 }
             } else if (song.type === 'freevideo') {
@@ -5415,7 +5436,7 @@
                     if (freeVideoEl === activeAudioEl && currentQueueSong()?.type === 'freevideo') renderVideoStageDetails({ ...song, duration: freeVideoEl.duration || song.duration });
                 };
                 freeVideoEl.load();
-                const shouldAutoplayFreeVideo = !options.deferAutoplay && resumeSession?.wasPlaying !== false;
+                const shouldAutoplayFreeVideo = !options.deferAutoplay && !externalAudioFocusInterrupted && resumeSession?.wasPlaying !== false;
                 if (shouldAutoplayFreeVideo) freeVideoEl.play().catch(e => { console.error(e); setTrackLoading(false); showToast('No se pudo reproducir este video libre', 'fa-triangle-exclamation'); });
                 else setTrackLoading(false);
             } else {
@@ -5429,7 +5450,7 @@
                 applyVolume(parseFloat(document.getElementById('volumeSlider').value));
                 bindDirectAudioEvents(audioEl);
                 audioEl.onloadedmetadata = () => applyResumeSessionToMedia(audioEl, song, resumeSession);
-                const shouldAutoplayAudio = !options.deferAutoplay && resumeSession?.wasPlaying !== false;
+                const shouldAutoplayAudio = !options.deferAutoplay && !externalAudioFocusInterrupted && resumeSession?.wasPlaying !== false;
                 if (shouldAutoplayAudio) audioEl.play().catch(e => { console.error(e); setTrackLoading(false); showToast('No se pudo reproducir esta pista', 'fa-triangle-exclamation'); });
                 else setTrackLoading(false);
             }
@@ -6286,6 +6307,7 @@
             if (!stage || !isVisualVideo(song)) return;
             videoStageMinimized = !!minimized;
             videoStageManualMinimized = videoStageMinimized && options.manual === true;
+            if (videoStageMinimized) videoStageNeedsVisualRefresh = true;
             videoStageAutoHiddenReason = videoStageMinimized ? (options.autoReason || (options.manual ? '' : videoStageAutoHiddenReason)) : '';
             stage.classList.toggle('visible', !videoStageMinimized);
             if (videoStageMinimized) stage.classList.remove('is-error');
@@ -6302,6 +6324,7 @@
         function showVideoStage(song, options = {}) {
             const stage = document.getElementById('videoStage');
             stage.classList.remove('is-error');
+            setVideoFramePoster(song, false);
             const hiddenDocument = document.visibilityState === 'hidden';
             stage.classList.toggle('visible', !hiddenDocument);
             videoStageMinimized = hiddenDocument;
@@ -6319,6 +6342,7 @@
             renderVideoStageDetails(song);
             renderVideoSuggestions(song);
             updateVideoStageToggle(!videoStageMinimized);
+            if (options.restoreFrame && song.type === 'yt') refreshYouTubeVideoFrame('show');
             if (options.focus && !videoStageMinimized) window.requestAnimationFrame(() => stage.scrollIntoView({ behavior: 'smooth', block: 'start' }));
         }
 
@@ -6341,12 +6365,70 @@
             }
         }
 
+        function setVideoFramePoster(song, restoring = false) {
+            const poster = document.getElementById('videoFramePoster');
+            if (!poster) return;
+            const source = String(song?.img || '').trim();
+            poster.onerror = () => { poster.hidden = true; poster.classList.remove('is-restoring'); };
+            poster.src = source;
+            poster.alt = source ? `Miniatura de ${song?.title || 'la pista actual'}` : '';
+            poster.hidden = !source;
+            poster.classList.toggle('is-restoring', restoring && !!source);
+        }
+
+        function finishVideoFrameRestore(expectedUrl) {
+            const poster = document.getElementById('videoFramePoster');
+            if (!poster || currentQueueSong()?.url !== expectedUrl) return;
+            poster.classList.remove('is-restoring');
+            window.setTimeout(() => {
+                if (currentQueueSong()?.url === expectedUrl && poster) poster.hidden = true;
+            }, 220);
+        }
+
+        function refreshYouTubeVideoFrame(reason = 'restore') {
+            const song = currentQueueSong();
+            const stage = document.getElementById('videoStage');
+            const frame = document.querySelector('#yt-player-container iframe');
+            const frameBox = document.querySelector('#videoStage .video-frame');
+            if (!stage?.classList.contains('visible') || song?.type !== 'yt' || !ytPlayer || !frameBox) return;
+            const expectedUrl = String(song.url);
+            setVideoFramePoster(song, true);
+            clearTimeout(videoFrameRefreshTimer);
+            const reflow = () => {
+                if (currentQueueSong()?.url !== expectedUrl || !stage.classList.contains('visible')) return;
+                const rect = frameBox.getBoundingClientRect();
+                const width = Math.max(1, Math.floor(rect.width || frameBox.clientWidth));
+                const height = Math.max(1, Math.floor(rect.height || frameBox.clientHeight));
+                try { ytPlayer.setSize?.(width, height); } catch (error) { /* El IFrame puede estar actualizando sus dimensiones */ }
+                if (frame) {
+                    frame.style.display = 'block';
+                    frame.style.visibility = 'hidden';
+                    void frame.offsetHeight;
+                    frame.style.visibility = 'visible';
+                }
+                videoStageNeedsVisualRefresh = false;
+                finishVideoFrameRestore(expectedUrl);
+            };
+            window.requestAnimationFrame(() => {
+                reflow();
+                videoFrameRefreshTimer = window.setTimeout(() => {
+                    reflow();
+                    let state = null;
+                    try { state = ytPlayer.getPlayerState?.(); } catch (error) { /* El IFrame puede estar transicionando */ }
+                    if (ytPlaybackIntent && state !== window.YT?.PlayerState?.PLAYING) requestYouTubePlayback(`visual-${reason}`);
+                }, 260);
+            });
+        }
+
         function toggleVideoStageVisibility() {
             const song = currentQueueSong();
             if (!isVisualVideo(song)) { showToast('No hay un video activo para mostrar', 'fa-clapperboard'); return; }
             const stage = document.getElementById('videoStage');
             if (stage.classList.contains('visible')) hideVideoStage(false, { manual: true });
-            else showVideoStage(song, { focus: true });
+            else {
+                showVideoStage(song, { focus: true, restoreFrame: true });
+                if (song.type === 'freevideo') { freeVideoEl.style.display = 'block'; }
+            }
         }
 
         function setupVideoStageObserver() {
@@ -6407,6 +6489,7 @@
 
         function requestYouTubePlayback(reason = 'retry') {
             const song = currentQueueSong();
+            if (externalAudioFocusInterrupted) return false;
             if (!ytPlayer || song?.type !== 'yt' || !ytPlaybackIntent || playbackStoppedByUser) return false;
             let state = null;
             try { state = ytPlayer.getPlayerState?.(); } catch (error) { state = null; }
@@ -6464,7 +6547,7 @@
             // El parámetro autoplay no alcanza cuando el navegador bloquea autoplay.
             // La acción original del usuario ya habilitó reproducción: reintentamos
             // explícitamente al recibir onReady y también desde el heartbeat multimedia.
-            if (song?.type === 'yt' && !playbackStoppedByUser && !(resume?.wasPlaying === false) && ytPlayer.playVideo) {
+            if (song?.type === 'yt' && !externalAudioFocusInterrupted && !playbackStoppedByUser && !(resume?.wasPlaying === false) && ytPlayer.playVideo) {
                 ytPlaybackIntent = true;
                 requestYouTubePlayback('ready');
                 armYouTubeStartupWatchdog(song.url);
@@ -6473,6 +6556,10 @@
         function onYTStateChange(event) {
             if (event?.target && event.target !== ytPlayer) return;
             if (event.data === YT.PlayerState.PLAYING) {
+                if (externalAudioFocusInterrupted) {
+                    try { ytPlayer?.pauseVideo?.(); } catch (error) { /* El IFrame puede estar transicionando */ }
+                    return;
+                }
                 if (isNativeYouTubePlaylistPlayback()) syncNativeYouTubePlaylistPosition();
                 clearTimeout(ytStartupTimer);
                 ytStartupTimer = null;
@@ -6483,8 +6570,14 @@
                 if (!progressInterval) startProgress(ytPlayer);
                 if (nowarfyRemoteIsPlayer) void publishNowarfyRemoteState();
             } else if (event.data === YT.PlayerState.PAUSED) {
-                // ChromeOS puede emitir PAUSED al ocultar una PWA aunque el usuario no haya
-                // pedido pausar. En ese caso conservamos la intención y dejamos que el
+                // Si otra aplicación tomó el foco mientras la PWA estaba oculta, ceder durante
+                // unos segundos evita que el anclaje vuelva a reclamar el audio inmediatamente.
+                if (document.visibilityState === 'hidden' && ytPlaybackIntent && !playbackStoppedByUser && !externalAudioFocusInterrupted) {
+                    schedulePossibleExternalAudioYield('youtube-paused-out-of-focus');
+                    return;
+                }
+                // ChromeOS también puede emitir PAUSED al ocultar una PWA sin que exista otra
+                // aplicación de audio. En ese caso conservamos la intención y dejamos que el
                 // heartbeat multimedia reintente playVideo; solo una pausa explícita detiene todo.
                 const shouldKeepPlaying = ytPlaybackIntent && !playbackStoppedByUser;
                 if (shouldKeepPlaying) {
@@ -6527,6 +6620,7 @@
 
         function togglePlay() {
             if (nowarfyAuthUser && nowarfyRemoteSession && !nowarfyRemoteIsPlayer) { void sendNowarfyCommand('toggle'); return; }
+            if (externalAudioFocusInterrupted) { showToast('Nowarfy cedió el audio a otra aplicación', 'fa-volume-high'); return; }
             nowarfyAudioUnlocked = true;
             if (currentIndex === -1 || !queue[currentIndex]) return;
             // Si venimos de restaurar la cola guardada y todavía no se cargó nada en el reproductor, arrancarla.
@@ -6870,9 +6964,91 @@
             if ('mediaSession' in navigator) {
                 try { navigator.mediaSession.playbackState = 'none'; } catch (e) { /* API opcional */ }
             }
+            setupAudioSessionSupport();
         }
+        function pauseNowarfyForExternalAudio() {
+            if (externalAudioFocusInterrupted) return;
+            const song = currentQueueSong();
+            const wasIntendedToPlay = !playbackStoppedByUser && (isPlaying || (song?.type === 'yt' && ytPlaybackIntent));
+            if (!wasIntendedToPlay) return;
+            externalAudioFocusInterrupted = true;
+            externalAudioFocusResumePending = true;
+            if (song?.type === 'yt') {
+                ytPlaybackIntent = false;
+                try { ytPlayer?.pauseVideo?.(); } catch (error) { /* El IFrame puede estar transicionando */ }
+            } else {
+                try { activeAudioEl?.pause?.(); } catch (error) { /* Audio ya detenido */ }
+            }
+            stopSilentLoop();
+            isPlaying = false;
+            persistVideoResumeSession(true);
+            updateIcon();
+            updatePlaybackState();
+        }
+
+        function resumeNowarfyAfterExternalAudio() {
+            if (!externalAudioFocusInterrupted) return;
+            if (navigator.audioSession?.state === 'interrupted') return;
+            clearTimeout(externalAudioFocusRecoveryTimer);
+            externalAudioFocusRecoveryTimer = null;
+            const shouldResume = externalAudioFocusResumePending && !playbackStoppedByUser && !!currentPlayingQid;
+            externalAudioFocusInterrupted = false;
+            externalAudioFocusResumePending = false;
+            if (!shouldResume) { updatePlaybackState(); return; }
+            const song = currentQueueSong();
+            if (!song) return;
+            isPlaying = false;
+            if (song.type === 'yt' && ytPlayer?.playVideo) {
+                ytPlaybackIntent = true;
+                requestYouTubePlayback('external-audio-ended');
+                startSilentLoop();
+            } else if (activeAudioEl?.play) {
+                const playAttempt = activeAudioEl.play();
+                if (playAttempt?.catch) playAttempt.catch(() => { isPlaying = false; updateIcon(); });
+            }
+            updateIcon();
+            updatePlaybackState();
+        }
+
+        function schedulePossibleExternalAudioYield(reason = 'unexpected-pause') {
+            if (externalAudioFocusInterrupted || playbackStoppedByUser || !currentPlayingQid) return;
+            const song = currentQueueSong();
+            const wasIntendedToPlay = isPlaying || (song?.type === 'yt' && ytPlaybackIntent);
+            if (!wasIntendedToPlay) return;
+            externalAudioFocusInterrupted = true;
+            externalAudioFocusResumePending = true;
+            externalAudioFocusLastState = `probable:${reason}`;
+            if (song?.type === 'yt') ytPlaybackIntent = false;
+            stopSilentLoop();
+            isPlaying = false;
+            persistVideoResumeSession(true);
+            updateIcon();
+            updatePlaybackState();
+            clearTimeout(externalAudioFocusRecoveryTimer);
+            externalAudioFocusRecoveryTimer = window.setTimeout(() => {
+                externalAudioFocusRecoveryTimer = null;
+                if (navigator.audioSession?.state === 'interrupted') return;
+                resumeNowarfyAfterExternalAudio();
+            }, EXTERNAL_AUDIO_GRACE_MS);
+        }
+
+        function handleAudioSessionStateChange() {
+            const state = String(navigator.audioSession?.state || '');
+            externalAudioFocusLastState = state;
+            if (state === 'interrupted') pauseNowarfyForExternalAudio();
+            else if (state !== 'interrupted' && externalAudioFocusInterrupted) resumeNowarfyAfterExternalAudio();
+        }
+
+        function setupAudioSessionSupport() {
+            const session = navigator.audioSession;
+            if (!session?.addEventListener) return;
+            try { session.type = 'playback'; } catch (error) { /* API experimental o no disponible */ }
+            session.addEventListener('statechange', handleAudioSessionStateChange);
+            handleAudioSessionStateChange();
+        }
+
         function startSilentLoop() {
-            if (!silentAudioLoop) return;
+            if (!silentAudioLoop || externalAudioFocusInterrupted) return;
             if (silentAudioLoop.ended) silentAudioLoop.currentTime = 0;
             const playAttempt = silentAudioLoop.play();
             if (playAttempt?.catch) playAttempt.catch(() => { /* Silencio: fallo no crítico */ });
@@ -6923,7 +7099,7 @@
         }
         function setupPlaybackContinuity() {
             const inspectCurrentPlayback = () => {
-                if (playbackStoppedByUser || !currentPlayingQid) return;
+                if (externalAudioFocusInterrupted || playbackStoppedByUser || !currentPlayingQid) return;
                 const current = currentQueueSong();
                 if (!current) return;
                 if (current.type === 'mp3' && isPlaying && activeAudioEl?.ended) {
@@ -6961,7 +7137,17 @@
             // congela los temporizadores de JavaScript. Inspecciona estado, tiempo restante
             // y reintenta playVideo solo si el usuario aún quería seguir reproduciendo.
             silentAudioLoop?.addEventListener('timeupdate', inspectCurrentPlayback);
-            silentAudioLoop?.addEventListener('playing', inspectCurrentPlayback);
+            silentAudioLoop?.addEventListener('playing', () => {
+                if (externalAudioFocusInterrupted && String(externalAudioFocusLastState).startsWith('probable:')) {
+                    resumeNowarfyAfterExternalAudio();
+                    return;
+                }
+                inspectCurrentPlayback();
+            });
+            silentAudioLoop?.addEventListener('pause', () => {
+                if (mediaTransitionInProgress || externalAudioFocusInterrupted || playbackStoppedByUser || document.visibilityState !== 'hidden') return;
+                schedulePossibleExternalAudioYield('anchor-paused-out-of-focus');
+            });
             document.addEventListener('visibilitychange', () => inspectCurrentPlayback());
             window.addEventListener('focus', inspectCurrentPlayback);
         }

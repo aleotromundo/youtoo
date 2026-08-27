@@ -32,7 +32,7 @@ async function waitForDebugger() {
 }
 async function evaluate(expression, awaitPromise = true) {
   const result = await command('Runtime.evaluate', { expression, awaitPromise, returnByValue: true });
-  if (result.exceptionDetails) throw new Error(result.exceptionDetails.text || 'Error JavaScript en la página');
+  if (result.exceptionDetails) throw new Error(result.exceptionDetails.exception?.description || result.exceptionDetails.text || 'Error JavaScript en la página');
   return result.result?.value;
 }
 
@@ -61,12 +61,16 @@ try {
       _qid: 'lyrics-ui-test', url: 'lyrics-ui-video', type: 'yt', isPlaylist: false,
       title: 'Foo Fighters - Everlong (Official Music Video)', artist: 'Foo Fighters',
       channelTitle: 'Foo Fighters', channelId: 'UC-test', duration: 252, categoryId: '10',
-      description: 'Official music video.'
+      description: 'Official music video.', img: 'data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22120%22 height=%2268%22%3E%3Crect width=%22120%22 height=%2268%22 fill=%22%235eead4%22/%3E%3C/svg%3E'
     };
     queue = [song];
     queueSeenKeys = new Set([songKey(song)]);
     currentIndex = 0;
     currentPlayingQid = song._qid;
+    window.__frameSizeCalls = [];
+    window.YT = { PlayerState: { PLAYING: 1 } };
+    ytPlayer = { setSize(width, height) { window.__frameSizeCalls.push({ width, height }); }, getPlayerState() { return 1; }, playVideo() {} };
+    document.getElementById('yt-player-container').innerHTML = '<iframe title="YouTube test frame"></iframe>';
     window.fetch = ((originalFetch) => (url, options) => {
       if (!String(url).includes('/api/lyrics')) return originalFetch(url, options);
       return Promise.resolve(new Response(JSON.stringify({
@@ -106,17 +110,20 @@ try {
     const stage = document.getElementById('videoStage');
     const button = document.getElementById('videoStageToggleBtn');
     const rect = button.getBoundingClientRect();
-    return { stageHidden: !stage.classList.contains('visible'), buttonVisible: !button.hidden, buttonWidth: rect.width, buttonHeight: rect.height, buttonLabel: button.getAttribute('aria-label'), copy: button.textContent.trim() };
+    return { stageHidden: !stage.classList.contains('visible'), buttonVisible: !button.hidden, buttonWidth: rect.width, buttonHeight: rect.height, buttonLabel: button.getAttribute('aria-label'), copy: button.textContent.trim(), beforeAnimation: getComputedStyle(button, '::before').animationName, afterAnimation: getComputedStyle(button, '::after').animationName, ripplePointerEvents: getComputedStyle(button, '::before').pointerEvents };
   })()`);
-  if (!hidden.stageHidden || !hidden.buttonVisible || hidden.buttonWidth < 145 || hidden.buttonHeight < 42 || !hidden.buttonLabel.includes('automáticamente') || !hidden.copy.includes('Mostrar video')) throw new Error(`Botón de video minimizado insuficiente: ${JSON.stringify(hidden)}`);
+  if (!hidden.stageHidden || !hidden.buttonVisible || hidden.buttonWidth < 145 || hidden.buttonHeight < 42 || !hidden.buttonLabel.includes('automáticamente') || !hidden.copy.includes('Mostrar video') || hidden.beforeAnimation !== 'video-toggle-ripple' || hidden.afterAnimation !== 'video-toggle-ripple' || hidden.ripplePointerEvents !== 'none') throw new Error(`Botón de video minimizado insuficiente: ${JSON.stringify(hidden)}`);
+  const hiddenScreenshot = await command('Page.captureScreenshot', { format: 'png' });
+  await writeFile('/tmp/nowarfy-video-toggle-ripples.png', Buffer.from(hiddenScreenshot.data, 'base64'));
 
   await evaluate(`(() => { toggleVideoStageVisibility(); return true; })()`);
-  const shown = await evaluate(`(() => ({ stageVisible: document.getElementById('videoStage').classList.contains('visible'), restoreButtonHidden: document.getElementById('videoStageToggleBtn').hidden }))()`);
-  if (!shown.stageVisible || !shown.restoreButtonHidden) throw new Error(`El video no volvió a mostrarse: ${JSON.stringify(shown)}`);
+  await new Promise(resolve => setTimeout(resolve, 700));
+  const shown = await evaluate(`(() => ({ stageVisible: document.getElementById('videoStage').classList.contains('visible'), restoreButtonHidden: document.getElementById('videoStageToggleBtn').hidden, posterHidden: document.getElementById('videoFramePoster').hidden, frameVisible: getComputedStyle(document.querySelector('#yt-player-container iframe')).visibility === 'visible', frameSizeCalls: window.__frameSizeCalls }))()`);
+  if (!shown.stageVisible || !shown.restoreButtonHidden || !shown.posterHidden || !shown.frameVisible || !shown.frameSizeCalls.length || shown.frameSizeCalls.at(-1).width < 1 || shown.frameSizeCalls.at(-1).height < 1) throw new Error(`El video no volvió a pintarse correctamente: ${JSON.stringify(shown)}`);
 
   const screenshot = await command('Page.captureScreenshot', { format: 'png' });
   await writeFile('/tmp/nowarfy-video-lyrics-ui.png', Buffer.from(screenshot.data, 'base64'));
-  console.log(JSON.stringify({ passed: true, checks: { verifiedLyricsButton: true, lyricsPanelAndZoom: true, prominentAutoHideButton: true, restoreVideo: true }, lyricReady, lyricOpen, hidden, shown }, null, 2));
+  console.log(JSON.stringify({ passed: true, checks: { verifiedLyricsButton: true, lyricsPanelAndZoom: true, prominentAutoHideButton: true, expandingRings: true, restoreVideoFrame: true }, lyricReady, lyricOpen, hidden, shown }, null, 2));
 } finally {
   if (socket) socket.close();
   browser.kill('SIGTERM');
