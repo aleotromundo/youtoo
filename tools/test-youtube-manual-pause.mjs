@@ -62,6 +62,7 @@ try {
     currentIndex = 0;
     currentPlayingQid = song._qid;
     externalAudioFocusInterrupted = false;
+    Object.defineProperty(document, 'hasFocus', { configurable: true, value: () => true });
     playbackStoppedByUser = false;
     ytPlaybackIntent = true;
     isPlaying = true;

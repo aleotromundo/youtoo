@@ -2066,6 +2066,9 @@
         let externalAudioFocusResumePending = false;
         let externalAudioFocusLastState = '';
         let externalAudioFocusRecoveryTimer = null;
+        let externalAudioFocusResumeCheckTimer = null;
+        let externalAudioFocusResumeAttempting = false;
+        let externalAudioFocusRecoveryAttempts = 0;
         let externalAudioFocusFadeTimer = null;
         let externalAudioFocusVolume = null;
         let videoStageManualMinimized = false;
@@ -2079,6 +2082,7 @@
         let automaticQueueRecoveryInFlight = false;
         const PLAYBACK_CONTINUITY_CHECK_MS = 9000;
         const EXTERNAL_AUDIO_RESUME_DELAY_MS = 900;
+        const EXTERNAL_AUDIO_RESUME_RETRY_MS = 2500;
         const YT_PLAY_RETRY_THROTTLE_MS = 750;
         const YT_END_EARLY_TOLERANCE_SECONDS = 1.5;
         let channelFilter = null; // { id, title } cuando el usuario entra a ver el contenido de un canal
@@ -5288,7 +5292,7 @@
             };
             audio.onpause = () => {
                 if (audio !== activeAudioEl || audio.ended || crossfadeInProgress || String(audio.dataset.queueId || '') !== String(currentPlayingQid || '')) return;
-                if (document.visibilityState === 'hidden' && !playbackStoppedByUser && !externalAudioFocusInterrupted && isPlaying) {
+                if ((document.visibilityState === 'hidden' || (typeof document.hasFocus === 'function' && !document.hasFocus())) && !playbackStoppedByUser && !externalAudioFocusInterrupted && isPlaying) {
                     schedulePossibleExternalAudioYield('direct-audio-paused');
                     return;
                 }
@@ -6647,7 +6651,8 @@
                 // Un clic en el centro del IFrame no burbujea hasta la página. Si la PWA está
                 // visible y la pista ya estaba establemente sonando, este PAUSED es la señal
                 // disponible de una pausa manual. Nunca lo revertimos desde el watchdog.
-                if (document.visibilityState !== 'hidden' && !externalAudioFocusInterrupted && isPlaying) {
+                const pageHasFocus = typeof document.hasFocus === 'function' ? document.hasFocus() : document.visibilityState !== 'hidden';
+                if (document.visibilityState !== 'hidden' && pageHasFocus && !externalAudioFocusInterrupted && isPlaying) {
                     ytPlaybackIntent = false;
                     playbackStoppedByUser = true;
                     stopSilentLoop();
@@ -6662,7 +6667,7 @@
                 }
                 // Si otra aplicación tomó el foco mientras la PWA estaba oculta, ceder durante
                 // unos segundos evita que el anclaje vuelva a reclamar el audio inmediatamente.
-                if (document.visibilityState === 'hidden' && ytPlaybackIntent && !playbackStoppedByUser && !externalAudioFocusInterrupted) {
+                if ((document.visibilityState === 'hidden' || !pageHasFocus) && ytPlaybackIntent && !playbackStoppedByUser && !externalAudioFocusInterrupted) {
                     schedulePossibleExternalAudioYield('youtube-paused-out-of-focus');
                     return;
                 }
@@ -7123,33 +7128,84 @@
             updatePlaybackState();
         }
 
-        function resumeNowarfyAfterExternalAudio() {
-            if (!externalAudioFocusInterrupted) return;
+        function scheduleExternalAudioResumeCheck(expectedQid, reason = 'resume-check') {
+            clearTimeout(externalAudioFocusResumeCheckTimer);
+            if (!externalAudioFocusInterrupted || !externalAudioFocusResumePending || playbackStoppedByUser) return;
+            const delay = EXTERNAL_AUDIO_RESUME_RETRY_MS + (Math.min(externalAudioFocusRecoveryAttempts, 8) * 750);
+            externalAudioFocusResumeCheckTimer = window.setTimeout(() => {
+                externalAudioFocusResumeCheckTimer = null;
+                if (currentPlayingQid !== expectedQid || playbackStoppedByUser || !externalAudioFocusInterrupted) return;
+                if (navigator.audioSession?.state === 'interrupted') {
+                    scheduleExternalAudioResumeCheck(expectedQid, 'audio-session-still-interrupted');
+                    return;
+                }
+                resumeNowarfyAfterExternalAudio(reason);
+            }, delay);
+        }
+
+        function resumeNowarfyAfterExternalAudio(reason = 'external-audio-ended') {
+            if (!externalAudioFocusInterrupted || externalAudioFocusResumeAttempting) return;
             if (navigator.audioSession?.state === 'interrupted') return;
             clearTimeout(externalAudioFocusRecoveryTimer);
             externalAudioFocusRecoveryTimer = null;
             const shouldResume = externalAudioFocusResumePending && !playbackStoppedByUser && !!currentPlayingQid;
+            if (!shouldResume) {
+                externalAudioFocusInterrupted = false;
+                externalAudioFocusResumePending = false;
+                externalAudioFocusLastState = '';
+                clearTimeout(externalAudioFocusResumeCheckTimer);
+                externalAudioFocusResumeCheckTimer = null;
+                updatePlaybackState();
+                return;
+            }
+            const song = currentQueueSong();
+            if (!song) return;
+            const expectedQid = currentPlayingQid;
+            const restoreVolume = Number.isFinite(externalAudioFocusVolume) ? externalAudioFocusVolume : Math.max(0, Math.min(1, Number(lastVolume) || 0));
+            externalAudioFocusRecoveryAttempts += 1;
+            externalAudioFocusResumeAttempting = true;
             externalAudioFocusInterrupted = false;
             externalAudioFocusResumePending = false;
             externalAudioFocusLastState = '';
-            if (!shouldResume) { updatePlaybackState(); return; }
-            const song = currentQueueSong();
-            if (!song) return;
-            const restoreVolume = Number.isFinite(externalAudioFocusVolume) ? externalAudioFocusVolume : Math.max(0, Math.min(1, Number(lastVolume) || 0));
             externalAudioFocusVolume = null;
             isPlaying = false;
+            let playStarted = false;
             if (song.type === 'yt' && ytPlayer?.playVideo) {
                 ytPlaybackIntent = true;
-                requestYouTubePlayback('external-audio-ended');
+                playStarted = requestYouTubePlayback(reason);
                 startSilentLoop();
                 void fadeNowarfyVolume(restoreVolume, 360);
             } else if (activeAudioEl?.play) {
                 const playAttempt = activeAudioEl.play();
-                if (playAttempt?.catch) playAttempt.catch(() => { isPlaying = false; updateIcon(); });
+                playStarted = true;
+                if (playAttempt?.catch) playAttempt.catch(() => { playStarted = false; isPlaying = false; updateIcon(); });
                 void fadeNowarfyVolume(restoreVolume, 360);
             }
+            if (playStarted) isPlaying = true;
             updateIcon();
             updatePlaybackState();
+            window.setTimeout(() => {
+                externalAudioFocusResumeAttempting = false;
+                const current = currentQueueSong();
+                if (currentPlayingQid !== expectedQid || playbackStoppedByUser) return;
+                let playing = false;
+                if (current?.type === 'yt') {
+                    try { playing = ytPlayer?.getPlayerState?.() === window.YT?.PlayerState?.PLAYING; } catch (error) { playing = false; }
+                } else playing = !!(activeAudioEl && !activeAudioEl.paused);
+                if (playing) {
+                    externalAudioFocusRecoveryAttempts = 0;
+                    return;
+                }
+                externalAudioFocusInterrupted = true;
+                externalAudioFocusResumePending = true;
+                externalAudioFocusLastState = `probable:resume-rejected:${reason}`;
+                isPlaying = false;
+                stopSilentLoop();
+                persistVideoResumeSession(true);
+                updateIcon();
+                updatePlaybackState();
+                scheduleExternalAudioResumeCheck(expectedQid, 'resume-rejected');
+            }, 1100);
         }
 
         function schedulePossibleExternalAudioYield(reason = 'unexpected-pause') {
@@ -7296,7 +7352,7 @@
             silentAudioLoop?.addEventListener('timeupdate', inspectCurrentPlayback);
             silentAudioLoop?.addEventListener('playing', inspectCurrentPlayback);
             silentAudioLoop?.addEventListener('pause', () => {
-                if (mediaTransitionInProgress || externalAudioFocusInterrupted || playbackStoppedByUser || document.visibilityState !== 'hidden') return;
+                if (mediaTransitionInProgress || externalAudioFocusInterrupted || playbackStoppedByUser || (document.visibilityState !== 'hidden' && (typeof document.hasFocus !== 'function' || document.hasFocus()))) return;
                 schedulePossibleExternalAudioYield('anchor-paused-out-of-focus');
             });
             document.addEventListener('visibilitychange', () => {

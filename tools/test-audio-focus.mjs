@@ -64,7 +64,8 @@ try {
     queue = [song]; currentIndex = 0; currentPlayingQid = song._qid; isPlaying = true; playbackStoppedByUser = false; ytPlaybackIntent = true;
     let pauseCalls = 0;
     window.__audioFocusPlayCalls = 0;
-    ytPlayer = { volume: 80, pauseVideo() { pauseCalls += 1; }, playVideo() { window.__audioFocusPlayCalls += 1; }, getVolume() { return this.volume; }, setVolume(value) { this.volume = value; }, getPlayerState() { return 2; } };
+    let ytState = 2;
+    ytPlayer = { volume: 80, pauseVideo() { pauseCalls += 1; }, playVideo() { window.__audioFocusPlayCalls += 1; if (window.__audioFocusPlayCalls >= 2) ytState = 1; }, getVolume() { return this.volume; }, setVolume(value) { this.volume = value; }, getPlayerState() { return ytState; } };
     setupAudioSessionSupport();
     session.state = 'interrupted';
     session.dispatchEvent(new Event('statechange'));
@@ -82,6 +83,13 @@ try {
   const resumedAfterFade = await evaluate('({ volume: ytPlayer.volume, externalAudioFocusInterrupted, intent: ytPlaybackIntent })');
   if (resumed.interrupted || resumed.resumePending || !resumed.intent || resumed.playCalls !== 1 || resumed.current !== 'audio-focus-test' || interruption.volume > 1 || resumedAfterFade.volume < 79 || resumedAfterFade.externalAudioFocusInterrupted || !resumedAfterFade.intent) throw new Error(`La reanudación/fade falló: ${JSON.stringify({ interruption, resumed, resumedAfterFade })}`);
 
+  await new Promise(resolve => setTimeout(resolve, 1200));
+  const waitingForRetry = await evaluate('({ interrupted: externalAudioFocusInterrupted, pending: externalAudioFocusResumePending, attempts: externalAudioFocusRecoveryAttempts, playCalls: window.__audioFocusPlayCalls })');
+  if (!waitingForRetry.interrupted || !waitingForRetry.pending || waitingForRetry.attempts < 1 || waitingForRetry.playCalls !== 1) throw new Error(`No quedó esperando una recuperación escalonada: ${JSON.stringify(waitingForRetry)}`);
+  await new Promise(resolve => setTimeout(resolve, 4100));
+  const recoveredAfterRetry = await evaluate('({ interrupted: externalAudioFocusInterrupted, pending: externalAudioFocusResumePending, attempts: externalAudioFocusRecoveryAttempts, playCalls: window.__audioFocusPlayCalls, playing: isPlaying, intent: ytPlaybackIntent })');
+  if (recoveredAfterRetry.interrupted || recoveredAfterRetry.pending || recoveredAfterRetry.attempts !== 0 || recoveredAfterRetry.playCalls < 2 || !recoveredAfterRetry.playing || !recoveredAfterRetry.intent) throw new Error(`La recuperación escalonada falló: ${JSON.stringify(recoveredAfterRetry)}`);
+
   const fallbackYield = await evaluate(`(() => {
     isPlaying = true; playbackStoppedByUser = false; ytPlaybackIntent = true; externalAudioFocusInterrupted = false; externalAudioFocusResumePending = false;
     schedulePossibleExternalAudioYield('test-out-of-focus-pause');
@@ -90,7 +98,7 @@ try {
     return { yielded, restored: { interrupted: externalAudioFocusInterrupted, pending: externalAudioFocusResumePending, intent: ytPlaybackIntent, current: currentPlayingQid } };
   })()`);
   if (!fallbackYield.yielded.interrupted || !fallbackYield.yielded.pending || fallbackYield.yielded.playing || fallbackYield.yielded.intent || !fallbackYield.yielded.state.includes('probable') || fallbackYield.restored.interrupted || fallbackYield.restored.pending || !fallbackYield.restored.intent) throw new Error(`El fallback fuera de foco falló: ${JSON.stringify(fallbackYield)}`);
-  console.log(JSON.stringify({ passed: true, checks: { audioSessionPlaybackType: true, fadesOutOnInterruption: true, pausesOnExternalInterruption: true, preservesQueuePosition: true, fadesInOnResume: true, resumesAfterInterruption: true, fallbackYieldsWithoutAudioSession: true }, interruption, resumed, resumedAfterFade, fallbackYield }, null, 2));
+  console.log(JSON.stringify({ passed: true, checks: { audioSessionPlaybackType: true, fadesOutOnInterruption: true, pausesOnExternalInterruption: true, preservesQueuePosition: true, fadesInOnResume: true, waitsForReleaseBeforeRetrying: true, resumesAfterInterruption: true, fallbackYieldsWithoutAudioSession: true }, interruption, resumed, resumedAfterFade, waitingForRetry, recoveredAfterRetry, fallbackYield }, null, 2));
 } finally {
   if (socket) socket.close();
   browser.kill('SIGTERM');
