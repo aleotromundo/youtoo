@@ -2066,6 +2066,8 @@
         let externalAudioFocusResumePending = false;
         let externalAudioFocusLastState = '';
         let externalAudioFocusRecoveryTimer = null;
+        let externalAudioFocusFadeTimer = null;
+        let externalAudioFocusVolume = null;
         let videoStageManualMinimized = false;
         let videoStageNeedsVisualRefresh = false;
         let videoFrameRefreshTimer = null;
@@ -6642,6 +6644,22 @@
                 if (!progressInterval) startProgress(ytPlayer);
                 if (nowarfyRemoteIsPlayer) void publishNowarfyRemoteState();
             } else if (event.data === YT.PlayerState.PAUSED) {
+                // Un clic en el centro del IFrame no burbujea hasta la página. Si la PWA está
+                // visible y la pista ya estaba establemente sonando, este PAUSED es la señal
+                // disponible de una pausa manual. Nunca lo revertimos desde el watchdog.
+                if (document.visibilityState !== 'hidden' && !externalAudioFocusInterrupted && isPlaying) {
+                    ytPlaybackIntent = false;
+                    playbackStoppedByUser = true;
+                    stopSilentLoop();
+                    clearTimeout(ytStartupTimer);
+                    ytStartupTimer = null;
+                    isPlaying = false;
+                    persistVideoResumeSession(true);
+                    updateIcon();
+                    updatePlaybackState();
+                    if (nowarfyRemoteIsPlayer) void publishNowarfyRemoteState();
+                    return;
+                }
                 // Si otra aplicación tomó el foco mientras la PWA estaba oculta, ceder durante
                 // unos segundos evita que el anclaje vuelva a reclamar el audio inmediatamente.
                 if (document.visibilityState === 'hidden' && ytPlaybackIntent && !playbackStoppedByUser && !externalAudioFocusInterrupted) {
@@ -6650,7 +6668,7 @@
                 }
                 // ChromeOS también puede emitir PAUSED al ocultar una PWA sin que exista otra
                 // aplicación de audio. En ese caso conservamos la intención y dejamos que el
-                // heartbeat multimedia reintente playVideo; solo una pausa explícita detiene todo.
+                // heartbeat multimedia reintente playVideo; una pausa visible ya fue tratada arriba.
                 const shouldKeepPlaying = ytPlaybackIntent && !playbackStoppedByUser;
                 if (shouldKeepPlaying) {
                     isPlaying = true;
@@ -6981,19 +6999,59 @@
                 void sendNowarfyCommand('volume', Math.round(v * 100));
                 return;
             }
+            if (externalAudioFocusInterrupted) {
+                const slider = document.getElementById('volumeSlider');
+                if (slider) { slider.value = v; slider.style.background = `linear-gradient(to right, var(--accent) ${v * 100}%, #535353 ${v * 100}%)`; }
+                externalAudioFocusVolume = v;
+                localStorage.setItem('nowarfy_vol', v);
+                return;
+            }
             applyVolume(v);
             localStorage.setItem('nowarfy_vol', v);
         }
+        function applyPlaybackVolume(v) {
+            const safe = Math.max(0, Math.min(1, Number(v) || 0));
+            audioEl.volume = safe;
+            nextAudioEl.volume = safe;
+            freeVideoEl.volume = safe;
+            if (ytPlayer && ytPlayer.setVolume) ytPlayer.setVolume(safe * 100);
+        }
         function applyVolume(v) {
-            audioEl.volume = v;
-            nextAudioEl.volume = v;
-            freeVideoEl.volume = v;
-            if (ytPlayer && ytPlayer.setVolume) ytPlayer.setVolume(v * 100);
+            const safe = Math.max(0, Math.min(1, parseFloat(v)));
+            applyPlaybackVolume(safe);
             const slider = document.getElementById('volumeSlider');
-            slider.value = v;
-            slider.style.background = `linear-gradient(to right, var(--accent) ${v * 100}%, #535353 ${v * 100}%)`;
+            slider.value = safe;
+            slider.style.background = `linear-gradient(to right, var(--accent) ${safe * 100}%, #535353 ${safe * 100}%)`;
             const icon = document.getElementById('volIcon');
-            icon.className = (v == 0 ? 'fas fa-volume-mute' : v < 0.5 ? 'fas fa-volume-down' : 'fas fa-volume-up') + ' btn-control';
+            icon.className = (safe == 0 ? 'fas fa-volume-mute' : safe < 0.5 ? 'fas fa-volume-down' : 'fas fa-volume-up') + ' btn-control';
+        }
+        function getCurrentPlaybackVolume(song = currentQueueSong()) {
+            try {
+                if (song?.type === 'yt' && ytPlayer?.getVolume) return Math.max(0, Math.min(1, Number(ytPlayer.getVolume()) / 100));
+                if (activeAudioEl) return Math.max(0, Math.min(1, Number(activeAudioEl.volume)));
+            } catch (error) { /* El reproductor puede estar cambiando de fuente */ }
+            return Math.max(0, Math.min(1, Number(lastVolume) || 0));
+        }
+        function fadeNowarfyVolume(target, duration = 280) {
+            const safeTarget = Math.max(0, Math.min(1, Number(target) || 0));
+            const start = getCurrentPlaybackVolume();
+            clearInterval(externalAudioFocusFadeTimer);
+            return new Promise(resolve => {
+                const startedAt = performance.now();
+                const tick = () => {
+                    const progress = Math.min(1, (performance.now() - startedAt) / duration);
+                    const eased = 1 - Math.pow(1 - progress, 3);
+                    const value = start + (safeTarget - start) * eased;
+                    applyPlaybackVolume(value);
+                    if (progress >= 1) {
+                        clearInterval(externalAudioFocusFadeTimer);
+                        externalAudioFocusFadeTimer = null;
+                        resolve();
+                    }
+                };
+                tick();
+                externalAudioFocusFadeTimer = window.setInterval(tick, 32);
+            });
         }
         function toggleMute() {
             const slider = document.getElementById('volumeSlider');
@@ -7047,14 +7105,19 @@
             if (!wasIntendedToPlay) return;
             externalAudioFocusInterrupted = true;
             externalAudioFocusResumePending = true;
-            if (song?.type === 'yt') {
-                ytPlaybackIntent = false;
-                try { ytPlayer?.pauseVideo?.(); } catch (error) { /* El IFrame puede estar transicionando */ }
-            } else {
-                try { activeAudioEl?.pause?.(); } catch (error) { /* Audio ya detenido */ }
-            }
+            const restoreVolume = getCurrentPlaybackVolume(song);
+            externalAudioFocusVolume = Number.isFinite(restoreVolume) ? restoreVolume : Math.max(0, Math.min(1, Number(lastVolume) || 0));
+            if (song?.type === 'yt') ytPlaybackIntent = false;
             stopSilentLoop();
             isPlaying = false;
+            void fadeNowarfyVolume(0, 280).then(() => {
+                if (!externalAudioFocusInterrupted || currentQueueSong()?.url !== song?.url) return;
+                if (song?.type === 'yt') {
+                    try { ytPlayer?.pauseVideo?.(); } catch (error) { /* El IFrame puede estar transicionando */ }
+                } else {
+                    try { activeAudioEl?.pause?.(); } catch (error) { /* Audio ya detenido */ }
+                }
+            });
             persistVideoResumeSession(true);
             updateIcon();
             updatePlaybackState();
@@ -7072,14 +7135,18 @@
             if (!shouldResume) { updatePlaybackState(); return; }
             const song = currentQueueSong();
             if (!song) return;
+            const restoreVolume = Number.isFinite(externalAudioFocusVolume) ? externalAudioFocusVolume : Math.max(0, Math.min(1, Number(lastVolume) || 0));
+            externalAudioFocusVolume = null;
             isPlaying = false;
             if (song.type === 'yt' && ytPlayer?.playVideo) {
                 ytPlaybackIntent = true;
                 requestYouTubePlayback('external-audio-ended');
                 startSilentLoop();
+                void fadeNowarfyVolume(restoreVolume, 360);
             } else if (activeAudioEl?.play) {
                 const playAttempt = activeAudioEl.play();
                 if (playAttempt?.catch) playAttempt.catch(() => { isPlaying = false; updateIcon(); });
+                void fadeNowarfyVolume(restoreVolume, 360);
             }
             updateIcon();
             updatePlaybackState();
@@ -7093,9 +7160,19 @@
             externalAudioFocusInterrupted = true;
             externalAudioFocusResumePending = true;
             externalAudioFocusLastState = `probable:${reason}`;
+            const restoreVolume = getCurrentPlaybackVolume(song);
+            externalAudioFocusVolume = Number.isFinite(restoreVolume) ? restoreVolume : Math.max(0, Math.min(1, Number(lastVolume) || 0));
             if (song?.type === 'yt') ytPlaybackIntent = false;
             stopSilentLoop();
             isPlaying = false;
+            void fadeNowarfyVolume(0, 280).then(() => {
+                if (!externalAudioFocusInterrupted || currentQueueSong()?.url !== song?.url) return;
+                if (song?.type === 'yt') {
+                    try { ytPlayer?.pauseVideo?.(); } catch (error) { /* El IFrame puede estar transicionando */ }
+                } else {
+                    try { activeAudioEl?.pause?.(); } catch (error) { /* Audio ya detenido */ }
+                }
+            });
             persistVideoResumeSession(true);
             updateIcon();
             updatePlaybackState();
