@@ -6131,16 +6131,29 @@
         function lyricsArtistName(song) {
             return normalizeSourceText(song?.artist || song?.channelTitle || '')
                 .replace(/\b(official|music|channel|canal)\b/gi, ' ')
+                .replace(/\s*[-|·–—]\s*(?:topic|official)\s*$/i, ' ')
                 .replace(/(?:vevo|topic)$/i, '')
                 .replace(/\s+/g, ' ')
                 .trim();
         }
-
         function lyricsTrackTitle(song) {
-            return normalizeSourceText(song?.title || '')
-                .replace(/\s*[|·–—-]\s*(official|music|audio|video|lyrics?|lyric|visualizer|vevo).*$/i, '')
+            let title = normalizeSourceText(song?.title || '')
+                .replace(/\s*[([{]([^\])}]{0,120})[\])}]/g, (full, inner) => /\b(?:official|music|video|audio|lyrics?|lyric|visualizer|hd|hq|4k|vevo)\b/i.test(inner) ? ' ' : full)
+                .replace(/\s+(?:official\s+)?(?:music\s+)?(?:video|audio|lyrics?|lyric|visualizer|hd|hq|4k)\s*$/i, ' ')
+                .replace(/\s*[|·–—-]\s*(?:official|music|audio|video|lyrics?|lyric|visualizer|vevo)\b.*$/i, ' ')
+                .replace(/\s+/g, ' ')
                 .trim();
+            const artist = lyricsTextKey(lyricsArtistName(song));
+            const embedded = title.match(/^(.{2,100}?)\s+[-–—|·]\s+(.{2,160})$/);
+            if (embedded) {
+                const prefix = lyricsTextKey(embedded[1]);
+                const compactPrefix = prefix.replace(/\s/g, '');
+                const compactArtist = artist.replace(/\s/g, '');
+                if (prefix === artist || (compactPrefix && compactPrefix === compactArtist)) title = embedded[2].trim();
+            }
+            return title;
         }
+
 
         function lyricsSongKey(song) {
             return `${lyricsTextKey(lyricsArtistName(song))}::${lyricsTextKey(lyricsTrackTitle(song))}`;
@@ -6209,7 +6222,7 @@
             if (panel) panel.hidden = true;
             if (content) { content.textContent = ''; content.style.fontSize = ''; }
             if (status) status.textContent = 'Letra verificada';
-            if (source) source.textContent = 'Coincidencia corroborada por artista, título y duración.';
+            if (source) source.textContent = 'Coincidencia corroborada por metadatos disponibles y la fuente pública.';
             if (zoomValue) zoomValue.textContent = '100%';
         }
 
@@ -6228,7 +6241,7 @@
             button.setAttribute('aria-expanded', 'false');
             button.innerHTML = '<i class="fas fa-music"></i> Ver letra';
             status.textContent = `Letra verificada · ${data.track.source || 'fuente pública'}`;
-            source.textContent = 'Coincidencia corroborada por artista, título y duración.';
+            source.textContent = 'Coincidencia corroborada por metadatos disponibles y la fuente pública.';
             sourceLink.href = data.track.sourceUrl || 'https://lrclib.net/';
             return true;
         }

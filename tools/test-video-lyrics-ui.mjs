@@ -59,8 +59,8 @@ try {
   const prepared = await evaluate(`(() => {
     const song = {
       _qid: 'lyrics-ui-test', url: 'lyrics-ui-video', type: 'yt', isPlaylist: false,
-      title: 'Foo Fighters - Everlong (Official Music Video)', artist: 'Foo Fighters',
-      channelTitle: 'Foo Fighters', channelId: 'UC-test', duration: 252, categoryId: '10',
+      title: 'Foo Fighters - Everlong (Official Music Video)', artist: 'FooFightersVEVO',
+      channelTitle: 'FooFightersVEVO', channelId: 'UC-test', duration: 252, categoryId: '10',
       description: 'Official music video.', img: 'data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22120%22 height=%2268%22%3E%3Crect width=%22120%22 height=%2268%22 fill=%22%235eead4%22/%3E%3C/svg%3E'
     };
     queue = [song];
@@ -75,8 +75,10 @@ try {
     isPlaying = true;
     ytPlayer = { setSize(width, height) { window.__frameSizeCalls.push({ width, height }); }, getPlayerState() { return 1; }, getCurrentTime() { return 122; }, getDuration() { return 252; }, loadVideoById(payload) { window.__frameReloadCalls.push(payload); }, playVideo() {} };
     document.getElementById('yt-player-container').innerHTML = '<iframe title="YouTube test frame"></iframe>';
+    window.__lyricsRequestUrls = [];
     window.fetch = ((originalFetch) => (url, options) => {
       if (!String(url).includes('/api/lyrics')) return originalFetch(url, options);
+      window.__lyricsRequestUrls.push(String(url));
       return Promise.resolve(new Response(JSON.stringify({
         found: true, verified: true,
         verification: { artist: true, title: true, duration: true, durationDelta: 1 },
@@ -93,9 +95,10 @@ try {
     buttonVisible: !document.getElementById('lyricsToggleBtn').hidden,
     panelInitiallyHidden: document.getElementById('lyricsPanel').hidden,
     text: document.getElementById('lyricsContent').textContent,
-    source: document.getElementById('lyricsToolbarStatus').textContent
+    source: document.getElementById('lyricsToolbarStatus').textContent,
+    lyricsRequestUrl: window.__lyricsRequestUrls[0] || ''
   }))()`);
-  if (!lyricReady.buttonVisible || !lyricReady.panelInitiallyHidden || !lyricReady.text.includes('Everlong') || !lyricReady.source.includes('LRCLIB')) throw new Error(`La letra no quedó lista: ${JSON.stringify(lyricReady)}`);
+  if (!lyricReady.buttonVisible || !lyricReady.panelInitiallyHidden || !lyricReady.text.includes('Everlong') || !lyricReady.source.includes('LRCLIB') || !lyricReady.lyricsRequestUrl.includes('artist=FooFighters') || !lyricReady.lyricsRequestUrl.includes('title=Everlong') || lyricReady.lyricsRequestUrl.includes('Official')) throw new Error(`La letra no quedó lista o no limpió metadatos: ${JSON.stringify(lyricReady)}`);
 
   await evaluate(`(() => { document.getElementById('lyricsToggleBtn').click(); changeLyricsZoom(0.1); return true; })()`);
   const lyricOpen = await evaluate(`(() => ({
