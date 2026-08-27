@@ -7333,9 +7333,13 @@
                     queueAutomaticAdvance('youtube-timed-ended-fallback');
                     return;
                 }
+                // Nunca interrumpimos un buffer normal: llamar a playVideo() durante BUFFERING
+                // puede reiniciar el segmento y se percibe como un corte periódico. La
+                // continuidad solo interviene ante estados realmente detenidos.
+                if (state === YT.PlayerState.BUFFERING || state === YT.PlayerState.PLAYING) return;
                 // Si ChromeOS dejó el iframe pausado o sin arrancar mientras la intención
                 // seguía activa, el evento timeupdate del audio auxiliar vuelve a darle play.
-                if (ytPlaybackIntent && !playbackStoppedByUser && state !== YT.PlayerState.PLAYING) {
+                if (ytPlaybackIntent && !playbackStoppedByUser && (state === YT.PlayerState.PAUSED || state === YT.PlayerState.UNSTARTED || state === YT.PlayerState.CUED)) {
                     if (!isPlaying) {
                         isPlaying = true;
                         updateIcon();
