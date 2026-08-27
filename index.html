@@ -2083,6 +2083,9 @@
         const PLAYBACK_CONTINUITY_CHECK_MS = 9000;
         const EXTERNAL_AUDIO_RESUME_DELAY_MS = 900;
         const EXTERNAL_AUDIO_RESUME_RETRY_MS = 2500;
+        // Preferencia actual: Nowarfy mantiene la continuidad en segundo plano.
+        // Para escuchar otra aplicación, el usuario pausa Nowarfy manualmente.
+        const NOWARFY_AUDIO_PRIORITY_MODE = true;
         const YT_PLAY_RETRY_THROTTLE_MS = 750;
         const YT_END_EARLY_TOLERANCE_SECONDS = 1.5;
         let channelFilter = null; // { id, title } cuando el usuario entra a ver el contenido de un canal
@@ -5291,9 +5294,16 @@
                 }
             };
             audio.onpause = () => {
-                if (audio !== activeAudioEl || audio.ended || crossfadeInProgress || String(audio.dataset.queueId || '') !== String(currentPlayingQid || '')) return;
-                if ((document.visibilityState === 'hidden' || (typeof document.hasFocus === 'function' && !document.hasFocus())) && !playbackStoppedByUser && !externalAudioFocusInterrupted && isPlaying) {
+                if (mediaTransitionInProgress || audio !== activeAudioEl || audio.ended || crossfadeInProgress || String(audio.dataset.queueId || '') !== String(currentPlayingQid || '')) return;
+                if ((document.visibilityState === 'hidden' || (typeof document.hasFocus === 'function' && !document.hasFocus())) && !NOWARFY_AUDIO_PRIORITY_MODE && !playbackStoppedByUser && !externalAudioFocusInterrupted && isPlaying) {
                     schedulePossibleExternalAudioYield('direct-audio-paused');
+                    return;
+                }
+                if (NOWARFY_AUDIO_PRIORITY_MODE && !playbackStoppedByUser && !audio.ended) {
+                    isPlaying = true;
+                    startSilentLoop();
+                    updateIcon();
+                    updatePlaybackState();
                     return;
                 }
                 isPlaying = false;
@@ -6668,7 +6678,7 @@
                 }
                 // Si otra aplicación tomó el foco mientras la PWA estaba oculta, ceder durante
                 // unos segundos evita que el anclaje vuelva a reclamar el audio inmediatamente.
-                if ((document.visibilityState === 'hidden' || !pageHasFocus) && ytPlaybackIntent && !playbackStoppedByUser && !externalAudioFocusInterrupted) {
+                if ((document.visibilityState === 'hidden' || !pageHasFocus) && !NOWARFY_AUDIO_PRIORITY_MODE && ytPlaybackIntent && !playbackStoppedByUser && !externalAudioFocusInterrupted) {
                     schedulePossibleExternalAudioYield('youtube-paused-out-of-focus');
                     return;
                 }
@@ -7105,7 +7115,7 @@
             setupAudioSessionSupport();
         }
         function pauseNowarfyForExternalAudio() {
-            if (externalAudioFocusInterrupted) return;
+            if (NOWARFY_AUDIO_PRIORITY_MODE || externalAudioFocusInterrupted) return;
             const song = currentQueueSong();
             const wasIntendedToPlay = !playbackStoppedByUser && (isPlaying || (song?.type === 'yt' && ytPlaybackIntent));
             if (!wasIntendedToPlay) return;
@@ -7145,7 +7155,7 @@
         }
 
         function resumeNowarfyAfterExternalAudio(reason = 'external-audio-ended') {
-            if (!externalAudioFocusInterrupted || externalAudioFocusResumeAttempting) return;
+            if (NOWARFY_AUDIO_PRIORITY_MODE || !externalAudioFocusInterrupted || externalAudioFocusResumeAttempting) return;
             if (navigator.audioSession?.state === 'interrupted') return;
             clearTimeout(externalAudioFocusRecoveryTimer);
             externalAudioFocusRecoveryTimer = null;
@@ -7210,7 +7220,7 @@
         }
 
         function schedulePossibleExternalAudioYield(reason = 'unexpected-pause') {
-            if (externalAudioFocusInterrupted || playbackStoppedByUser || !currentPlayingQid) return;
+            if (NOWARFY_AUDIO_PRIORITY_MODE || externalAudioFocusInterrupted || playbackStoppedByUser || !currentPlayingQid) return;
             const song = currentQueueSong();
             const wasIntendedToPlay = isPlaying || (song?.type === 'yt' && ytPlaybackIntent);
             if (!wasIntendedToPlay) return;
@@ -7238,7 +7248,7 @@
         }
 
         function scheduleExternalAudioResume(reason = 'focus-return') {
-            if (!externalAudioFocusInterrupted || navigator.audioSession?.state === 'interrupted') return;
+            if (NOWARFY_AUDIO_PRIORITY_MODE || !externalAudioFocusInterrupted || navigator.audioSession?.state === 'interrupted') return;
             clearTimeout(externalAudioFocusRecoveryTimer);
             externalAudioFocusRecoveryTimer = window.setTimeout(() => {
                 externalAudioFocusRecoveryTimer = null;
@@ -7250,7 +7260,7 @@
             const state = String(navigator.audioSession?.state || '');
             externalAudioFocusLastState = state;
             if (state === 'interrupted') pauseNowarfyForExternalAudio();
-            else if (state !== 'interrupted' && externalAudioFocusInterrupted) resumeNowarfyAfterExternalAudio();
+            else if (!NOWARFY_AUDIO_PRIORITY_MODE && state !== 'interrupted' && externalAudioFocusInterrupted) resumeNowarfyAfterExternalAudio();
         }
 
         function setupAudioSessionSupport() {
@@ -7320,6 +7330,11 @@
                     queueAutomaticAdvance('direct-ended-fallback');
                     return;
                 }
+                if (current.type === 'mp3' && NOWARFY_AUDIO_PRIORITY_MODE && !playbackStoppedByUser && activeAudioEl?.paused && !activeAudioEl?.ended) {
+                    const playAttempt = activeAudioEl.play?.();
+                    if (playAttempt?.catch) playAttempt.catch(() => { /* Otra app aún tiene el foco; se revisa en el siguiente ciclo */ });
+                    return;
+                }
                 if (current.type !== 'yt' || !ytPlayer?.getPlayerState || !window.YT) return;
                 let state = null;
                 let position = 0;
@@ -7357,7 +7372,7 @@
             silentAudioLoop?.addEventListener('timeupdate', inspectCurrentPlayback);
             silentAudioLoop?.addEventListener('playing', inspectCurrentPlayback);
             silentAudioLoop?.addEventListener('pause', () => {
-                if (mediaTransitionInProgress || externalAudioFocusInterrupted || playbackStoppedByUser || (document.visibilityState !== 'hidden' && (typeof document.hasFocus !== 'function' || document.hasFocus()))) return;
+                if (mediaTransitionInProgress || NOWARFY_AUDIO_PRIORITY_MODE || externalAudioFocusInterrupted || playbackStoppedByUser || (document.visibilityState !== 'hidden' && (typeof document.hasFocus !== 'function' || document.hasFocus()))) return;
                 schedulePossibleExternalAudioYield('anchor-paused-out-of-focus');
             });
             document.addEventListener('visibilitychange', () => {

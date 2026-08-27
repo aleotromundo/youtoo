@@ -71,34 +71,23 @@ try {
     session.dispatchEvent(new Event('statechange'));
     return new Promise(resolve => setTimeout(() => resolve({ state: session.state, type: session.type, interrupted: externalAudioFocusInterrupted, resumePending: externalAudioFocusResumePending, playing: isPlaying, intent: ytPlaybackIntent, pauseCalls, volume: ytPlayer.volume }), 360));
   })()`);
-  if (interruption.type !== 'playback' || !interruption.interrupted || !interruption.resumePending || interruption.playing || interruption.intent || interruption.pauseCalls !== 1) throw new Error(`La cesión externa falló: ${JSON.stringify(interruption)}`);
+  if (interruption.type !== 'playback' || interruption.interrupted || interruption.resumePending || !interruption.playing || !interruption.intent || interruption.pauseCalls !== 0 || interruption.volume !== 80) throw new Error(`La prioridad de Nowarfy falló: ${JSON.stringify(interruption)}`);
 
   const resumed = await evaluate(`(() => {
     const session = navigator.audioSession;
     session.state = 'active';
     session.dispatchEvent(new Event('statechange'));
-    return { interrupted: externalAudioFocusInterrupted, resumePending: externalAudioFocusResumePending, playing: isPlaying, intent: ytPlaybackIntent, playCalls: window.__audioFocusPlayCalls, current: currentPlayingQid, volumeDuringFadeIn: ytPlayer.volume };
+    return { interrupted: externalAudioFocusInterrupted, resumePending: externalAudioFocusResumePending, playing: isPlaying, intent: ytPlaybackIntent, playCalls: window.__audioFocusPlayCalls, current: currentPlayingQid, volume: ytPlayer.volume };
   })()`);
-  await new Promise(resolve => setTimeout(resolve, 450));
-  const resumedAfterFade = await evaluate('({ volume: ytPlayer.volume, externalAudioFocusInterrupted, intent: ytPlaybackIntent })');
-  if (resumed.interrupted || resumed.resumePending || !resumed.intent || resumed.playCalls !== 1 || resumed.current !== 'audio-focus-test' || interruption.volume > 1 || resumedAfterFade.volume < 79 || resumedAfterFade.externalAudioFocusInterrupted || !resumedAfterFade.intent) throw new Error(`La reanudación/fade falló: ${JSON.stringify({ interruption, resumed, resumedAfterFade })}`);
+  if (resumed.interrupted || resumed.resumePending || !resumed.playing || !resumed.intent || resumed.playCalls !== 0 || resumed.current !== 'audio-focus-test' || resumed.volume !== 80) throw new Error(`La prioridad cambió al liberar el foco: ${JSON.stringify(resumed)}`);
 
-  await new Promise(resolve => setTimeout(resolve, 1200));
-  const waitingForRetry = await evaluate('({ interrupted: externalAudioFocusInterrupted, pending: externalAudioFocusResumePending, attempts: externalAudioFocusRecoveryAttempts, playCalls: window.__audioFocusPlayCalls })');
-  if (!waitingForRetry.interrupted || !waitingForRetry.pending || waitingForRetry.attempts < 1 || waitingForRetry.playCalls !== 1) throw new Error(`No quedó esperando una recuperación escalonada: ${JSON.stringify(waitingForRetry)}`);
-  await new Promise(resolve => setTimeout(resolve, 4100));
-  const recoveredAfterRetry = await evaluate('({ interrupted: externalAudioFocusInterrupted, pending: externalAudioFocusResumePending, attempts: externalAudioFocusRecoveryAttempts, playCalls: window.__audioFocusPlayCalls, playing: isPlaying, intent: ytPlaybackIntent })');
-  if (recoveredAfterRetry.interrupted || recoveredAfterRetry.pending || recoveredAfterRetry.attempts !== 0 || recoveredAfterRetry.playCalls < 2 || !recoveredAfterRetry.playing || !recoveredAfterRetry.intent) throw new Error(`La recuperación escalonada falló: ${JSON.stringify(recoveredAfterRetry)}`);
-
-  const fallbackYield = await evaluate(`(() => {
+  const priorityYield = await evaluate(`(() => {
     isPlaying = true; playbackStoppedByUser = false; ytPlaybackIntent = true; externalAudioFocusInterrupted = false; externalAudioFocusResumePending = false;
     schedulePossibleExternalAudioYield('test-out-of-focus-pause');
-    const yielded = { interrupted: externalAudioFocusInterrupted, pending: externalAudioFocusResumePending, playing: isPlaying, intent: ytPlaybackIntent, state: externalAudioFocusLastState };
-    resumeNowarfyAfterExternalAudio();
-    return { yielded, restored: { interrupted: externalAudioFocusInterrupted, pending: externalAudioFocusResumePending, intent: ytPlaybackIntent, current: currentPlayingQid } };
+    return { interrupted: externalAudioFocusInterrupted, pending: externalAudioFocusResumePending, playing: isPlaying, intent: ytPlaybackIntent, state: externalAudioFocusLastState, volume: ytPlayer.volume };
   })()`);
-  if (!fallbackYield.yielded.interrupted || !fallbackYield.yielded.pending || fallbackYield.yielded.playing || fallbackYield.yielded.intent || !fallbackYield.yielded.state.includes('probable') || fallbackYield.restored.interrupted || fallbackYield.restored.pending || !fallbackYield.restored.intent) throw new Error(`El fallback fuera de foco falló: ${JSON.stringify(fallbackYield)}`);
-  console.log(JSON.stringify({ passed: true, checks: { audioSessionPlaybackType: true, fadesOutOnInterruption: true, pausesOnExternalInterruption: true, preservesQueuePosition: true, fadesInOnResume: true, waitsForReleaseBeforeRetrying: true, resumesAfterInterruption: true, fallbackYieldsWithoutAudioSession: true }, interruption, resumed, resumedAfterFade, waitingForRetry, recoveredAfterRetry, fallbackYield }, null, 2));
+  if (priorityYield.interrupted || priorityYield.pending || !priorityYield.playing || !priorityYield.intent || priorityYield.volume !== 80) throw new Error(`El modo prioritario cedió el foco: ${JSON.stringify(priorityYield)}`);
+  console.log(JSON.stringify({ passed: true, checks: { audioSessionPlaybackType: true, keepsPriorityOnInterruption: true, preservesPlayingState: true, preservesVolume: true, manualPauseCoveredSeparately: true }, interruption, resumed, priorityYield }, null, 2));
 } finally {
   if (socket) socket.close();
   browser.kill('SIGTERM');
