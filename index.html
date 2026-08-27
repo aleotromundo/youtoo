@@ -769,19 +769,43 @@
         .video-stage-meta { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 14px; }
         .video-stage-meta span { display: inline-flex; align-items: center; gap: 5px; padding: 5px 7px; border: 1px solid rgba(190,188,255,.14); border-radius: 999px; color: #c7c6d8; background: rgba(255,255,255,.035); font-size: .64rem; font-weight: 800; }
         .video-stage-meta i { color: #5eead4; font-size: .62rem; }
-        .video-stage-description { display: -webkit-box; margin: 14px 0 0; overflow: hidden; color: #a9aac0; font-size: .75rem; line-height: 1.5; -webkit-box-orient: vertical; -webkit-line-clamp: 5; }
+        .video-stage-description-wrap { min-width: 0; }
+        .video-stage-description-label { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 14px; color: #8688a4; font-size: .62rem; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; }
+        .video-stage-description { display: -webkit-box; margin: 7px 0 0; overflow: hidden; color: #a9aac0; font-size: .75rem; line-height: 1.5; -webkit-box-orient: vertical; -webkit-line-clamp: 5; }
         .video-stage-description.is-empty { color: #777991; font-style: italic; }
+        .video-stage-description[hidden] { display: none; }
         .video-stage-note { color: #8788a2; font-size: .72rem; line-height: 1.5; }
         .video-stage-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
         .video-stage-close, .video-stage-channel { align-self: flex-start; border: 1px solid rgba(255,255,255,.15); background: rgba(255,255,255,.06); color: #ecebff; border-radius: 9px; padding: 8px 10px; font-size: .75rem; cursor: pointer; }
+        .video-stage-close.video-stage-close-primary { display: inline-flex; align-items: center; gap: 7px; border-color: rgba(94,234,212,.5); color: #071016; background: linear-gradient(135deg, #5eead4, #a7f3d0); box-shadow: 0 9px 20px rgba(94,234,212,.16), inset 0 1px 0 rgba(255,255,255,.55); font-weight: 900; }
+        .video-stage-close.video-stage-close-primary span { white-space: nowrap; }
+        .video-stage-close.video-stage-close-primary small { color: rgba(7,16,22,.7); font-size: .59rem; font-weight: 800; letter-spacing: .02em; }
         .video-stage-channel { border-color: rgba(94,234,212,.26); color: #dffff8; background: rgba(94,234,212,.07); }
         .video-stage-close:hover, .video-stage-channel:hover { border-color: #5eead4; color: #5eead4; }
+        .video-stage-close.video-stage-close-primary:hover { color: #071016; filter: brightness(1.08); transform: translateY(-1px); }
         .video-stage-channel[hidden] { display: none; }
-        #videoStageToggleBtn.video-minimized { position: relative; display: inline-flex; align-items: center; justify-content: center; width: 34px; height: 34px; border: 1px solid rgba(94,234,212,.62); border-radius: 50%; color: #071016; background: #5eead4; box-shadow: 0 0 0 0 rgba(94,234,212,.42); animation: mini-video-attention 2.4s ease-out infinite; }
-        #videoStageToggleBtn.video-minimized::after { content: 'Video activo'; position: absolute; right: 0; bottom: calc(100% + 7px); min-width: max-content; padding: 5px 7px; border: 1px solid rgba(94,234,212,.25); border-radius: 6px; color: #dffff8; background: rgba(9,10,20,.96); font: 800 .58rem 'Manrope', sans-serif; letter-spacing: .03em; opacity: .96; pointer-events: none; }
-        #videoStageToggleBtn .video-mini-indicator { position: absolute; top: 1px; right: 0; display: none; width: 9px; height: 9px; border: 2px solid #15162a; border-radius: 50%; background: #ff6d85; }
-        #videoStageToggleBtn.video-minimized .video-mini-indicator { display: block; }
-        @keyframes mini-video-attention { 0%, 55%, 100% { box-shadow: 0 0 0 0 rgba(94,234,212,.34); } 72% { box-shadow: 0 0 0 8px rgba(94,234,212,0); } }
+        .lyrics-toggle { display: inline-flex; align-items: center; gap: 6px; border: 1px solid rgba(94,234,212,.32); border-radius: 999px; padding: 5px 8px; color: #dffff8; background: rgba(94,234,212,.08); font: 800 .64rem 'Manrope', sans-serif; cursor: pointer; white-space: nowrap; }
+        .lyrics-toggle:hover, .lyrics-toggle[aria-expanded="true"] { border-color: rgba(94,234,212,.72); color: #071016; background: #5eead4; }
+        .lyrics-toggle[hidden] { display: none; }
+        .lyrics-panel { margin-top: 10px; overflow: hidden; border: 1px solid rgba(94,234,212,.2); border-radius: 13px; background: rgba(6,8,17,.4); }
+        .lyrics-panel[hidden] { display: none; }
+        .lyrics-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 9px; border-bottom: 1px solid rgba(190,188,255,.12); background: rgba(255,255,255,.035); }
+        .lyrics-toolbar-status { min-width: 0; overflow: hidden; color: #aeb0c7; font-size: .61rem; font-weight: 800; text-overflow: ellipsis; white-space: nowrap; }
+        .lyrics-toolbar-controls { display: inline-flex; align-items: center; gap: 4px; flex-shrink: 0; }
+        .lyrics-zoom-btn { display: inline-grid; width: 27px; height: 27px; place-items: center; border: 1px solid rgba(190,188,255,.2); border-radius: 7px; color: #e8e6ff; background: rgba(255,255,255,.05); cursor: pointer; }
+        .lyrics-zoom-btn:hover { border-color: #5eead4; color: #5eead4; }
+        .lyrics-zoom-value { min-width: 37px; color: #d9d7ff; font: 800 .62rem 'Manrope', sans-serif; text-align: center; }
+        .lyrics-scroll { max-height: min(390px, 45vh); overflow-y: auto; padding: 17px 18px 20px; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; touch-action: pan-y; scrollbar-color: rgba(94,234,212,.62) rgba(255,255,255,.06); }
+        .lyrics-content { margin: 0; color: #f2f0ff; font-size: 1rem; line-height: 1.8; white-space: pre-wrap; overflow-wrap: anywhere; transform-origin: top left; }
+        .lyrics-source { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 18px 11px; border-top: 1px solid rgba(190,188,255,.1); color: #7f819d; font-size: .6rem; line-height: 1.35; }
+        .lyrics-source a { color: #8deee1; text-decoration: underline; text-underline-offset: 2px; }
+        #videoStageToggleBtn.video-minimized { position: fixed; right: 24px; bottom: calc(var(--player-height) + 18px); z-index: 850; display: inline-flex; align-items: center; justify-content: center; gap: 9px; min-width: 164px; min-height: 48px; padding: 9px 14px 9px 12px; border: 1px solid rgba(94,234,212,.72); border-radius: 14px; color: #071016; background: linear-gradient(135deg, #5eead4, #a7f3d0); box-shadow: 0 15px 28px rgba(0,0,0,.28), 0 0 0 5px rgba(94,234,212,.1); font: 900 .73rem 'Manrope', sans-serif; animation: mini-video-attention 2.4s ease-out infinite; }
+        #videoStageToggleBtn.video-minimized i { font-size: .92rem; }
+        #videoStageToggleBtn.video-minimized .video-stage-toggle-copy { display: grid; gap: 1px; text-align: left; }
+        #videoStageToggleBtn.video-minimized .video-stage-toggle-copy small { color: rgba(7,16,22,.7); font-size: .58rem; font-weight: 800; }
+        #videoStageToggleBtn.video-minimized::after { content: ''; position: absolute; right: 12px; top: -5px; width: 9px; height: 9px; border: 2px solid #15162a; border-radius: 50%; background: #ff6d85; box-shadow: 0 0 0 3px rgba(255,109,133,.2); }
+        #videoStageToggleBtn .video-mini-indicator { display: none; }
+        @keyframes mini-video-attention { 0%, 55%, 100% { box-shadow: 0 15px 28px rgba(0,0,0,.28), 0 0 0 5px rgba(94,234,212,.1); } 72% { box-shadow: 0 15px 28px rgba(0,0,0,.28), 0 0 0 12px rgba(94,234,212,0); } }
         .video-stage.is-error .video-frame::after { content: 'Este video no permite reproducción embebida. Elegí otro resultado.'; position: absolute; inset: 0; display: grid; place-items: center; padding: 32px; text-align: center; color: #f0d1d9; background: rgba(19,11,19,.88); font-size: .9rem; z-index: 4; }
         .video-suggestions { display: none; border-top: 1px solid rgba(190,188,255,.14); padding: 18px 20px 20px; }
         .video-suggestions.visible { display: block; }
@@ -802,7 +826,9 @@
         .video-suggestion-title { color: #f2f0ff; font-size: .73rem; font-weight: 800; }
         .video-suggestion-artist { margin-top: 4px; color: #9899b2; font-size: .65rem; }
         @media (max-width: 1050px) { .video-suggestions-list { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-        @media (max-width: 560px) { .video-suggestions { padding: 15px; } .video-suggestions-list { grid-template-columns: 1fr; } .video-suggestion { grid-template-columns: 105px minmax(0, 1fr); } .video-suggestion-thumb { width: 105px; } }
+        @media (max-width: 560px) { .video-suggestions { padding: 15px; } .video-suggestions-list { grid-template-columns: 1fr; } .video-suggestion { grid-template-columns: 105px minmax(0, 1fr); } .video-suggestion-thumb { width: 105px; } .lyrics-toolbar { align-items: flex-start; } .lyrics-scroll { max-height: 50vh; padding: 15px 14px 18px; } .lyrics-content { font-size: .95rem; line-height: 1.75; } .lyrics-source { padding-left: 14px; padding-right: 14px; } }
+        @media (max-width: 768px) { #videoStageToggleBtn.video-minimized { right: 12px; bottom: calc(var(--player-height) + 12px); min-width: 151px; min-height: 45px; padding: 8px 11px; } .video-stage-close.video-stage-close-primary { width: 100%; justify-content: center; } .video-stage-close.video-stage-close-primary small { display: none; } }
+        @media (prefers-reduced-motion: reduce) { #videoStageToggleBtn.video-minimized { animation: none; } }
         .video-source-badge { position: absolute; top: 9px; left: 9px; z-index: 3; padding: 5px 7px; border-radius: 6px; background: rgba(8,8,18,.78); color: #e6e1ff; font-size: .58rem; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; }
         .video-source-badge i { color: #ff7b90; margin-right: 4px; }
         .card-duration { position: absolute; left: 9px; right: auto; bottom: 9px; z-index: 3; padding: 4px 6px; border-radius: 5px; background: rgba(8,8,18,.82); color: #fff; font-size: .66rem; font-weight: 800; font-variant-numeric: tabular-nums; }
@@ -1304,8 +1330,8 @@
                 <div class="video-stage-layout">
                     <div class="video-frame"><div id="yt-player-container"></div><video id="freeVideoPlayer" controls playsinline preload="metadata" hidden></video></div>
                     <div class="video-stage-info">
-                        <div><p class="video-stage-kicker">Reproduciendo desde YouTube</p><h2 class="video-stage-title" id="videoStageTitle">Elegí un video</h2><p class="video-stage-artist" id="videoStageArtist"></p><div class="video-stage-meta" id="videoStageMeta"></div><p class="video-stage-description" id="videoStageDescription"></p></div>
-                        <div><p class="video-stage-note">Datos extraídos de la ficha pública del video. Algunos videos pueden estar restringidos por su creador, región o YouTube.</p><div class="video-stage-actions"><button type="button" class="video-stage-channel" id="videoStageChannelBtn" onclick="openVideoStageChannel()" hidden><i class="fas fa-satellite-dish"></i> Ver canal</button><button type="button" class="video-stage-close" onclick="hideVideoStage(false)"><i class="fas fa-chevron-up"></i> Ocultar video</button></div></div>
+                        <div><p class="video-stage-kicker">Reproduciendo desde YouTube</p><h2 class="video-stage-title" id="videoStageTitle">Elegí un video</h2><p class="video-stage-artist" id="videoStageArtist"></p><div class="video-stage-meta" id="videoStageMeta"></div><div class="video-stage-description-wrap"><div class="video-stage-description-label"><span>Descripción</span><button type="button" class="lyrics-toggle" id="lyricsToggleBtn" onclick="toggleLyricsPanel()" aria-expanded="false" hidden><i class="fas fa-music"></i> Ver letra</button></div><p class="video-stage-description" id="videoStageDescription"></p>            <section class="lyrics-panel" id="lyricsPanel" aria-label="Letra de la canción" hidden><div class="lyrics-toolbar"><span class="lyrics-toolbar-status" id="lyricsToolbarStatus">Letra verificada</span><div class="lyrics-toolbar-controls"><button type="button" class="lyrics-zoom-btn" onclick="changeLyricsZoom(-0.1)" aria-label="Reducir tamaño de letra" title="Reducir tamaño"><i class="fas fa-minus"></i></button><span class="lyrics-zoom-value" id="lyricsZoomValue">100%</span><button type="button" class="lyrics-zoom-btn" onclick="changeLyricsZoom(0.1)" aria-label="Aumentar tamaño de letra" title="Aumentar tamaño"><i class="fas fa-plus"></i></button><button type="button" class="lyrics-zoom-btn" onclick="resetLyricsZoom()" aria-label="Restablecer tamaño de letra" title="Restablecer tamaño"><i class="fas fa-rotate-left"></i></button></div></div><div class="lyrics-scroll" id="lyricsScroll" tabindex="0"><pre class="lyrics-content" id="lyricsContent"></pre></div><div class="lyrics-source"><span id="lyricsSourceLabel">Coincidencia corroborada por artista, título y duración.</span><a id="lyricsSourceLink" href="https://lrclib.net/" target="_blank" rel="noopener noreferrer">Fuente</a></div></section></div></div>
+                        <div><p class="video-stage-note">Datos extraídos de la ficha pública del video. Algunos videos pueden estar restringidos por su creador, región o YouTube.</p><div class="video-stage-actions"><button type="button" class="video-stage-channel" id="videoStageChannelBtn" onclick="openVideoStageChannel()" hidden><i class="fas fa-satellite-dish"></i> Ver canal</button><button type="button" class="video-stage-close video-stage-close-primary" onclick="hideVideoStage(false, { manual: true })" aria-label="Ocultar video y conservar solo el audio"><i class="fas fa-eye-slash"></i><span>Ocultar video</span><small>ahorrar carga visual</small></button></div></div>
                     </div>
                 </div>
                 <div class="video-suggestions" id="videoSuggestions" aria-label="Más videos sugeridos">
@@ -1375,7 +1401,7 @@
             <button type="button" class="btn-control share-btn whatsapp" id="shareWhatsappBtn" onclick="shareCurrentToWhatsApp()" title="Compartir por WhatsApp" aria-label="Compartir por WhatsApp" disabled><i class="fab fa-whatsapp"></i></button>
             <button type="button" class="btn-control share-btn copy-link" id="copyCurrentLinkBtn" onclick="copyCurrentLink()" title="Copiar enlace" aria-label="Copiar enlace" disabled><i class="fas fa-link"></i></button>
             <button type="button" class="btn-control share-btn download" id="downloadCurrentBtn" onclick="downloadCurrentTrack()" title="Descargar audio con licencia permitida" aria-label="Descargar audio con licencia permitida" hidden><i class="fas fa-download"></i></button>
-            <button type="button" class="btn-control" id="videoStageToggleBtn" onclick="toggleVideoStageVisibility()" title="Mostrar video" aria-label="Mostrar video" hidden><i class="fas fa-clapperboard"></i><span class="video-mini-indicator" aria-hidden="true"></span></button>
+            <button type="button" class="btn-control" id="videoStageToggleBtn" onclick="toggleVideoStageVisibility()" title="Mostrar video" aria-label="Mostrar video" hidden><i class="fas fa-eye"></i><span class="video-stage-toggle-copy"><strong>Mostrar video</strong><small>El audio sigue activo</small></span><span class="video-mini-indicator" aria-hidden="true"></span></button>
             <i class="fas fa-compress-arrows-alt btn-control" id="pipBtn" onclick="toggleFloatingMode()" title="Modo Flotante" style="cursor:pointer; opacity: 0.7;"></i>
         </div>
     </div>
@@ -2051,6 +2077,15 @@
         let nowarfyLastHistoryState = null;
         let knowledgeBaseState = null;
         let knowledgeBaseSearchTimer = null;
+        const LYRICS_CACHE_KEY = 'nowarfy_verified_lyrics_v1';
+        const LYRICS_CACHE_MAX_AGE_MS = 14 * 24 * 60 * 60 * 1000;
+        const LYRICS_CACHE_MAX_ITEMS = 80;
+        let lyricsRequestToken = 0;
+        let lyricsZoom = 1;
+        let currentLyrics = null;
+        let lyricsLoadingKey = '';
+        let videoStageAutoHiddenReason = '';
+        let videoStageManualMinimized = false;
 
         const audioEl = document.getElementById('audio-element');
         const nextAudioEl = document.getElementById('audio-element-next');
@@ -2083,6 +2118,7 @@
         restoreQueueFromStorage();
         setupQueueTrashDropzone();
         setupVideoStageObserver();
+        setupVideoStageVisibilityAwareness();
         setupBackgroundPersistence();
         setupPlaybackContinuity();
         setupInstallableApp();
@@ -3914,7 +3950,7 @@
         function minimizeActiveVideoForNavigation() {
             const song = currentQueueSong();
             const stage = document.getElementById('videoStage');
-            if (isVisualVideo(song) && stage?.classList.contains('visible')) setVideoStageMinimized(true);
+            if (isVisualVideo(song) && stage?.classList.contains('visible')) setVideoStageMinimized(true, { autoReason: 'navigation' });
         }
 
         async function showSection(section, options = {}) {
@@ -5322,6 +5358,7 @@
                 : null;
             currentPlayingQid = song._qid;
             currentSourceIdx = options.sourceIdx ?? null;
+            resetLyricsPanel();
             ytPlayCommandAt = 0;
             pendingVideoResumeSession = resumeSession;
             restoreVideoMinimizedAfterReady = !!(resumeSession && song.type === 'yt' && options.restoreMinimized);
@@ -6026,6 +6063,176 @@
             return !!song && (song.type === 'yt' || song.type === 'freevideo');
         }
 
+        function lyricsTextKey(value) {
+            return normalizeSourceText(value)
+                .normalize('NFKD')
+                .replace(/[\u0300-\u036f]/g, '')
+                .toLowerCase()
+                .replace(/&/g, ' and ')
+                .replace(/[^a-z0-9]+/g, ' ')
+                .replace(/\s+/g, ' ')
+                .trim();
+        }
+
+        function lyricsArtistName(song) {
+            return normalizeSourceText(song?.artist || song?.channelTitle || '')
+                .replace(/\b(official|music|channel|canal)\b/gi, ' ')
+                .replace(/(?:vevo|topic)$/i, '')
+                .replace(/\s+/g, ' ')
+                .trim();
+        }
+
+        function lyricsTrackTitle(song) {
+            return normalizeSourceText(song?.title || '')
+                .replace(/\s*[|·–—-]\s*(official|music|audio|video|lyrics?|lyric|visualizer|vevo).*$/i, '')
+                .trim();
+        }
+
+        function lyricsSongKey(song) {
+            return `${lyricsTextKey(lyricsArtistName(song))}::${lyricsTextKey(lyricsTrackTitle(song))}`;
+        }
+
+        function lyricsEligibleSong(song) {
+            if (!song || song.isPlaylist || !['yt', 'mp3'].includes(song.type)) return false;
+            const artist = lyricsArtistName(song);
+            const title = lyricsTrackTitle(song);
+            if (!artist || !title || /^(youtube|canal|unknown|nowarfy)$/i.test(artist)) return false;
+            if (song.type === 'yt' && typeof isNonMusicalVideo === 'function' && isNonMusicalVideo(song)) return false;
+            const text = `${title} ${artist} ${song.description || ''}`.toLowerCase();
+            if (/podcast|interview|entrevista|audiobook|audiolibro|spoken word|lecture|narration|chapter|news|noticias|tutorial|review|reaction/.test(text)) return false;
+            return true;
+        }
+
+        function readLyricsCache() {
+            try {
+                const cache = JSON.parse(localStorage.getItem(LYRICS_CACHE_KEY) || '{}');
+                return cache && typeof cache === 'object' ? cache : {};
+            } catch (error) {
+                return {};
+            }
+        }
+
+        function writeLyricsCache(key, value) {
+            try {
+                const cache = readLyricsCache();
+                cache[key] = { ...value, savedAt: Date.now() };
+                const entries = Object.entries(cache)
+                    .sort(([, a], [, b]) => Number(b?.savedAt || 0) - Number(a?.savedAt || 0))
+                    .slice(0, LYRICS_CACHE_MAX_ITEMS);
+                localStorage.setItem(LYRICS_CACHE_KEY, JSON.stringify(Object.fromEntries(entries)));
+            } catch (error) {
+                // La letra sigue funcionando durante la sesión aunque el almacenamiento esté lleno.
+            }
+        }
+
+        function readCachedLyrics(key) {
+            const entry = readLyricsCache()[key];
+            if (!entry || Date.now() - Number(entry.savedAt || 0) > LYRICS_CACHE_MAX_AGE_MS) return null;
+            return entry.data?.found && entry.data?.verified ? entry.data : null;
+        }
+
+        function plainLyricsFromRecord(track) {
+            if (track?.plainLyrics) return String(track.plainLyrics).trim();
+            const synced = String(track?.syncedLyrics || '').trim();
+            return synced
+                .replace(/^\s*\[[^\]]+\]\s*/gm, '')
+                .replace(/\n{3,}/g, '\n\n')
+                .trim();
+        }
+
+        function resetLyricsPanel() {
+            lyricsRequestToken += 1;
+            lyricsLoadingKey = '';
+            currentLyrics = null;
+            lyricsZoom = 1;
+            const button = document.getElementById('lyricsToggleBtn');
+            const panel = document.getElementById('lyricsPanel');
+            const content = document.getElementById('lyricsContent');
+            const status = document.getElementById('lyricsToolbarStatus');
+            const source = document.getElementById('lyricsSourceLabel');
+            const zoomValue = document.getElementById('lyricsZoomValue');
+            if (button) { button.hidden = true; button.setAttribute('aria-expanded', 'false'); button.innerHTML = '<i class="fas fa-music"></i> Ver letra'; }
+            if (panel) panel.hidden = true;
+            if (content) { content.textContent = ''; content.style.fontSize = ''; }
+            if (status) status.textContent = 'Letra verificada';
+            if (source) source.textContent = 'Coincidencia corroborada por artista, título y duración.';
+            if (zoomValue) zoomValue.textContent = '100%';
+        }
+
+        function renderLyricsPanel(data, song) {
+            const text = plainLyricsFromRecord(data?.track);
+            if (!data?.found || !data?.verified || !text || currentQueueSong()?.url !== song?.url) return false;
+            const button = document.getElementById('lyricsToggleBtn');
+            const status = document.getElementById('lyricsToolbarStatus');
+            const content = document.getElementById('lyricsContent');
+            const source = document.getElementById('lyricsSourceLabel');
+            const sourceLink = document.getElementById('lyricsSourceLink');
+            if (!button || !status || !content || !source || !sourceLink) return false;
+            currentLyrics = { ...data, resourceId: song.url };
+            content.textContent = text;
+            button.hidden = false;
+            button.setAttribute('aria-expanded', 'false');
+            button.innerHTML = '<i class="fas fa-music"></i> Ver letra';
+            status.textContent = `Letra verificada · ${data.track.source || 'fuente pública'}`;
+            source.textContent = 'Coincidencia corroborada por artista, título y duración.';
+            sourceLink.href = data.track.sourceUrl || 'https://lrclib.net/';
+            return true;
+        }
+
+        async function loadVerifiedLyrics(song) {
+            if (!lyricsEligibleSong(song)) return;
+            const key = lyricsSongKey(song);
+            if (currentLyrics?.resourceId === song.url || lyricsLoadingKey === key) return;
+            lyricsLoadingKey = key;
+            const token = ++lyricsRequestToken;
+            const cached = readCachedLyrics(key);
+            if (cached) { renderLyricsPanel(cached, song); lyricsLoadingKey = ''; return; }
+            const params = new URLSearchParams({ title: lyricsTrackTitle(song), artist: lyricsArtistName(song) });
+            const duration = Number(song.duration);
+            if (Number.isFinite(duration) && duration > 0) params.set('duration', String(Math.round(duration)));
+            try {
+                const response = await fetch(`/api/lyrics?${params.toString()}`, { headers: { Accept: 'application/json' } });
+                const data = await response.json().catch(() => null);
+                if (token !== lyricsRequestToken || currentQueueSong()?.url !== song?.url) return;
+                if (!response.ok || !data?.found || !data?.verified) return;
+                writeLyricsCache(key, { data });
+                renderLyricsPanel(data, song);
+            } catch (error) {
+                // La ausencia temporal de la fuente no altera la reproducción ni muestra un botón falso.
+            } finally {
+                if (lyricsLoadingKey === key) lyricsLoadingKey = '';
+            }
+        }
+
+        function toggleLyricsPanel() {
+            const button = document.getElementById('lyricsToggleBtn');
+            const panel = document.getElementById('lyricsPanel');
+            if (!button || button.hidden || !panel || !currentLyrics) return;
+            const show = panel.hidden;
+            panel.hidden = !show;
+            button.setAttribute('aria-expanded', String(show));
+            button.innerHTML = show ? '<i class="fas fa-eye-slash"></i> Ocultar letra' : '<i class="fas fa-music"></i> Ver letra';
+            if (show) document.getElementById('lyricsScroll')?.focus?.({ preventScroll: true });
+        }
+
+        function applyLyricsZoom() {
+            const content = document.getElementById('lyricsContent');
+            const value = document.getElementById('lyricsZoomValue');
+            if (content) content.style.fontSize = `${lyricsZoom}rem`;
+            if (value) value.textContent = `${Math.round(lyricsZoom * 100)}%`;
+        }
+
+        function changeLyricsZoom(delta) {
+            if (!currentLyrics) return;
+            lyricsZoom = Math.min(1.6, Math.max(.75, Math.round((lyricsZoom + Number(delta || 0)) * 100) / 100));
+            applyLyricsZoom();
+        }
+
+        function resetLyricsZoom() {
+            lyricsZoom = 1;
+            applyLyricsZoom();
+        }
+
         function renderVideoStageDetails(song) {
             const meta = document.getElementById('videoStageMeta');
             const description = document.getElementById('videoStageDescription');
@@ -6045,6 +6252,7 @@
             description.textContent = cleanDescription || (isFreeVideo ? 'Clip con licencia abierta alojado en Wikimedia Commons.' : 'No hay una descripción pública disponible para este video.');
             description.classList.toggle('is-empty', !cleanDescription);
             channelButton.hidden = !song?.channelId;
+            void loadVerifiedLyrics(song);
         }
 
         function openVideoStageChannel() {
@@ -6059,11 +6267,16 @@
             const song = currentQueueSong();
             const isVideo = isVisualVideo(song);
             const minimized = isVideo && !isVisible;
+            const copy = button.querySelector('.video-stage-toggle-copy');
+            const reason = videoStageAutoHiddenReason;
             button.hidden = !minimized;
             button.classList.toggle('video-minimized', minimized);
             if (minimized) {
-                button.title = 'El video sigue activo · volver a mostrar';
-                button.setAttribute('aria-label', 'El video sigue activo; volver a mostrar video');
+                const automatic = reason === 'document-hidden' || reason === 'out-of-view' || reason === 'navigation';
+                const smallText = automatic ? 'Ocultado para ahorrar carga' : 'El audio sigue activo';
+                if (copy) copy.innerHTML = `<strong>Mostrar video</strong><small>${smallText}</small>`;
+                button.title = automatic ? 'El video no estaba visible; volver a mostrarlo' : 'El video sigue activo · volver a mostrar';
+                button.setAttribute('aria-label', automatic ? 'El video se ocultó automáticamente; volver a mostrar video' : 'El video sigue activo; volver a mostrar video');
             }
         }
 
@@ -6072,8 +6285,13 @@
             const song = currentQueueSong();
             if (!stage || !isVisualVideo(song)) return;
             videoStageMinimized = !!minimized;
+            videoStageManualMinimized = videoStageMinimized && options.manual === true;
+            videoStageAutoHiddenReason = videoStageMinimized ? (options.autoReason || (options.manual ? '' : videoStageAutoHiddenReason)) : '';
             stage.classList.toggle('visible', !videoStageMinimized);
             if (videoStageMinimized) stage.classList.remove('is-error');
+            if (song.type === 'yt' && ytPlayer?.setPlaybackQuality) {
+                try { ytPlayer.setPlaybackQuality(videoStageMinimized ? 'small' : 'auto'); } catch (error) { /* YouTube puede ignorar el cambio */ }
+            }
             updateVideoStageToggle(!videoStageMinimized);
             persistVideoResumeSession(true);
             if (!videoStageMinimized && options.focus) {
@@ -6084,8 +6302,14 @@
         function showVideoStage(song, options = {}) {
             const stage = document.getElementById('videoStage');
             stage.classList.remove('is-error');
-            stage.classList.add('visible');
-            videoStageMinimized = false;
+            const hiddenDocument = document.visibilityState === 'hidden';
+            stage.classList.toggle('visible', !hiddenDocument);
+            videoStageMinimized = hiddenDocument;
+            videoStageManualMinimized = false;
+            videoStageAutoHiddenReason = hiddenDocument ? 'document-hidden' : '';
+            if (song.type === 'yt' && ytPlayer?.setPlaybackQuality) {
+                try { ytPlayer.setPlaybackQuality(hiddenDocument ? 'small' : 'auto'); } catch (error) { /* YouTube puede ignorarlo */ }
+            }
             document.getElementById('videoStageTitle').textContent = song.title || (song.type === 'freevideo' ? 'Video libre' : 'Video de YouTube');
             document.getElementById('videoStageArtist').textContent = song.type === 'freevideo' ? `${song.artist || 'Wikimedia Commons'} · ${song.license || 'licencia abierta'}` : (song.channelTitle || song.artist || '');
             const kicker = document.querySelector('.video-stage-kicker');
@@ -6094,11 +6318,11 @@
             if (note) note.textContent = song.type === 'freevideo' ? 'Archivo público de Wikimedia Commons. Revisá la ficha de origen para atribución y licencia.' : 'Datos extraídos de la ficha pública del video. Algunos videos pueden estar restringidos por su creador, región o YouTube.';
             renderVideoStageDetails(song);
             renderVideoSuggestions(song);
-            updateVideoStageToggle(true);
-            if (options.focus) window.requestAnimationFrame(() => stage.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+            updateVideoStageToggle(!videoStageMinimized);
+            if (options.focus && !videoStageMinimized) window.requestAnimationFrame(() => stage.scrollIntoView({ behavior: 'smooth', block: 'start' }));
         }
 
-        function hideVideoStage(pauseVideo = false) {
+        function hideVideoStage(pauseVideo = false, options = {}) {
             const song = currentQueueSong();
             if (!isVisualVideo(song)) {
                 videoStageMinimized = false;
@@ -6106,7 +6330,7 @@
                 updateVideoStageToggle(true);
                 return;
             }
-            setVideoStageMinimized(true);
+            setVideoStageMinimized(true, options);
             if (pauseVideo && isPlaying) {
                 if (song.type === 'yt' && ytPlayer) ytPlayer.pauseVideo();
                 else if (song.type === 'freevideo') freeVideoEl.pause();
@@ -6121,28 +6345,40 @@
             const song = currentQueueSong();
             if (!isVisualVideo(song)) { showToast('No hay un video activo para mostrar', 'fa-clapperboard'); return; }
             const stage = document.getElementById('videoStage');
-            if (stage.classList.contains('visible')) hideVideoStage(false);
+            if (stage.classList.contains('visible')) hideVideoStage(false, { manual: true });
             else showVideoStage(song, { focus: true });
         }
 
         function setupVideoStageObserver() {
             const stage = document.getElementById('videoStage');
-            const scrollRoot = document.querySelector('.content-area');
             if (!stage || !window.IntersectionObserver) return;
             videoStageObserver?.disconnect();
             videoStageObserver = new IntersectionObserver(entries => {
                 const entry = entries[0];
                 const song = currentQueueSong();
-                if (!entry || !isVisualVideo(song) || !isPlaying || videoStageMinimized) return;
-                if (stage.classList.contains('visible') && entry.intersectionRatio < 0.28) {
+                if (!entry || !isVisualVideo(song) || videoStageMinimized || !stage.classList.contains('visible')) return;
+                if (entry.intersectionRatio < 0.28) {
                     window.setTimeout(() => {
-                        if (stage.classList.contains('visible') && !videoStageMinimized && isVisualVideo(currentQueueSong()) && isPlaying) {
-                            setVideoStageMinimized(true);
+                        const rect = stage.getBoundingClientRect();
+                        const viewportHeight = window.innerHeight || document.documentElement.clientHeight;
+                        const visibleEnough = rect.bottom > viewportHeight * 0.28 && rect.top < viewportHeight * 0.72;
+                        if (stage.classList.contains('visible') && !videoStageMinimized && isVisualVideo(currentQueueSong()) && !visibleEnough) {
+                            setVideoStageMinimized(true, { autoReason: 'out-of-view' });
                         }
                     }, 180);
                 }
-            }, { root: scrollRoot || null, threshold: [0, 0.28, 0.7] });
+            }, { root: null, threshold: [0, 0.28, 0.7], rootMargin: '0px 0px -4% 0px' });
             videoStageObserver.observe(stage);
+        }
+
+        function setupVideoStageVisibilityAwareness() {
+            document.addEventListener('visibilitychange', () => {
+                const stage = document.getElementById('videoStage');
+                const song = currentQueueSong();
+                if (document.visibilityState === 'hidden' && stage?.classList.contains('visible') && isVisualVideo(song)) {
+                    setVideoStageMinimized(true, { autoReason: 'document-hidden' });
+                }
+            });
         }
 
         function initYTPlayer(resourceId, isPlaylist = false, resumeSession = null, deferAutoplay = false) {
