@@ -107,7 +107,7 @@ try {
 
   await evaluate('openYouTubeCompactWindow()');
   const opened = await evaluate('window.__openCalls');
-  if (!opened?.length || opened[0].url !== expectedUrl || opened[0].name !== 'nowarfy-youtube-compact' || !opened[0].features.includes('width=640') || !opened[0].features.includes('height=390')) {
+  if (!opened?.length || opened[0].url !== expectedUrl || opened[0].name !== 'nowarfy-youtube-compact' || !opened[0].features.includes('width=720') || !opened[0].features.includes('height=450')) {
     throw new Error(`Ventana compacta inválida: ${JSON.stringify(opened)}`);
   }
 
