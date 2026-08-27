@@ -2074,6 +2074,7 @@
         let videoStageManualMinimized = false;
         let videoStageNeedsVisualRefresh = false;
         let videoFrameRefreshTimer = null;
+        let videoFrameRestoreAwaitingPlayer = '';
         let youtubeCompactWindow = null;
         let youtubeEmbedFallbackUrl = '';
         let mediaTransitionInProgress = false;
@@ -5302,6 +5303,8 @@
                 if (NOWARFY_AUDIO_PRIORITY_MODE && !playbackStoppedByUser && !audio.ended) {
                     isPlaying = true;
                     startSilentLoop();
+                    const playAttempt = audio.play?.();
+                    if (playAttempt?.catch) playAttempt.catch(() => { /* El sistema aún mantiene otro foco; el watchdog reintentará */ });
                     updateIcon();
                     updatePlaybackState();
                     return;
@@ -6466,7 +6469,41 @@
             poster.classList.remove('is-restoring');
             window.setTimeout(() => {
                 if (currentQueueSong()?.url === expectedUrl && poster) poster.hidden = true;
-            }, 220);
+            }, 1250);
+        }
+
+        function reloadYouTubeVideoVisual(expectedUrl) {
+            const song = currentQueueSong();
+            if (!song || song.type !== 'yt' || String(song.url) !== expectedUrl || !ytPlayer) return false;
+            if (videoFrameRestoreAwaitingPlayer === expectedUrl) return false;
+            let state = null;
+            let position = 0;
+            try {
+                state = ytPlayer.getPlayerState?.();
+                position = Math.max(0, Number(ytPlayer.getCurrentTime?.() || 0));
+            } catch (error) { /* El IFrame puede estar transicionando */ }
+            const shouldPlay = !!ytPlaybackIntent && !playbackStoppedByUser && (isPlaying || state === window.YT?.PlayerState?.PLAYING);
+            try {
+                if (isNativeYouTubePlaylistPlayback()) {
+                    if (!shouldPlay || !ytPlayer.playVideoAt || !ytPlayer.getPlaylistIndex) return false;
+                    const playlistIndex = Number(ytPlayer.getPlaylistIndex());
+                    if (!Number.isFinite(playlistIndex) || playlistIndex < 0) return false;
+                    ytPlayer.playVideoAt(playlistIndex);
+                    if (position > 1) window.setTimeout(() => { if (currentQueueSong()?.url === expectedUrl) ytPlayer.seekTo?.(position, true); }, 260);
+                } else if (shouldPlay && ytPlayer.loadVideoById) {
+                    ytPlayer.loadVideoById({ videoId: expectedUrl, startSeconds: position, suggestedQuality: 'auto' });
+                } else if (!shouldPlay && ytPlayer.cueVideoById) {
+                    ytPlayer.cueVideoById({ videoId: expectedUrl, startSeconds: position, suggestedQuality: 'auto' });
+                } else return false;
+            } catch (error) {
+                console.debug('No se pudo solicitar el repintado oficial de YouTube', error);
+                return false;
+            }
+            videoFrameRestoreAwaitingPlayer = expectedUrl;
+            window.setTimeout(() => {
+                if (videoFrameRestoreAwaitingPlayer === expectedUrl) videoFrameRestoreAwaitingPlayer = '';
+            }, 1600);
+            return true;
         }
 
         function refreshYouTubeVideoFrame(reason = 'restore') {
@@ -6491,15 +6528,19 @@
                     frame.style.visibility = 'visible';
                 }
                 videoStageNeedsVisualRefresh = false;
-                finishVideoFrameRestore(expectedUrl);
             };
             window.requestAnimationFrame(() => {
                 reflow();
                 videoFrameRefreshTimer = window.setTimeout(() => {
+                    reloadYouTubeVideoVisual(expectedUrl);
                     reflow();
-                    let state = null;
-                    try { state = ytPlayer.getPlayerState?.(); } catch (error) { /* El IFrame puede estar transicionando */ }
-                    if (ytPlaybackIntent && state !== window.YT?.PlayerState?.PLAYING) requestYouTubePlayback(`visual-${reason}`);
+                    window.setTimeout(() => {
+                        reflow();
+                        let state = null;
+                        try { state = ytPlayer.getPlayerState?.(); } catch (error) { /* El IFrame puede estar transicionando */ }
+                        if (ytPlaybackIntent && state !== window.YT?.PlayerState?.PLAYING) requestYouTubePlayback(`visual-${reason}`);
+                        finishVideoFrameRestore(expectedUrl);
+                    }, 320);
                 }, 260);
             });
         }

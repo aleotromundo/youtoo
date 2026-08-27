@@ -68,8 +68,12 @@ try {
     currentIndex = 0;
     currentPlayingQid = song._qid;
     window.__frameSizeCalls = [];
-    window.YT = { PlayerState: { PLAYING: 1 } };
-    ytPlayer = { setSize(width, height) { window.__frameSizeCalls.push({ width, height }); }, getPlayerState() { return 1; }, playVideo() {} };
+    window.__frameReloadCalls = [];
+    window.YT = { PlayerState: { UNSTARTED: -1, ENDED: 0, PLAYING: 1, PAUSED: 2, BUFFERING: 3, CUED: 5 } };
+    ytPlaybackIntent = true;
+    playbackStoppedByUser = false;
+    isPlaying = true;
+    ytPlayer = { setSize(width, height) { window.__frameSizeCalls.push({ width, height }); }, getPlayerState() { return 1; }, getCurrentTime() { return 122; }, getDuration() { return 252; }, loadVideoById(payload) { window.__frameReloadCalls.push(payload); }, playVideo() {} };
     document.getElementById('yt-player-container').innerHTML = '<iframe title="YouTube test frame"></iframe>';
     window.fetch = ((originalFetch) => (url, options) => {
       if (!String(url).includes('/api/lyrics')) return originalFetch(url, options);
@@ -117,13 +121,13 @@ try {
   await writeFile('/tmp/nowarfy-video-toggle-ripples.png', Buffer.from(hiddenScreenshot.data, 'base64'));
 
   await evaluate(`(() => { toggleVideoStageVisibility(); return true; })()`);
-  await new Promise(resolve => setTimeout(resolve, 700));
-  const shown = await evaluate(`(() => ({ stageVisible: document.getElementById('videoStage').classList.contains('visible'), restoreButtonHidden: document.getElementById('videoStageToggleBtn').hidden, posterHidden: document.getElementById('videoFramePoster').hidden, frameVisible: getComputedStyle(document.querySelector('#yt-player-container iframe')).visibility === 'visible', frameSizeCalls: window.__frameSizeCalls }))()`);
-  if (!shown.stageVisible || !shown.restoreButtonHidden || !shown.posterHidden || !shown.frameVisible || !shown.frameSizeCalls.length || shown.frameSizeCalls.at(-1).width < 1 || shown.frameSizeCalls.at(-1).height < 1) throw new Error(`El video no volvió a pintarse correctamente: ${JSON.stringify(shown)}`);
+  await new Promise(resolve => setTimeout(resolve, 4000));
+  const shown = await evaluate(`(() => ({ stageVisible: document.getElementById('videoStage').classList.contains('visible'), restoreButtonHidden: document.getElementById('videoStageToggleBtn').hidden, posterHidden: document.getElementById('videoFramePoster').hidden, frameVisible: getComputedStyle(document.querySelector('#yt-player-container iframe')).visibility === 'visible', frameSizeCalls: window.__frameSizeCalls, frameReloadCalls: window.__frameReloadCalls }))()`);
+  if (!shown.stageVisible || !shown.restoreButtonHidden || !shown.posterHidden || !shown.frameVisible || !shown.frameSizeCalls.length || shown.frameSizeCalls.at(-1).width < 1 || shown.frameSizeCalls.at(-1).height < 1 || shown.frameReloadCalls.length !== 1 || shown.frameReloadCalls[0].videoId !== 'lyrics-ui-video' || shown.frameReloadCalls[0].startSeconds !== 122) throw new Error(`El video no volvió a pintarse correctamente: ${JSON.stringify(shown)}`);
 
   const screenshot = await command('Page.captureScreenshot', { format: 'png' });
   await writeFile('/tmp/nowarfy-video-lyrics-ui.png', Buffer.from(screenshot.data, 'base64'));
-  console.log(JSON.stringify({ passed: true, checks: { verifiedLyricsButton: true, lyricsPanelAndZoom: true, prominentAutoHideButton: true, expandingRings: true, restoreVideoFrame: true }, lyricReady, lyricOpen, hidden, shown }, null, 2));
+  console.log(JSON.stringify({ passed: true, checks: { verifiedLyricsButton: true, lyricsPanelAndZoom: true, prominentAutoHideButton: true, expandingRings: true, restoreVideoFrame: true, officialVisualReload: true }, lyricReady, lyricOpen, hidden, shown }, null, 2));
 } finally {
   if (socket) socket.close();
   browser.kill('SIGTERM');
