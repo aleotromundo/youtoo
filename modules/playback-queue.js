@@ -634,7 +634,13 @@ function playQueueAt(idx, options = {}) {
             ytPlaybackIntent = !deferYTAutoplay && resumeSession?.wasPlaying !== false;
             const startSeconds = resumeSession && Number(resumeSession.position) > 0 ? Number(resumeSession.position) : 0;
             try {
-                if (ytPlaybackIntent) ytPlayer.loadVideoById({ videoId: song.url, startSeconds });
+                const keepNativePlaylist = isNativeYouTubePlaylistPlayback()
+                    && typeof ytPlayer.playVideoAt === 'function'
+                    && String(queuePlaylistContext?.playlistId || '') === String(song.youtubePlaylistId || queuePlaylistContext?.playlistId || '');
+                if (keepNativePlaylist) {
+                    if (ytPlaybackIntent) ytPlayer.playVideoAt(idx);
+                    else if (typeof ytPlayer.cueVideoById === 'function') ytPlayer.cueVideoById({ videoId: song.url, startSeconds });
+                } else if (ytPlaybackIntent) ytPlayer.loadVideoById({ videoId: song.url, startSeconds });
                 else ytPlayer.cueVideoById({ videoId: song.url, startSeconds });
                 if (ytPlaybackIntent) {
                     startSilentLoop();

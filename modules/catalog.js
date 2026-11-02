@@ -2000,7 +2000,7 @@ function renderSongList(list, title, icon, options = {}) {
                 <button type="button" class="song-row-addq" title="Agregar a una lista" aria-label="Agregar a una lista"><i class="fas fa-list-music"></i></button>
                 <i class="fas fa-play song-row-play" aria-hidden="true"></i>
             </span>`;
-        row.onclick = () => selectSong(song, song.sourceIndex ?? idx);
+        row.onclick = () => selectCatalogSong(song, song.sourceIndex ?? idx);
         row.querySelector('.song-row-favorite').onclick = (e) => {
             e.stopPropagation();
             toggleFavoriteSong(song, e.currentTarget);
@@ -2020,6 +2020,33 @@ function renderSongList(list, title, icon, options = {}) {
 
     section.appendChild(songList);
     container.appendChild(section);
+}
+
+function selectCatalogSong(song, sourceIdx = 0) {
+    const playlistState = activePlaylistCatalog;
+    const playlistId = String(playlistState?.playlist?.url || '');
+    const belongsToOpenPlaylist = !!playlistId && String(song?.collectionId || '') === playlistId;
+    if (!belongsToOpenPlaylist) {
+        selectSong(song, sourceIdx);
+        return;
+    }
+
+    const samePlaylistQueue = queuePlaybackMode === 'prebuilt_playlist'
+        && String(queuePlaylistContext?.playlistId || '') === playlistId;
+    if (!samePlaylistQueue) {
+        startPrebuiltPlaylistPlayback(
+            playlistState.playlist,
+            playlistState.tracks,
+            playlistState.pageInfo || {},
+            playlistState.nextPageToken || '',
+            song.url
+        );
+        return;
+    }
+
+    const index = queue.findIndex(item => String(item.url) === String(song.url));
+    if (index >= 0) playQueueAt(index, { sourceIdx, focusVideo: true });
+    else selectSong(song, sourceIdx);
 }
 
 function renderPlaylistGrid(list, title) {
@@ -2096,7 +2123,7 @@ function renderOpenedPlaylist() {
     });
 }
 
-function startPrebuiltPlaylistPlayback(playlist, tracks, pageInfo = {}, nextPageToken = '') {
+function startPrebuiltPlaylistPlayback(playlist, tracks, pageInfo = {}, nextPageToken = '', selectedUrl = '') {
     if (!playlist?.url || !tracks?.length) return false;
     queuePlaybackMode = 'prebuilt_playlist';
     queuePlaylistContext = {
@@ -2115,7 +2142,12 @@ function startPrebuiltPlaylistPlayback(playlist, tracks, pageInfo = {}, nextPage
     persistQueue();
     renderContinuousPlaybackControls();
     renderQueue();
-    playQueueAt(0, { sourceIdx: tracks[0].sourceIndex ?? 0, playlistId: String(playlist.url), forceNewYouTubePlayer: true, focusVideo: true });
+    const selectedIndex = selectedUrl ? queue.findIndex(item => String(item.url) === String(selectedUrl)) : 0;
+    const startIndex = selectedIndex >= 0 ? selectedIndex : 0;
+    playQueueAt(startIndex, {
+        sourceIdx: tracks[startIndex].sourceIndex ?? 0,
+        playlistId: String(playlist.url), forceNewYouTubePlayer: true, focusVideo: true
+    });
     showToast(`Reproduciendo playlist · ${queue.length} videos en orden`, 'fa-list-music');
     return true;
 }
