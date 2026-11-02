@@ -850,7 +850,6 @@ async function fetchSimilarArtistTracks(seedSong, count) {
 function isRadioMusicTrack(song) {
     if (!song?.url || !['yt', 'mp3'].includes(song.type)) return false;
     const text = `${song.title || ''} ${song.artist || ''} ${song.description || ''} ${song.genre || ''}`.toLowerCase();
-    if (song.type === 'yt' && /\b(?:podcast|interview|entrevista|reaction|reacción|commentary|comentario|news|noticias|documentary|documental|tutorial|lecture|clase|curso|speech|discurso|conversation|conversación|discussion|discusión|voice.?over|spoken word|narration|narración|narrator|story|stories|historia|review|reseña|press conference|conferencia de prensa|q\s*&\s*a|questions?\s+and\s+answers?)\b/.test(text)) return false;
     if (/audiobook|audio book|audiolibro|spoken word|narration|narrator|chapter|book reading|story|stories|lecture|podcast|interview|meditation|sleep music|children|bedtime|sound effect|foley|noise|ambient/.test(text)) return false;
     if (song.type === 'yt' && song.categoryId && String(song.categoryId) !== '10') return false;
     if (song.type === 'yt' && typeof isNonMusicalVideo === 'function' && isNonMusicalVideo(song)) return false;
@@ -858,10 +857,24 @@ function isRadioMusicTrack(song) {
     return true;
 }
 
-function appendUniqueSongs(candidates, target, limit) {
+function isAutomaticQueueCandidate(song, seed) {
+    if (!isRadioMusicTrack(song)) return false;
+    if (!seed || song.type !== 'yt') return true;
+    const candidateText = `${song.title || ''} ${song.artist || ''} ${song.description || ''} ${song.genre || ''}`.toLowerCase();
+    const seedArtist = String(seed.artist || seed.channelTitle || '').trim().toLowerCase();
+    const candidateArtist = String(song.artist || song.channelTitle || '').trim().toLowerCase();
+    if (seedArtist && candidateArtist && (candidateArtist.includes(seedArtist) || seedArtist.includes(candidateArtist))) return true;
+    const seedTerms = `${seed.artist || ''} ${seed.genre || ''}`.toLowerCase().split(/[^a-záéíóúüñ0-9]+/i).filter(term => term.length >= 4);
+    if (seedTerms.some(term => candidateText.includes(term))) return true;
+    const hasMusicSignal = /official music video|music video|video musical|videoclip|official audio|lyric video|lyrics?|letra|full album|álbum completo|album completo|live performance|presentación en vivo|canción|cancion|single|remix|cover|acoustic|instrumental|karaoke|song|track|concert|concierto/.test(candidateText);
+    const hasSpokenSignal = /\b(?:podcast|interview|entrevista|reaction|reacción|news|noticias|documentary|documental|tutorial|lecture|clase|curso|speech|discurso|conversation|conversación|discussion|discusión|voice.?over|spoken word|narration|narración|narrator|press conference|conferencia de prensa)\b/.test(candidateText);
+    return hasMusicSignal && !hasSpokenSignal;
+}
+
+function appendUniqueSongs(candidates, target, limit, seed = null) {
     for (const song of candidates || []) {
         if (target.length >= limit || !song?.url) break;
-        if (!isRadioMusicTrack(song)) continue;
+        if (!isAutomaticQueueCandidate(song, seed)) continue;
         const key = songKey(song);
         if (queueSeenKeys.has(key)) continue;
         queueSeenKeys.add(key);
@@ -875,29 +888,29 @@ async function buildAutomaticBatch(seed) {
     const remaining = () => QUEUE_BATCH - added.length;
 
     if (queueRound === 0) {
-        appendUniqueSongs(await fetchSameArtistTracks(seed, remaining()), added, QUEUE_BATCH);
+        appendUniqueSongs(await fetchSameArtistTracks(seed, remaining()), added, QUEUE_BATCH, seed);
         if (remaining() > 0 && seed?.artist) {
-            appendUniqueSongs(await reserveGetCandidates({ styleKey: style, artist: seed.artist, limit: remaining() }), added, QUEUE_BATCH);
+            appendUniqueSongs(await reserveGetCandidates({ styleKey: style, artist: seed.artist, limit: remaining() }), added, QUEUE_BATCH, seed);
         }
         queueRound = 1;
     }
 
     if (remaining() > 0) {
-        appendUniqueSongs(await fetchSimilarArtistTracks(seed, remaining()), added, QUEUE_BATCH);
+        appendUniqueSongs(await fetchSimilarArtistTracks(seed, remaining()), added, QUEUE_BATCH, seed);
         if (remaining() > 0) {
-            appendUniqueSongs(await reserveGetCandidates({ styleKey: style, limit: remaining() }), added, QUEUE_BATCH);
+            appendUniqueSongs(await reserveGetCandidates({ styleKey: style, limit: remaining() }), added, QUEUE_BATCH, seed);
         }
     }
 
     if (remaining() > 0) {
-        appendUniqueSongs(await fetchOpenverseGenreTracks(seed, remaining()), added, QUEUE_BATCH);
+        appendUniqueSongs(await fetchOpenverseGenreTracks(seed, remaining()), added, QUEUE_BATCH, seed);
     }
 
     if (remaining() > 0) {
-        appendUniqueSongs(await fetchJamendoGenreTracks(seed, remaining()), added, QUEUE_BATCH);
+        appendUniqueSongs(await fetchJamendoGenreTracks(seed, remaining()), added, QUEUE_BATCH, seed);
     }
     if (remaining() > 0) {
-        appendUniqueSongs(await fetchRelatedMusicTracks(remaining(), getRadioStyle(seed), seed), added, QUEUE_BATCH);
+        appendUniqueSongs(await fetchRelatedMusicTracks(remaining(), getRadioStyle(seed), seed), added, QUEUE_BATCH, seed);
     }
 
     return added;
@@ -1380,7 +1393,7 @@ function appendAutomaticFallback(song) {
 function findAutomaticFallback(current) {
     const currentId = String(current?.url || '');
     const candidates = [...currentList, ...homeMusic, ...homeMusicVideos, ...homeVideos]
-        .filter(item => item?.url && String(item.url) !== currentId && isRadioMusicTrack(item));
+        .filter(item => item?.url && String(item.url) !== currentId && isAutomaticQueueCandidate(item, current));
     return candidates.find(item => !queueSeenKeys.has(songKey(item))) || null;
 }
 

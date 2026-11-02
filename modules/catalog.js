@@ -730,7 +730,7 @@ async function performSmartSearch(query, options = {}) {
         const knownPool = [...(queue || []), ...(currentList || []), ...(homeVideos || []), ...(homeMusicVideos || []), ...(homeMusic || [])];
         const queryNeedle = String(query || '').toLowerCase().trim();
         const sessionCandidates = knownPool.filter(song => {
-            if (!song?.url || !isRadioMusicTrack(song)) return false;
+            if (!song?.url) return false;
             const text = `${song.title || ''} ${song.artist || ''} ${song.description || ''}`.toLowerCase();
             return text.includes(queryNeedle);
         });
@@ -739,13 +739,10 @@ async function performSmartSearch(query, options = {}) {
             return all.findIndex(other => songKey(other) === key) === index;
         });
         const openverseQuery = channelFilter ? query : `${query} music`;
-        const cachedSearchIsSufficient = !channelFilter && localSongs.length >= 3;
         const [youtubeResult, openverseResult] = await Promise.allSettled([
-            cachedSearchIsSufficient
-                ? Promise.resolve([])
-                : (channelFilter
-                    ? fetchYouTubeSearch(query, 'video,playlist', { channelId: channelFilter.id, maxResults: 50, signal: activeSearchController.signal })
-                    : fetchYouTubeSearch(query, 'video,playlist,channel', { maxResults: 50, signal: activeSearchController.signal })),
+            channelFilter
+                ? fetchYouTubeSearch(query, 'video,playlist', { channelId: channelFilter.id, maxResults: 50, signal: activeSearchController.signal })
+                : fetchYouTubeSearch(query, 'video,playlist,channel', { maxResults: 50, signal: activeSearchController.signal }),
             fetchOpenverseTracks(openverseQuery, 20, { page: 1, reserveContext: 'manual', seed: { artist: query, title: query }, signal: activeSearchController.signal })
         ]);
         if (requestId !== activeSearchRequestId) return;
@@ -951,8 +948,6 @@ function isNonMusicalVideo(item) {
     const text = videoSearchText(item);
     const categoryId = String(item.categoryId || item.videoSnippet?.categoryId || '');
     const hasStrongMusicSignal = /official music video|music video|video musical|videoclip|official audio|lyric video|lyrics?|letra|band version|full album|álbum completo|album completo|full concert|live performance|presentación en vivo|canción|cancion|single|remix|cover|acoustic|instrumental|karaoke|song|track|concert|concierto|music video/.test(text);
-    const hasSpokenContentSignal = /\b(?:podcast|interview|entrevista|reaction|reacción|commentary|comentario|news|noticias|documentary|documental|tutorial|lecture|clase|curso|speech|discurso|conversation|conversación|discussion|discusión|voice.?over|spoken word|narration|narración|narrator|story|stories|historia|review|reseña|press conference|conferencia de prensa|q\s*&\s*a|questions?\s+and\s+answers?)\b/.test(text);
-    if (hasSpokenContentSignal && !hasStrongMusicSignal) return true;
     if (categoryId === '10' || hasStrongMusicSignal) return false;
     return /tutorial|how to|documentary|documental|vlog|podcast|interview|entrevista|news|noticias|review|reseña|reaction|reacción|gameplay|gaming|trailer|teaser|lecture|clase|curso|comedy|comedia|short film|cortometraje|live stream|streaming|sports|deportes|travel|viaje|cooking|cocina|technology|tecnología|unboxing|audiobook|audiolibro|lesson|tutorial/.test(text);
 }
