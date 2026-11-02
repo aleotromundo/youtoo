@@ -145,7 +145,7 @@ async function loadNextPrebuiltPlaylistPage(targetQid, options = {}) {
         const targetIndex = queue.findIndex(item => item._qid === targetQid);
         const nextIndex = targetIndex + 1;
         if (nextIndex >= 0 && nextIndex < queue.length) {
-            playQueueAt(nextIndex);
+            playQueueAt(nextIndex, { deferAutoplay: !!options.deferAutoplay });
             return true;
         }
         finishPrebuiltPlaylistPlayback('La playlist no tiene más videos reproducibles');
@@ -161,7 +161,7 @@ async function loadNextPrebuiltPlaylistPage(targetQid, options = {}) {
     }
 }
 
-function advancePrebuiltPlaylist(targetQid) {
+function advancePrebuiltPlaylist(targetQid, options = {}) {
     if (queuePlaybackMode !== 'prebuilt_playlist' || !targetQid) return false;
     if (isNativeYouTubePlaylistPlayback() && ytPlayer) {
         syncNativeYouTubePlaylistPosition();
@@ -185,27 +185,27 @@ function advancePrebuiltPlaylist(targetQid) {
     if (index < 0) return false;
     const nextIndex = index + 1;
     if (nextIndex < queue.length) {
-        playQueueAt(nextIndex);
+        playQueueAt(nextIndex, { deferAutoplay: !!options.deferAutoplay });
         return true;
     }
     if (queuePlaylistContext?.nextPageToken) {
-        void loadNextPrebuiltPlaylistPage(targetQid);
+        void loadNextPrebuiltPlaylistPage(targetQid, { deferAutoplay: !!options.deferAutoplay });
         return true;
     }
     return false;
 }
 
-function advanceShuffledPlaylist(targetQid) {
+function advanceShuffledPlaylist(targetQid, options = {}) {
     if (queuePlaybackMode !== 'prebuilt_playlist' || !targetQid) return false;
     const index = queue.findIndex(item => item._qid === targetQid);
     if (index < 0) return false;
     const nextIndex = index + 1;
     if (nextIndex < queue.length) {
-        playQueueAt(nextIndex);
+        playQueueAt(nextIndex, { deferAutoplay: !!options.deferAutoplay });
         return true;
     }
     if (queuePlaylistContext?.nextPageToken) {
-        void loadNextPrebuiltPlaylistPage(targetQid);
+        void loadNextPrebuiltPlaylistPage(targetQid, { deferAutoplay: !!options.deferAutoplay });
         return true;
     }
     return false;

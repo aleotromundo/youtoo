@@ -682,17 +682,18 @@ function togglePlay() {
 function nextSong(manual = false) {
     if (manual && nowarfyAuthUser && nowarfyRemoteSession && !nowarfyRemoteIsPlayer) { void sendNowarfyCommand('next'); return true; }
     if (queue.length === 0) return false;
+    const deferAutoplay = manual && (playbackStoppedByUser || (!isPlaying && !ytPlaybackIntent));
     if (queuePlaybackMode === 'prebuilt_playlist') {
         const advanced = shuffleMode
-            ? advanceShuffledPlaylist(currentPlayingQid)
-            : advancePrebuiltPlaylist(currentPlayingQid);
+            ? advanceShuffledPlaylist(currentPlayingQid, { deferAutoplay })
+            : advancePrebuiltPlaylist(currentPlayingQid, { deferAutoplay });
         if (advanced) return true;
         if (!manual) finishPrebuiltPlaylistPlayback('Terminó la playlist de YouTube');
         else showToast('Ya estás en el último video de esta playlist', 'fa-flag-checkered');
         return true;
     }
     if (manual && shuffleMode) {
-        playQueueAt(Math.floor(Math.random() * queue.length));
+        playQueueAt(Math.floor(Math.random() * queue.length), { deferAutoplay });
         return true;
     }
     const current = queue[currentIndex];
@@ -705,7 +706,7 @@ function nextSong(manual = false) {
         void recoverAutomaticQueue(currentPlayingQid);
         return true;
     }
-    playQueueAt(next);
+    playQueueAt(next, { deferAutoplay });
     return true;
 }
 function prevSong() {
