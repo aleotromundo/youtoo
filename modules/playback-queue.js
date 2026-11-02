@@ -163,6 +163,36 @@ async function selectSong(song, sourceIdx) {
         await sendRemotePlaySongCommand(song, 0);
         return;
     }
+
+    const currentQueueIndex = queue.findIndex(item => item._qid === currentPlayingQid);
+    if (currentQueueIndex >= 0 && queue.length > 0) {
+        const existingIndex = queue.findIndex(item => String(item.url) === String(song?.url) && item.type === song?.type);
+        if (existingIndex === currentQueueIndex) {
+            playQueueAt(currentQueueIndex, { sourceIdx, focusVideo: true });
+            return;
+        }
+
+        const nextSong = existingIndex >= 0 ? queue.splice(existingIndex, 1)[0] : withQid(song);
+        const adjustedCurrentIndex = existingIndex >= 0 && existingIndex < currentQueueIndex
+            ? currentQueueIndex - 1
+            : currentQueueIndex;
+        const insertIndex = adjustedCurrentIndex + 1;
+        queue.splice(insertIndex, 0, nextSong);
+        queueSeenKeys.add(songKey(nextSong));
+
+        // Una selección externa rompe la playlist nativa de YouTube solo a nivel
+        // del reproductor; la cola materializada conserva lo que venía después.
+        if (queuePlaybackMode === 'prebuilt_playlist' && queuePlaylistContext) {
+            queuePlaylistContext.nativePlayback = false;
+            persistQueueMode();
+        }
+        persistQueue();
+        renderQueue();
+        playQueueAt(insertIndex, { sourceIdx, focusVideo: true });
+        void reserveDiscoveredCandidates([song], { context: 'queue', seed: song, queryContext: 'manual-next' });
+        if (queuePlaybackMode === 'radio') void growQueueIfNeeded(true);
+        return;
+    }
     
     setRadioQueueMode();
     const q = withQid(song);
@@ -820,6 +850,7 @@ async function fetchSimilarArtistTracks(seedSong, count) {
 function isRadioMusicTrack(song) {
     if (!song?.url || !['yt', 'mp3'].includes(song.type)) return false;
     const text = `${song.title || ''} ${song.artist || ''} ${song.description || ''} ${song.genre || ''}`.toLowerCase();
+    if (song.type === 'yt' && /\b(?:podcast|interview|entrevista|reaction|reacción|commentary|comentario|news|noticias|documentary|documental|tutorial|lecture|clase|curso|speech|discurso|conversation|conversación|discussion|discusión|voice.?over|spoken word|narration|narración|narrator|story|stories|historia|review|reseña|press conference|conferencia de prensa|q\s*&\s*a|questions?\s+and\s+answers?)\b/.test(text)) return false;
     if (/audiobook|audio book|audiolibro|spoken word|narration|narrator|chapter|book reading|story|stories|lecture|podcast|interview|meditation|sleep music|children|bedtime|sound effect|foley|noise|ambient/.test(text)) return false;
     if (song.type === 'yt' && song.categoryId && String(song.categoryId) !== '10') return false;
     if (song.type === 'yt' && typeof isNonMusicalVideo === 'function' && isNonMusicalVideo(song)) return false;

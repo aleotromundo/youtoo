@@ -951,6 +951,8 @@ function isNonMusicalVideo(item) {
     const text = videoSearchText(item);
     const categoryId = String(item.categoryId || item.videoSnippet?.categoryId || '');
     const hasStrongMusicSignal = /official music video|music video|video musical|videoclip|official audio|lyric video|lyrics?|letra|band version|full album|álbum completo|album completo|full concert|live performance|presentación en vivo|canción|cancion|single|remix|cover|acoustic|instrumental|karaoke|song|track|concert|concierto|music video/.test(text);
+    const hasSpokenContentSignal = /\b(?:podcast|interview|entrevista|reaction|reacción|commentary|comentario|news|noticias|documentary|documental|tutorial|lecture|clase|curso|speech|discurso|conversation|conversación|discussion|discusión|voice.?over|spoken word|narration|narración|narrator|story|stories|historia|review|reseña|press conference|conferencia de prensa|q\s*&\s*a|questions?\s+and\s+answers?)\b/.test(text);
+    if (hasSpokenContentSignal && !hasStrongMusicSignal) return true;
     if (categoryId === '10' || hasStrongMusicSignal) return false;
     return /tutorial|how to|documentary|documental|vlog|podcast|interview|entrevista|news|noticias|review|reseña|reaction|reacción|gameplay|gaming|trailer|teaser|lecture|clase|curso|comedy|comedia|short film|cortometraje|live stream|streaming|sports|deportes|travel|viaje|cooking|cocina|technology|tecnología|unboxing|audiobook|audiolibro|lesson|tutorial/.test(text);
 }
