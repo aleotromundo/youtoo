@@ -2127,7 +2127,7 @@ function startPrebuiltPlaylistPlayback(playlist, tracks, pageInfo = {}, nextPage
         playlistId: String(playlist.url), title: String(playlist.title || 'Lista de reproducción'),
         artist: String(playlist.artist || playlist.channelTitle || 'YouTube'), img: playlist.img || '',
         channelId: playlist.channelId || '', totalResults: Number(pageInfo.totalResults || tracks.length),
-        nextPageToken: String(nextPageToken || ''), nativePlayback: true
+        nextPageToken: String(nextPageToken || ''), nativePlayback: false
     };
     continuousPlayback = true;
     localStorage.setItem(CONTINUOUS_PLAYBACK_STORAGE_KEY, 'true');
@@ -2143,7 +2143,7 @@ function startPrebuiltPlaylistPlayback(playlist, tracks, pageInfo = {}, nextPage
     const startIndex = selectedIndex >= 0 ? selectedIndex : 0;
     playQueueAt(startIndex, {
         sourceIdx: tracks[startIndex].sourceIndex ?? 0,
-        playlistId: String(playlist.url), forceNewYouTubePlayer: true, focusVideo: true
+        forceNewYouTubePlayer: true, focusVideo: true
     });
     if (shuffleMode && typeof syncQueueShuffleMode === 'function') syncQueueShuffleMode();
     showToast(`Reproduciendo playlist · ${queue.length} videos en orden`, 'fa-list-music');

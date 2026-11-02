@@ -1096,7 +1096,7 @@ function restoreQueueFromStorage() {
         const savedMode = localStorage.getItem(QUEUE_MODE_STORAGE_KEY);
         const savedContext = savedMode === 'prebuilt_playlist' ? JSON.parse(localStorage.getItem(QUEUE_PLAYLIST_STORAGE_KEY) || 'null') : null;
         queuePlaybackMode = savedMode === 'prebuilt_playlist' && savedContext?.playlistId ? 'prebuilt_playlist' : 'radio';
-        queuePlaylistContext = queuePlaybackMode === 'prebuilt_playlist' ? savedContext : null;
+        queuePlaylistContext = queuePlaybackMode === 'prebuilt_playlist' ? { ...savedContext, nativePlayback: false } : null;
         queue = queuePlaybackMode === 'prebuilt_playlist'
             ? savedQueue.filter(item => item?.type === 'yt' && item?.url)
             : savedQueue.filter(isRadioMusicTrack);
@@ -1137,7 +1137,7 @@ async function hydrateQueueFromIndexedDB() {
         : storedQueue.filter(isRadioMusicTrack);
     if (!nextQueue.length) return;
     queuePlaybackMode = nextMode;
-    queuePlaylistContext = nextMode === 'prebuilt_playlist' ? storedContext : null;
+    queuePlaylistContext = nextMode === 'prebuilt_playlist' ? { ...storedContext, nativePlayback: false } : null;
     queue = nextQueue;
     queueSeenKeys = new Set(queue.map(songKey));
     queueIdCounter = queue.reduce((max, song) => Math.max(max, Number(song?._qid) || 0), 0);
