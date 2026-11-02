@@ -683,7 +683,9 @@ function nextSong(manual = false) {
     if (manual && nowarfyAuthUser && nowarfyRemoteSession && !nowarfyRemoteIsPlayer) { void sendNowarfyCommand('next'); return true; }
     if (queue.length === 0) return false;
     if (queuePlaybackMode === 'prebuilt_playlist') {
-        const advanced = advancePrebuiltPlaylist(currentPlayingQid);
+        const advanced = shuffleMode
+            ? advanceShuffledPlaylist(currentPlayingQid)
+            : advancePrebuiltPlaylist(currentPlayingQid);
         if (advanced) return true;
         if (!manual) finishPrebuiltPlaylistPlayback('Terminó la playlist de YouTube');
         else showToast('Ya estás en el último video de esta playlist', 'fa-flag-checkered');

@@ -59,7 +59,13 @@ function updateFavButton(song) {
     const exists = isFavoriteSong(song);
     button.className = exists ? 'fas fa-heart fav-btn active' : 'far fa-heart fav-btn';
 }
-function toggleShuffle() { shuffleMode = !shuffleMode; const icon = document.getElementById('shuffleIcon'); icon.classList.toggle('on', shuffleMode); icon.style.opacity = shuffleMode ? '1' : '0.5'; }
+function toggleShuffle() {
+    shuffleMode = !shuffleMode;
+    const icon = document.getElementById('shuffleIcon');
+    icon.classList.toggle('on', shuffleMode);
+    icon.style.opacity = shuffleMode ? '1' : '0.5';
+    if (typeof syncQueueShuffleMode === 'function') syncQueueShuffleMode();
+}
 
 function initVolume() {
     const saved = parseFloat(localStorage.getItem('nowarfy_vol'));

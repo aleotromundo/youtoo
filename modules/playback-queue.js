@@ -58,6 +58,40 @@ function appendPrebuiltPlaylistTracks(tracks) {
     return queuedTracks.length;
 }
 
+function shuffleQueueRange(startIndex, endIndex = queue.length) {
+    const safeStart = Math.max(0, Math.min(Number(startIndex) || 0, queue.length));
+    const safeEnd = Math.max(safeStart, Math.min(Number(endIndex) || queue.length, queue.length));
+    const tail = queue.splice(safeStart, safeEnd - safeStart);
+    for (let i = tail.length - 1; i > 0; i -= 1) {
+        const randomIndex = Math.floor(Math.random() * (i + 1));
+        [tail[i], tail[randomIndex]] = [tail[randomIndex], tail[i]];
+    }
+    queue.splice(safeStart, 0, ...tail);
+}
+
+function shuffleQueueTailFrom(startIndex) {
+    shuffleQueueRange(startIndex, queue.length);
+}
+
+function syncQueueShuffleMode() {
+    if (!shuffleMode || !queue.length) {
+        persistQueue();
+        renderQueue();
+        return;
+    }
+    const currentQueueIndex = queue.findIndex(item => item._qid === currentPlayingQid);
+    if (currentQueueIndex < 0) return;
+    if (queuePlaybackMode === 'prebuilt_playlist' && queuePlaylistContext) {
+        // La API nativa de YouTube solo conoce el orden original. Desde acá
+        // dejamos que la cola propia controle el orden mezclado.
+        queuePlaylistContext.nativePlayback = false;
+        persistQueueMode();
+    }
+    shuffleQueueTailFrom(currentQueueIndex + 1);
+    persistQueue();
+    renderQueue();
+}
+
 function finishPrebuiltPlaylistPlayback(message = 'Terminó la playlist') {
     clearAutomaticAdvance();
     isPlaying = false;
@@ -84,7 +118,11 @@ async function loadNextPrebuiltPlaylistPage(targetQid, options = {}) {
             collectionId: context.playlistId, collectionTitle: context.title, collectionImg: context.img || ''
         }, queue.length);
         if (!nextTracks.length) throw new Error('playlist_page_empty');
+        const pageStartIndex = queue.length;
         appendPrebuiltPlaylistTracks(nextTracks);
+        if (shuffleMode && !isNativeYouTubePlaylistPlayback()) {
+            shuffleQueueRange(pageStartIndex, queue.length);
+        }
         context.nextPageToken = data.nextPageToken || '';
         context.totalResults = Number(data.pageInfo?.totalResults || context.totalResults || queue.length);
         if (activePlaylistCatalog?.playlist?.url === context.playlistId) {
@@ -143,6 +181,22 @@ function advancePrebuiltPlaylist(targetQid) {
         }
         return false;
     }
+    const index = queue.findIndex(item => item._qid === targetQid);
+    if (index < 0) return false;
+    const nextIndex = index + 1;
+    if (nextIndex < queue.length) {
+        playQueueAt(nextIndex);
+        return true;
+    }
+    if (queuePlaylistContext?.nextPageToken) {
+        void loadNextPrebuiltPlaylistPage(targetQid);
+        return true;
+    }
+    return false;
+}
+
+function advanceShuffledPlaylist(targetQid) {
+    if (queuePlaybackMode !== 'prebuilt_playlist' || !targetQid) return false;
     const index = queue.findIndex(item => item._qid === targetQid);
     if (index < 0) return false;
     const nextIndex = index + 1;
@@ -933,7 +987,11 @@ async function growQueueIfNeeded(force = false) {
         try {
             const added = await buildAutomaticBatch(seed);
             if (added.length) {
+                const addedStartIndex = queue.length;
                 queue = queue.concat(added);
+                if (shuffleMode) {
+                    shuffleQueueRange(addedStartIndex, queue.length);
+                }
                 persistQueue();
                 renderQueue();
             }

@@ -2145,6 +2145,7 @@ function startPrebuiltPlaylistPlayback(playlist, tracks, pageInfo = {}, nextPage
         sourceIdx: tracks[startIndex].sourceIndex ?? 0,
         playlistId: String(playlist.url), forceNewYouTubePlayer: true, focusVideo: true
     });
+    if (shuffleMode && typeof syncQueueShuffleMode === 'function') syncQueueShuffleMode();
     showToast(`Reproduciendo playlist · ${queue.length} videos en orden`, 'fa-list-music');
     return true;
 }
