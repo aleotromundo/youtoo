@@ -15,6 +15,7 @@
     let audioContext = null;
     let activeGraph = null;
     let butterchurn = null;
+    let milkdropEngine = null;
     let presetCollection = null;
     let presetNames = [];
     let activePresetName = '';
@@ -272,6 +273,7 @@
                 butterchurn.connectAudio(output);
                 activeButterchurnInput = output;
             }
+            if (milkdropEngine) milkdropEngine.attachAnalyser(graph.analyser);
             activeGraph = graph;
             if (audioContext.state === 'suspended') audioContext.resume().catch(() => {});
         } catch (error) {
@@ -362,6 +364,8 @@
         renderHeight = height;
         if (butterchurn) {
             try { butterchurn.setRendererSize(width, height); } catch (_) {}
+        } else if (milkdropEngine) {
+            try { milkdropEngine.resize(); } catch (_) {}
         } else {
             const fallback = $('retroFallbackCanvas');
             if (fallback) {
@@ -544,33 +548,22 @@
 
     async function initButterchurn() {
         try {
-            await loadButterchurnAssets();
+            await loadScriptOnce('/modules/milkdrop-engine.js', 'milkdrop-engine');
             const canvas = $('retroVisualizerCanvas');
-            if (!canvas || !window.butterchurn || !window.butterchurnPresets) throw new Error('Butterchurn no está disponible');
+            if (!canvas || !window.NowarfyMilkdropEngine) throw new Error('Motor MilkDrop nuevo no disponible');
             const context = ensureAudioContext();
             if (!context) throw new Error('El navegador no dispone de Web Audio');
-            const rect = canvas.getBoundingClientRect();
-            const width = Math.max(1, Math.round(rect.width || 640));
-            const height = Math.max(1, Math.round(rect.height || 360));
-            butterchurn = window.butterchurn.createVisualizer(context, canvas, {
-                width,
-                height,
-                pixelRatio: Math.min(2, Math.max(1, Number(window.devicePixelRatio) || 1)),
-                textureRatio: 1
-            });
-            presetCollection = window.butterchurnPresets.getPresets();
-            presetNames = Object.keys(presetCollection || {});
-            if (!presetNames.length) throw new Error('No se encontraron presets MilkDrop');
+            milkdropEngine = new window.NowarfyMilkdropEngine(canvas);
+            if (activeGraph) milkdropEngine.attachAnalyser(activeGraph.analyser);
             setButterchurnMode();
-            const savedPreset = (() => { try { return localStorage.getItem(VIZ_PRESET_KEY) || localStorage.getItem(LEGACY_PRESET_KEY) || ''; } catch (_) { return ''; } })();
-            if (!savedPreset || !switchPreset(savedPreset)) chooseRandomPreset();
-            try { localStorage.removeItem(LEGACY_PRESET_KEY); } catch (_) {}
+            presetTitle('YouToo Generative · feedback engine');
             if (activeGraph) routeGraph(activeGraph);
             if (!renderFrameId && isRetro()) renderFrameId = requestAnimationFrame(renderLoop);
         } catch (error) {
-            console.warn('[YouToo] Butterchurn no disponible, se usará el espectro alternativo:', error);
+            console.warn('[YouToo] Motor WebGL2 no disponible, se usará el espectro alternativo:', error);
+            milkdropEngine = null;
             butterchurn = null;
-            setFallbackMode('MilkDrop no disponible en este navegador; espectro visual alternativo activo.');
+            setFallbackMode('WebGL2 no disponible en este navegador; espectro visual alternativo activo.');
             if (!renderFrameId && isRetro()) renderFrameId = requestAnimationFrame(renderLoop);
         }
     }
@@ -974,7 +967,14 @@
         renderFrameId = 0;
         if (!isRetro() || document.hidden) return;
         updateMusicDirector(now);
-        if (butterchurn) {
+        if (milkdropEngine) {
+            try { milkdropEngine.render(now); }
+            catch (error) {
+                console.warn('[YouToo] Falló el motor generativo:', error);
+                milkdropEngine = null;
+                setFallbackMode('Se activó el visualizador alternativo.');
+            }
+        } else if (butterchurn) {
             try { butterchurn.render(); }
             catch (error) {
                 console.warn('[YouToo] Falló el render MilkDrop:', error);
