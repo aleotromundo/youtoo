@@ -32,6 +32,9 @@
     let queueSignature = '';
     let fallbackContext = null;
     let fallbackArt = null;
+    let microphoneStream = null;
+    let microphoneSource = null;
+    let microphoneAnalyser = null;
     const musicDirector = {
         low: 0,
         mid: 0,
@@ -170,6 +173,49 @@
         try { graph.silentGain.disconnect(); } catch (_) {}
     }
 
+    function stopMicrophoneFallback() {
+        try { microphoneSource?.disconnect(); } catch (_) {}
+        try { microphoneAnalyser?.disconnect(); } catch (_) {}
+        try { microphoneStream?.getTracks().forEach((track) => track.stop()); } catch (_) {}
+        microphoneStream = null;
+        microphoneSource = null;
+        microphoneAnalyser = null;
+    }
+
+    async function startMicrophoneFallback() {
+        if (microphoneAnalyser) {
+            setAudioState('Micrófono activo · señal reactiva', 'live');
+            return true;
+        }
+        if (!navigator.mediaDevices?.getUserMedia) {
+            setAudioState('Este navegador no permite usar el micrófono.', 'warning');
+            return false;
+        }
+        try {
+            const context = ensureAudioContext();
+            if (!context) throw new Error('Web Audio no disponible');
+            microphoneStream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false } });
+            microphoneSource = context.createMediaStreamSource(microphoneStream);
+            microphoneAnalyser = context.createAnalyser();
+            microphoneAnalyser.fftSize = 2048;
+            microphoneAnalyser.smoothingTimeConstant = 0.64;
+            const silentGain = context.createGain();
+            silentGain.gain.value = 0;
+            microphoneSource.connect(microphoneAnalyser);
+            microphoneAnalyser.connect(silentGain);
+            silentGain.connect(context.destination);
+            milkdropEngine?.attachAnalyser(microphoneAnalyser);
+            if (context.state === 'suspended') await context.resume().catch(() => {});
+            setAudioState('Micrófono activo · señal reactiva', 'live');
+            return true;
+        } catch (error) {
+            stopMicrophoneFallback();
+            console.warn('[YouToo] No se pudo activar el micrófono:', error);
+            setAudioState('No se pudo activar el micrófono; revisá el permiso del navegador.', 'warning');
+            return false;
+        }
+    }
+
     async function prepareMediaLoad(media, url) {
         if (!media || !url) return media;
         const needsAnalysis = isRetro();
@@ -256,6 +302,7 @@
 
     function routeGraph(graph) {
         if (!graph || !audioContext) return;
+        stopMicrophoneFallback();
         disconnectButterchurnInput();
         if (activeGraph && activeGraph !== graph) disconnectGraph(activeGraph);
         disconnectGraph(graph);
@@ -284,11 +331,15 @@
 
     function connectCurrentMedia(media) {
         const song = currentSong();
-        if (!media || !song || String(song.type) === 'yt' || !isActuallyPlaying()) return;
+        if (!media || !song || !isActuallyPlaying()) return;
+        if (String(song.type) === 'yt') {
+            setAudioState('Señal interna no disponible · tocá para usar el micrófono', 'warning');
+            return;
+        }
         const url = song.url || media.currentSrc || media.src;
         const corsIsReady = corsPreparedMedia.has(media) || media.crossOrigin === 'anonymous' || isSameOrigin(url);
         if (!corsIsReady) {
-            setAudioState('Reproducción activa · visualizador en modo ambiente para esta fuente.', 'warning');
+            setAudioState('Sin señal interna · tocá para usar el micrófono', 'warning');
             return;
         }
         const graph = makeAudioGraph(media);
@@ -709,6 +760,9 @@
         if (!force && now - lastUiSyncAt < 280) return;
         lastUiSyncAt = now;
         const song = currentSong();
+        if (force && song && String(song.type) === 'yt' && !microphoneAnalyser) {
+            setAudioState('Señal interna no disponible · tocá para usar el micrófono', 'warning');
+        }
         const title = song?.title || 'Esperando una pista';
         const artist = song?.artist || song?.channelTitle || 'YouToo · Retro Studio';
         const titleEl = $('retroTrackTitle');
@@ -958,6 +1012,7 @@
         } else {
             if (renderFrameId) cancelAnimationFrame(renderFrameId);
             renderFrameId = 0;
+            stopMicrophoneFallback();
             disconnectButterchurnInput();
             if (activeGraph) routeGraph(activeGraph);
         }
@@ -1024,6 +1079,12 @@
         }, { passive: true });
 
         $('retroModeToggle').addEventListener('click', () => setRetroMode(!isRetro()));
+        $('retroAudioState')?.addEventListener('click', () => { void startMicrophoneFallback(); });
+        $('retroAudioState')?.setAttribute('role', 'button');
+        $('retroAudioState')?.setAttribute('tabindex', '0');
+        $('retroAudioState')?.addEventListener('keydown', (event) => {
+            if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); void startMicrophoneFallback(); }
+        });
         $('retroPresetNext')?.addEventListener('click', chooseRandomPreset);
         $('retroFullscreen')?.addEventListener('click', () => {
             const target = $('retroVisualizerShell');

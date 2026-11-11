@@ -208,9 +208,11 @@ body.mode-classic .retro-studio { scroll-margin-top: 76px; }
     font: 600 .53rem 'Courier New', monospace;
     text-overflow: ellipsis;
     white-space: nowrap;
-    pointer-events: none;
+    pointer-events: auto;
+    cursor: pointer;
 }
 .retro-audio-state:empty { display: none; }
+.retro-audio-state:focus-visible { outline: 1px solid var(--retro-lime); outline-offset: 2px; }
 .retro-audio-state[data-state="live"] { color: #b1ff9e; border-color: rgba(49, 244, 27, .32); }
 .retro-audio-state[data-state="warning"] { color: #ffcf72; border-color: rgba(255, 207, 114, .38); }
 .retro-viz-hud {
