@@ -82,19 +82,17 @@ El botón **Sonar también acá** (solo en los controles, no en el reproductor p
 
 En *Cuenta* hay un panel colapsable (solo visible con sesión iniciada) que muestra en vivo: rol, IDs cortos de dispositivo y sesión, versión del estado, estado de Realtime y `BroadcastChannel`, posición recibida/publicada, cola, último comando y un log de los últimos 6 eventos. Sirve para ver el protocolo funcionando al cambiar de dispositivo; no modifica nada. El botón **Copiar diagnóstico** genera un texto listo para pegar en un issue.
 
-## Ecualizador
+## Modo retro Winamp
 
 Junto al buscador está el interruptor entre la interfaz moderna y **Retro Studio**, una vista de escritorio inspirada en Winamp. El cambio incluye una transformación visual de tres segundos. En escritorio distribuye el visualizador en el 40% izquierdo y el reproductor/playlist en el 60% derecho; en móvil se apila en una sola columna.
 
-Retro Studio combina el visualizador **MilkDrop** implementado por [Butterchurn](https://github.com/jberg/butterchurn) con presets de [Butterchurn Presets](https://github.com/jberg/butterchurn-presets), un espectro de 48 bandas, EQ ajustable de diez bandas y la cola real del reproductor. Ambos bundles y sus avisos MIT están versionados localmente en `vendor/`; se descargan de forma diferida al entrar al modo retro y quedan en caché para usos posteriores.
+Retro Studio combina el visualizador **MilkDrop** implementado por [Butterchurn](https://github.com/jberg/butterchurn) con presets de [Butterchurn Presets](https://github.com/jberg/butterchurn-presets), un espectro de 48 bandas y la cola real del reproductor. Ambos bundles y sus avisos MIT están versionados localmente en `vendor/`; se descargan de forma diferida al entrar al modo retro y quedan en caché para usos posteriores.
 
-El EQ y el análisis reactivo solo pueden procesar **audio directo del mismo documento**, así que:
+No incluye ecualizador. El visualizador puede reaccionar al audio directo del mismo documento cuando su servidor permite acceso CORS; si no, la pista igual se reproduce y el visualizador usa modo ambiente.
 
-- **Funciona** en pistas de audio directo (Openverse/Freesound, Jamendo, Commons) y en videos libres de Wikimedia Commons, siempre que el servidor responda con CORS. Antes de conectar un medio se hace una prueba `fetch` en modo CORS; si falla, la pista se reproduce sin EQ y se avisa en el panel.
-- **YouTube conserva sus controles y reproducción**, pero el visualizador pasa a modo ambiente y el EQ no modifica esa señal: el reproductor vive en un iframe de otro origen y la IFrame API no expone su audio.
-- **Puente de audio**: con una pista de YouTube en reproducción, el botón *Buscar versión de audio del mismo tema* busca el mismo título en Openverse y Jamendo, elige el candidato con mejor coincidencia de título/artista/duración, verifica CORS y reemplaza la entrada de la cola para que el EQ sí se aplique.
+- **YouTube conserva su reproducción normal**, pero el visualizador usa modo ambiente: el reproductor vive en un iframe de otro origen y la IFrame API no entrega el audio a la página.
 
-Los controles Winamp (play/pausa, anterior, siguiente, volumen, seek, playlist, quitar pistas y vaciar cola) operan sobre la misma cola que el modo moderno. El ecualizador y el crossfade son excluyentes: mientras el audio está ruteado por Web Audio se desactiva el crossfade para no conectar dos elementos a la vez.
+Los controles Winamp (play/pausa, anterior, siguiente, volumen, seek, playlist, quitar pistas y vaciar cola) operan sobre la misma cola que el modo moderno. Mientras la fuente directa está conectada al analizador Web Audio para el visualizador, se desactiva el crossfade para evitar perder esa señal.
 
 ## Despliegue
 

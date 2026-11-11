@@ -112,7 +112,7 @@ let nowarfyTasteSyncTimer = null;
 let nowarfyTasteSyncInFlight = false;
 const EMPTY_TASTE = Object.freeze({ version: 3, personalization: true, searches: [], plays: [], channels: [], playlists: [] });
 
-// Son `let` porque el ecualizador puede necesitar reemplazar el elemento cuando
+// Son `let` porque el visualizador puede necesitar reemplazar el elemento cuando
 // una pista sin CORS quedaría en silencio al pasar por Web Audio.
 let audioEl = document.getElementById('audio-element');
 let nextAudioEl = document.getElementById('audio-element-next');

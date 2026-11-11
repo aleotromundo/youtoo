@@ -3,29 +3,15 @@
     'use strict';
 
     const MODE_KEY = 'nowarfy_classic';
-    const EQ_KEY = 'nowarfy_retro_eq_state_v1';
-    const EQ_ON_KEY = 'nowarfy_retro_eq_on_v1';
-    const PRESET_KEY = 'nowarfy_retro_eq_preset_v1';
+    const VIZ_PRESET_KEY = 'nowarfy_retro_viz_preset_v1';
+    const LEGACY_PRESET_KEY = 'nowarfy_retro_eq_preset_v1';
     const TRANSITION_MS = 3000;
     const MAX_VISIBLE_TRACKS = 400;
-    const BANDS = [31, 62, 125, 250, 500, 1000, 2000, 4000, 8000, 16000];
-    const BAND_PRESETS = {
-        flat: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-        rock: [5, 4, 2, 0, -2, -1, 2, 4, 5, 5],
-        bass: [7, 6, 5, 3, 1, 0, 0, 0, 0, 0],
-        vocal: [-2, -1, 0, 2, 4, 4, 3, 1, 0, -1],
-        electronic: [5, 4, 1, 0, -1, 2, 1, 3, 5, 6]
-    };
-    const EQ_LABELS = ['PLANO', 'ROCK', 'GRAVES', 'VOZ', 'ELECTRO'];
-    const PRESET_LABELS = ['flat', 'rock', 'bass', 'vocal', 'electronic'];
 
     const $ = (id) => document.getElementById(id);
     const corsResults = new Map();
     const corsPreparedMedia = new WeakSet();
     const graphByMedia = new WeakMap();
-    let eqValues = BAND_PRESETS.flat.slice();
-    let eqEnabled = false;
-    let eqPreset = 'flat';
     let audioContext = null;
     let activeGraph = null;
     let butterchurn = null;
@@ -103,12 +89,7 @@
         return Math.max(0, Number(media && media.currentTime) || 0);
     }
 
-    function setEqNote(message, kind) {
-        const note = $('retroEqNote');
-        if (note) {
-            note.textContent = message;
-            note.dataset.state = kind || 'info';
-        }
+    function setAudioState(message, kind) {
         const status = $('retroAudioState');
         if (status && message) {
             status.textContent = message;
@@ -173,12 +154,11 @@
         try { graph.source.disconnect(); } catch (_) {}
         try { graph.analyser.disconnect(); } catch (_) {}
         try { graph.silentGain.disconnect(); } catch (_) {}
-        graph.filters.forEach((filter) => { try { filter.disconnect(); } catch (_) {} });
     }
 
     async function prepareMediaLoad(media, url) {
         if (!media || !url) return media;
-        const needsAnalysis = isRetro() || eqEnabled;
+        const needsAnalysis = isRetro();
 
         if (!needsAnalysis) {
             if (graphByMedia.has(media)) {
@@ -203,7 +183,7 @@
         }
 
         corsPreparedMedia.delete(media);
-        setEqNote('Esta fuente no permite análisis CORS; el audio sigue funcionando en modo normal.', 'warning');
+        setAudioState('Esta fuente no permite análisis CORS; el audio sigue funcionando en modo normal.', 'warning');
         if (graphByMedia.has(media)) {
             const graph = graphByMedia.get(media);
             if (activeGraph === graph) activeGraph = null;
@@ -241,20 +221,11 @@
             analyser.smoothingTimeConstant = 0.78;
             const silentGain = context.createGain();
             silentGain.gain.value = 0;
-            const filters = BANDS.map((frequency, index) => {
-                const filter = context.createBiquadFilter();
-                filter.type = 'peaking';
-                filter.frequency.value = frequency;
-                filter.Q.value = 1.1;
-                filter.gain.value = Number(eqValues[index]) || 0;
-                return filter;
-            });
             const graph = {
                 media,
                 source,
                 analyser,
                 silentGain,
-                filters,
                 frequencies: new Uint8Array(analyser.frequencyBinCount)
             };
             graphByMedia.set(media, graph);
@@ -264,7 +235,7 @@
             return graph;
         } catch (error) {
             console.warn('[YouToo] No se pudo crear el grafo de audio:', error);
-            setEqNote('No se pudo iniciar Web Audio en este navegador; la reproducción continúa normalmente.', 'warning');
+            setAudioState('No se pudo iniciar Web Audio en este navegador; la reproducción continúa normalmente.', 'warning');
             return null;
         }
     }
@@ -280,15 +251,7 @@
             graph.analyser.connect(graph.silentGain);
             graph.silentGain.connect(audioContext.destination);
 
-            let output = graph.source;
-            if (eqEnabled) {
-                let previous = graph.source;
-                graph.filters.forEach((filter) => {
-                    previous.connect(filter);
-                    previous = filter;
-                });
-                output = previous;
-            }
+            const output = graph.source;
 
             // El camino de salida y el analizador de Butterchurn son ramas distintas: no duplica ni silencia el audio.
             output.connect(audioContext.destination);
@@ -300,7 +263,7 @@
             if (audioContext.state === 'suspended') audioContext.resume().catch(() => {});
         } catch (error) {
             console.warn('[YouToo] No se pudo enrutar el audio:', error);
-            setEqNote('No se pudo aplicar el procesamiento de audio; la reproducción normal sigue activa.', 'warning');
+            setAudioState('No se pudo iniciar el visualizador de audio; la reproducción normal sigue activa.', 'warning');
         }
     }
 
@@ -310,13 +273,13 @@
         const url = song.url || media.currentSrc || media.src;
         const corsIsReady = corsPreparedMedia.has(media) || media.crossOrigin === 'anonymous' || isSameOrigin(url);
         if (!corsIsReady) {
-            setEqNote('Reproducción activa · visualizador en modo ambiente para esta fuente.', 'warning');
+            setAudioState('Reproducción activa · visualizador en modo ambiente para esta fuente.', 'warning');
             return;
         }
         const graph = makeAudioGraph(media);
         if (!graph) return;
         routeGraph(graph);
-        setEqNote(eqEnabled ? 'SEÑAL DIRECTA · ECUALIZADOR ACTIVO' : 'SEÑAL DIRECTA · VISUALIZADOR REACTIVO', 'live');
+        setAudioState('Señal directa · visualizador reactivo', 'live');
     }
 
     function releaseMediaGraph(media) {
@@ -400,7 +363,7 @@
         const fallback = $('retroFallbackCanvas');
         if (canvas) canvas.hidden = true;
         if (fallback) fallback.hidden = false;
-        if (message) setEqNote(message, 'warning');
+        if (message) setAudioState(message, 'warning');
         fallbackContext = fallback ? fallback.getContext('2d') : null;
         resizeVisualizer();
     }
@@ -425,7 +388,7 @@
             activePresetName = name;
             lastPresetChangeAt = performance.now();
             presetTitle(name);
-            try { localStorage.setItem(PRESET_KEY, name); } catch (_) {}
+            try { localStorage.setItem(VIZ_PRESET_KEY, name); } catch (_) {}
             return true;
         } catch (error) {
             console.warn('[YouToo] Preset MilkDrop no compatible:', name, error);
@@ -463,8 +426,9 @@
             presetNames = Object.keys(presetCollection || {});
             if (!presetNames.length) throw new Error('No se encontraron presets MilkDrop');
             setButterchurnMode();
-            const savedPreset = (() => { try { return localStorage.getItem(PRESET_KEY) || ''; } catch (_) { return ''; } })();
+            const savedPreset = (() => { try { return localStorage.getItem(VIZ_PRESET_KEY) || localStorage.getItem(LEGACY_PRESET_KEY) || ''; } catch (_) { return ''; } })();
             if (!savedPreset || !switchPreset(savedPreset)) chooseRandomPreset();
+            try { localStorage.removeItem(LEGACY_PRESET_KEY); } catch (_) {}
             if (activeGraph) routeGraph(activeGraph);
             if (!renderFrameId && isRetro()) renderFrameId = requestAnimationFrame(renderLoop);
         } catch (error) {
@@ -475,89 +439,7 @@
         }
     }
 
-    function createEqBands() {
-        const container = $('retroEqBands');
-        if (!container || container.dataset.ready === '1') return;
-        container.dataset.ready = '1';
-        BANDS.forEach((frequency, index) => {
-            const label = document.createElement('label');
-            label.className = 'retro-band';
-            label.title = `${frequency} Hz`;
-
-            const input = document.createElement('input');
-            input.type = 'range';
-            input.min = '-12';
-            input.max = '12';
-            input.step = '1';
-            input.value = String(eqValues[index] || 0);
-            input.setAttribute('aria-label', `Ecualización ${frequency >= 1000 ? `${frequency / 1000} kHz` : `${frequency} Hz`}`);
-            input.dataset.band = String(index);
-            input.addEventListener('input', () => {
-                eqValues[index] = Number(input.value);
-                label.querySelector('.retro-band-value').textContent = `${eqValues[index] > 0 ? '+' : ''}${eqValues[index]} dB`;
-                if (activeGraph) activeGraph.filters[index].gain.setTargetAtTime(eqValues[index], audioContext.currentTime, 0.025);
-                saveEqValues();
-            });
-
-            const value = document.createElement('span');
-            value.className = 'retro-band-value';
-            value.textContent = `${eqValues[index] > 0 ? '+' : ''}${eqValues[index]} dB`;
-            const caption = document.createElement('small');
-            caption.textContent = frequency >= 1000 ? `${frequency / 1000}K` : String(frequency);
-            label.append(input, value, caption);
-            container.appendChild(label);
-        });
-    }
-
-    function saveEqValues() {
-        try { localStorage.setItem(EQ_KEY, JSON.stringify(eqValues)); } catch (_) {}
-    }
-
-    function loadEqSettings() {
-        try {
-            const stored = JSON.parse(localStorage.getItem(EQ_KEY) || 'null');
-            if (Array.isArray(stored) && stored.length === BANDS.length) {
-                eqValues = stored.map((value) => Math.max(-12, Math.min(12, Number(value) || 0)));
-            }
-            eqEnabled = localStorage.getItem(EQ_ON_KEY) === '1';
-            const preset = localStorage.getItem(PRESET_KEY);
-            if (preset && BAND_PRESETS[preset]) eqPreset = preset;
-        } catch (_) {}
-    }
-
-    function updateEqControls() {
-        const button = $('retroEqToggle');
-        if (button) {
-            button.setAttribute('aria-pressed', String(eqEnabled));
-            button.classList.toggle('is-on', eqEnabled);
-            const label = button.querySelector('[data-eq-label]');
-            if (label) label.textContent = eqEnabled ? 'EQ ON' : 'EQ OFF';
-        }
-        const select = $('retroEqPreset');
-        if (select) select.value = eqPreset;
-        const sliders = document.querySelectorAll('#retroEqBands input[type="range"]');
-        sliders.forEach((slider) => {
-            const index = Number(slider.dataset.band);
-            slider.value = String(eqValues[index] || 0);
-            const value = slider.closest('.retro-band')?.querySelector('.retro-band-value');
-            if (value) value.textContent = `${eqValues[index] > 0 ? '+' : ''}${eqValues[index]} dB`;
-        });
-    }
-
-    function applyEqPreset(name) {
-        const values = BAND_PRESETS[name];
-        if (!values) return;
-        eqPreset = name;
-        eqValues = values.slice();
-        if (activeGraph && audioContext) {
-            activeGraph.filters.forEach((filter, index) => filter.gain.setTargetAtTime(eqValues[index], audioContext.currentTime, 0.025));
-        }
-        try { localStorage.setItem(PRESET_KEY, name); } catch (_) {}
-        saveEqValues();
-        updateEqControls();
-    }
-
-    async function prepareCurrentDirectTrack() {
+    async function prepareCurrentVisualizationTrack() {
         const song = currentSong();
         const media = activeMedia();
         if (!song || !song.url || String(song.type) === 'yt' || !media) return;
@@ -572,7 +454,7 @@
         }
         const allowed = await probeCors(song.url);
         if (!allowed) {
-            setEqNote('Esta pista no publica permiso CORS; se mantiene el sonido y el visualizador pasa a modo ambiente.', 'warning');
+            setAudioState('Esta pista no publica permiso CORS; se mantiene el sonido y el visualizador pasa a modo ambiente.', 'warning');
             return;
         }
         if (typeof currentIndex !== 'undefined' && typeof playQueueAt === 'function') {
@@ -586,25 +468,6 @@
                     wasPlaying
                 }
             });
-        }
-    }
-
-    function toggleEq() {
-        eqEnabled = !eqEnabled;
-        try { localStorage.setItem(EQ_ON_KEY, eqEnabled ? '1' : '0'); } catch (_) {}
-        updateEqControls();
-        if (activeGraph) routeGraph(activeGraph);
-        if (eqEnabled) {
-            const song = currentSong();
-            if (song && String(song.type) === 'yt') {
-                setEqNote('YouTube no expone su señal al ecualizador del navegador; los controles seguirán disponibles para audio directo.', 'warning');
-            } else if (song && song.url) {
-                void prepareCurrentDirectTrack();
-            } else {
-                setEqNote('Ecualizador listo: se aplicará al reproducir una fuente de audio compatible.', 'info');
-            }
-        } else if (activeGraph) {
-            setEqNote('EQ desactivado · sonido directo', 'info');
         }
     }
 
@@ -787,7 +650,7 @@
                 status.dataset.state = 'info';
                 lastAmbientMode = true;
             } else if (activeGraph && activeGraph.media === activeMedia()) {
-                status.textContent = eqEnabled ? 'Señal directa · ecualizador activo' : 'Señal directa · MilkDrop reactivo';
+                status.textContent = 'Señal directa · MilkDrop reactivo';
                 status.dataset.state = 'live';
                 lastAmbientMode = false;
             } else {
@@ -961,7 +824,7 @@
             if (activeGraph) routeGraph(activeGraph);
             void initButterchurn();
             const song = currentSong();
-            if (song && song.url && String(song.type) !== 'yt') void prepareCurrentDirectTrack();
+            if (song && song.url && String(song.type) !== 'yt') void prepareCurrentVisualizationTrack();
             if (!renderFrameId) renderFrameId = requestAnimationFrame(renderLoop);
         } else {
             if (renderFrameId) cancelAnimationFrame(renderFrameId);
@@ -1012,16 +875,15 @@
 
     function init() {
         if (!$('retroModeToggle') || !$('retroStudio')) return;
-        loadEqSettings();
-        createEqBands();
+        try {
+            localStorage.removeItem('nowarfy_retro_eq_state_v1');
+            localStorage.removeItem('nowarfy_retro_eq_on_v1');
+        } catch (_) {}
         buildSpectrumBars();
-        updateEqControls();
         updateModeToggle();
         attachExistingMedia();
 
         $('retroModeToggle').addEventListener('click', () => setRetroMode(!isRetro()));
-        $('retroEqToggle')?.addEventListener('click', toggleEq);
-        $('retroEqPreset')?.addEventListener('change', (event) => applyEqPreset(event.target.value));
         $('retroPresetNext')?.addEventListener('click', chooseRandomPreset);
         $('retroFullscreen')?.addEventListener('click', () => {
             const target = $('retroVisualizerShell');
@@ -1071,14 +933,12 @@
             if (shell) observer.observe(shell);
         }
 
-        window.nowarfyEq = {
-            isEnabled: () => eqEnabled,
+        window.nowarfyAudioViz = {
             isRouted: (media) => graphByMedia.has(media),
             prepareMediaLoad,
             onMediaPlaying: connectCurrentMedia
         };
         window.toggleRetroMode = () => setRetroMode(!isRetro());
-        window.toggleRetroEq = toggleEq;
         window.nextRetroPreset = chooseRandomPreset;
         window.previewRetroSeek = previewSeek;
         window.commitRetroSeek = commitRetroSeek;
@@ -1094,7 +954,7 @@
             if (localStorage.getItem(MODE_KEY) === '1' || document.body.classList.contains('mode-classic')) {
                 setRetroMode(true, { initial: true });
                 const song = currentSong();
-                if (song && song.url && String(song.type) !== 'yt') void prepareCurrentDirectTrack();
+                if (song && song.url && String(song.type) !== 'yt') void prepareCurrentVisualizationTrack();
                 void initButterchurn();
                 renderFrameId = requestAnimationFrame(renderLoop);
             }

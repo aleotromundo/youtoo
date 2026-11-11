@@ -172,7 +172,7 @@ function setupBackgroundPlaybackSupport() {
         media.addEventListener('pause', updatePlaybackState);
         media.addEventListener('ended', updatePlaybackState);
     });
-    // El ecualizador puede reemplazar un <audio> para recuperar el audio normal.
+    // El visualizador puede reemplazar un <audio> para recuperar audio tras el ruteo Web Audio.
     document.addEventListener('nowarfy:media-rebuilt', (event) => {
         const media = event.detail?.media;
         if (!media) return;

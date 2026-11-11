@@ -512,32 +512,26 @@ function nextQueueIndex() {
 
 function getStandbyAudioEl() { return activeAudioEl === audioEl ? nextAudioEl : audioEl; }
 
-// El EQ no puede ecualizar el audio de YouTube (iframe de otro origen) y necesita
-// CORS en los medios directos. Estas dos puertas avisan al módulo clásico antes de
-// cargar una pista y desactivan el crossfade mientras el EQ está encendido.
-function nowarfyEqActive() {
-    return typeof window.nowarfyEq?.isEnabled === 'function' && window.nowarfyEq.isEnabled();
+// El visualizador requiere CORS para analizar medios directos; el iframe de YouTube
+// no expone su señal. Un medio ya ruteado no debe cambiarse a otra pista vía crossfade.
+function nowarfyVisualizationRouted(media) {
+    return !!media && typeof window.nowarfyAudioViz?.isRouted === 'function' && window.nowarfyAudioViz.isRouted(media);
 }
-// Un elemento ruteado a Web Audio no puede volver a reproducir una pista sin CORS:
-// quedaría en silencio. Mientras exista, no precargamos ni hacemos crossfade.
-function nowarfyEqRouted(media) {
-    return !!media && typeof window.nowarfyEq?.isRouted === 'function' && window.nowarfyEq.isRouted(media);
-}
-function nowarfyEqBlocksCrossfade() {
-    return nowarfyEqActive() || nowarfyEqRouted(audioEl) || nowarfyEqRouted(nextAudioEl) || nowarfyEqRouted(freeVideoEl);
+function nowarfyVisualizationBlocksCrossfade() {
+    return nowarfyVisualizationRouted(audioEl) || nowarfyVisualizationRouted(nextAudioEl) || nowarfyVisualizationRouted(freeVideoEl);
 }
 function nowarfyPrepareDirectMedia(media, url) {
-    if (typeof window.nowarfyEq?.prepareMediaLoad !== 'function') return media;
+    if (typeof window.nowarfyAudioViz?.prepareMediaLoad !== 'function') return media;
     try {
-        return window.nowarfyEq.prepareMediaLoad(media, url) || media;
+        return window.nowarfyAudioViz.prepareMediaLoad(media, url) || media;
     } catch (error) {
-        console.warn('[Nowarfy] EQ: no se pudo preparar el medio:', error);
+        console.warn('[Nowarfy] Visualizador: no se pudo preparar el medio:', error);
         return media;
     }
 }
 
 function prepareNextDirectAudio() {
-    if (nowarfyEqBlocksCrossfade()) return;
+    if (nowarfyVisualizationBlocksCrossfade()) return;
     const nextIndex = nextQueueIndex();
     const next = queue[nextIndex];
     if (nextIndex === currentIndex || !next || next.type !== 'mp3' || !next.url) return;
@@ -650,7 +644,7 @@ function finishDirectCrossfade(nextIndex, outgoing, incoming) {
 }
 
 function beginDirectAudioCrossfade() {
-    if (nowarfyEqBlocksCrossfade()) return;
+    if (nowarfyVisualizationBlocksCrossfade()) return;
     if (!continuousPlayback || crossfadeInProgress) return;
     const nextIndex = nextQueueIndex();
     const next = queue[nextIndex];
