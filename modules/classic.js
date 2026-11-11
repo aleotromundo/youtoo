@@ -40,7 +40,9 @@
         beatLevel: 0,
         lastBeatAt: 0,
         lastDecisionAt: 0,
-        history: []
+        history: [],
+        variant: 0,
+        recentSeeds: []
     };
 
     function isRetro() {
@@ -412,9 +414,86 @@
         const start = Math.floor(Math.random() * presetNames.length);
         for (let offset = 0; offset < presetNames.length; offset += 1) {
             const name = presetNames[(start + offset) % presetNames.length];
-            if (name !== activePresetName && switchPreset(name)) return;
+            if (name !== activePresetName && (loadUniquePreset(name, performance.now(), 0.52) || switchPreset(name))) return;
         }
-        switchPreset(presetNames[start]);
+        loadUniquePreset(presetNames[start], performance.now(), 0.52) || switchPreset(presetNames[start]);
+    }
+
+    function copyPreset(preset) {
+        try {
+            if (typeof structuredClone === 'function') return structuredClone(preset);
+            return JSON.parse(JSON.stringify(preset));
+        } catch (_) { return null; }
+    }
+
+    function seededRandom(seed) {
+        let value = seed >>> 0;
+        return () => {
+            value = (value * 1664525 + 1013904223) >>> 0;
+            return value / 4294967296;
+        };
+    }
+
+    function presetSeed(name, now) {
+        const song = currentSong();
+        const text = `${song?.url || song?.title || 'ambient'}|${name}|${Math.floor(now / 1000)}|${musicDirector.variant}`;
+        let hash = 2166136261;
+        for (let index = 0; index < text.length; index += 1) hash = Math.imul(hash ^ text.charCodeAt(index), 16777619);
+        return hash >>> 0;
+    }
+
+    function mixNumericValues(target, first, second, random, intensity) {
+        if (!target || typeof target !== 'object') return;
+        const keys = new Set([...Object.keys(first || {}), ...Object.keys(second || {})]);
+        keys.forEach((key) => {
+            const a = first?.[key];
+            const b = second?.[key];
+            if (typeof a === 'number' || typeof b === 'number') {
+                const base = typeof a === 'number' && typeof b === 'number' ? (random() > 0.46 ? a : b) : (typeof a === 'number' ? a : b);
+                const spread = 1 + (random() - 0.5) * intensity;
+                target[key] = Number.isFinite(base) ? base * spread : base;
+            } else if (a && typeof a === 'object') {
+                if (!target[key] || typeof target[key] !== 'object') target[key] = copyPreset(a) || {};
+                mixNumericValues(target[key], a, b, random, intensity * 0.7);
+            }
+        });
+    }
+
+    function buildUniquePreset(name, now, intensity) {
+        if (!presetCollection?.[name]) return null;
+        const otherName = presetNames[(presetNames.indexOf(name) + 1 + Math.floor(Math.random() * Math.max(1, presetNames.length - 1))) % presetNames.length];
+        const source = copyPreset(presetCollection[name]);
+        const other = copyPreset(presetCollection[otherName]);
+        if (!source || !other) return source;
+        const random = seededRandom(presetSeed(name, now));
+        mixNumericValues(source.baseVals, source.baseVals, other.baseVals, random, 0.08 + intensity * 0.16);
+        if (Array.isArray(source.shapes) && Array.isArray(other.shapes)) {
+            source.shapes = source.shapes.map((shape, index) => random() > 0.48 ? (copyPreset(other.shapes[index]) || shape) : shape);
+        }
+        if (Array.isArray(source.waves) && Array.isArray(other.waves)) {
+            source.waves = source.waves.map((wave, index) => random() > 0.42 ? (copyPreset(other.waves[index]) || wave) : wave);
+        }
+        musicDirector.variant += 1;
+        musicDirector.recentSeeds.push(presetSeed(name, now));
+        if (musicDirector.recentSeeds.length > 18) musicDirector.recentSeeds.shift();
+        return source;
+    }
+
+    function loadUniquePreset(name, now, intensity) {
+        const preset = buildUniquePreset(name, now, intensity);
+        if (!butterchurn || !preset) return false;
+        const transition = Math.max(1.4, Math.min(5.8, 4.7 - intensity * 2.4));
+        try {
+            butterchurn.loadPreset(preset, transition);
+            activePresetName = name;
+            lastPresetChangeAt = now;
+            presetTitle(`✦ ${name} · variation ${musicDirector.variant}`);
+            try { localStorage.setItem(VIZ_PRESET_KEY, name); } catch (_) {}
+            return true;
+        } catch (error) {
+            console.warn('[YouToo] No se pudo cargar la variación generativa:', error);
+            return false;
+        }
     }
 
     function readBand(frequencies, from, to) {
@@ -434,16 +513,7 @@
         const direction = musicDirector.high > musicDirector.low ? 1 : -1;
         const target = presetNames[(current + direction * jump + presetNames.length * 2) % presetNames.length];
         if (target && target !== activePresetName) {
-            const transition = Math.max(1.8, Math.min(5.5, 4.8 - intensity * 2.2));
-            try {
-                butterchurn.loadPreset(presetCollection[target], transition);
-                activePresetName = target;
-                lastPresetChangeAt = now;
-                presetTitle(`⚡ ${target}`);
-                try { localStorage.setItem(VIZ_PRESET_KEY, target); } catch (_) {}
-            } catch (error) {
-                console.warn('[YouToo] No se pudo cambiar de preset durante el beat:', error);
-            }
+            if (!loadUniquePreset(target, now, intensity)) switchPreset(target);
         }
     }
 
@@ -953,6 +1023,13 @@
         $('retroModeToggle').addEventListener('click', () => setRetroMode(!isRetro()));
         $('retroPresetNext')?.addEventListener('click', chooseRandomPreset);
         $('retroFullscreen')?.addEventListener('click', () => {
+            const target = $('retroVisualizerShell');
+            if (!target) return;
+            if (document.fullscreenElement) document.exitFullscreen?.().catch(() => {});
+            else target.requestFullscreen?.().catch(() => {});
+        });
+        $('retroVisualizerShell')?.addEventListener('dblclick', (event) => {
+            if (event.target?.closest?.('button, input, a, select')) return;
             const target = $('retroVisualizerShell');
             if (!target) return;
             if (document.fullscreenElement) document.exitFullscreen?.().catch(() => {});
