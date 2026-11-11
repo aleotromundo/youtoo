@@ -31,6 +31,17 @@
     let queueSignature = '';
     let fallbackContext = null;
     let fallbackArt = null;
+    const musicDirector = {
+        low: 0,
+        mid: 0,
+        high: 0,
+        energy: 0,
+        previousLow: 0,
+        beatLevel: 0,
+        lastBeatAt: 0,
+        lastDecisionAt: 0,
+        history: []
+    };
 
     function isRetro() {
         return document.body.classList.contains('mode-classic');
@@ -404,6 +415,61 @@
             if (name !== activePresetName && switchPreset(name)) return;
         }
         switchPreset(presetNames[start]);
+    }
+
+    function readBand(frequencies, from, to) {
+        const start = Math.max(0, Math.floor(frequencies.length * from));
+        const end = Math.min(frequencies.length, Math.max(start + 1, Math.floor(frequencies.length * to)));
+        let total = 0;
+        for (let index = start; index < end; index += 1) total += frequencies[index];
+        return total / Math.max(1, end - start) / 255;
+    }
+
+    function directPresetChange(now, intensity) {
+        if (!butterchurn || presetNames.length < 2) return;
+        if (now - musicDirector.lastDecisionAt < 7600) return;
+        musicDirector.lastDecisionAt = now;
+        const jump = Math.max(1, Math.floor(intensity * presetNames.length * 0.22));
+        const current = Math.max(0, presetNames.indexOf(activePresetName));
+        const direction = musicDirector.high > musicDirector.low ? 1 : -1;
+        const target = presetNames[(current + direction * jump + presetNames.length * 2) % presetNames.length];
+        if (target && target !== activePresetName) {
+            const transition = Math.max(1.8, Math.min(5.5, 4.8 - intensity * 2.2));
+            try {
+                butterchurn.loadPreset(presetCollection[target], transition);
+                activePresetName = target;
+                lastPresetChangeAt = now;
+                presetTitle(`⚡ ${target}`);
+                try { localStorage.setItem(VIZ_PRESET_KEY, target); } catch (_) {}
+            } catch (error) {
+                console.warn('[YouToo] No se pudo cambiar de preset durante el beat:', error);
+            }
+        }
+    }
+
+    function updateMusicDirector(now) {
+        const song = currentSong();
+        const graph = activeGraph && song && String(song.type) !== 'yt' ? activeGraph : null;
+        if (!graph || !graph.frequencies) return;
+        const frequencies = graph.frequencies;
+        const rawLow = readBand(frequencies, 0.005, 0.085);
+        const rawMid = readBand(frequencies, 0.085, 0.38);
+        const rawHigh = readBand(frequencies, 0.38, 0.86);
+        musicDirector.low += (rawLow - musicDirector.low) * 0.18;
+        musicDirector.mid += (rawMid - musicDirector.mid) * 0.14;
+        musicDirector.high += (rawHigh - musicDirector.high) * 0.12;
+        musicDirector.energy = musicDirector.low * 0.54 + musicDirector.mid * 0.32 + musicDirector.high * 0.14;
+        const rise = Math.max(0, musicDirector.low - musicDirector.previousLow);
+        musicDirector.previousLow = musicDirector.low;
+        musicDirector.history.push(musicDirector.energy);
+        if (musicDirector.history.length > 42) musicDirector.history.shift();
+        const baseline = musicDirector.history.reduce((sum, value) => sum + value, 0) / Math.max(1, musicDirector.history.length);
+        const beat = rise > 0.018 && musicDirector.energy > Math.max(0.2, baseline * 1.18);
+        musicDirector.beatLevel += ((beat ? 1 : 0) - musicDirector.beatLevel) * 0.24;
+        if (beat && now - musicDirector.lastBeatAt > 520) {
+            musicDirector.lastBeatAt = now;
+            if (musicDirector.energy > 0.34) directPresetChange(now, Math.min(1, musicDirector.energy + rise * 2));
+        }
     }
 
     async function initButterchurn() {
@@ -837,6 +903,7 @@
     function renderLoop(now) {
         renderFrameId = 0;
         if (!isRetro() || document.hidden) return;
+        updateMusicDirector(now);
         if (butterchurn) {
             try { butterchurn.render(); }
             catch (error) {
@@ -849,7 +916,7 @@
         updateSpectrum(now);
         drawFallback(now);
         if (now - lastUiSyncAt > 280) syncDeck(false);
-        if (butterchurn && presetNames.length > 1 && now - lastPresetChangeAt > 21000) chooseRandomPreset();
+        if (butterchurn && presetNames.length > 1 && now - lastPresetChangeAt > 32000) chooseRandomPreset();
         renderFrameId = requestAnimationFrame(renderLoop);
     }
 
