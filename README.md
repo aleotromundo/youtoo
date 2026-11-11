@@ -84,13 +84,17 @@ En *Cuenta* hay un panel colapsable (solo visible con sesión iniciada) que mues
 
 ## Ecualizador
 
-La vista clásica (`modules/classic.js`) tiene un EQ de 10 bandas. Solo puede procesar **audio del mismo documento**, así que:
+Junto al buscador está el interruptor entre la interfaz moderna y **Retro Studio**, una vista de escritorio inspirada en Winamp. El cambio incluye una transformación visual de tres segundos. En escritorio distribuye el visualizador en el 40% izquierdo y el reproductor/playlist en el 60% derecho; en móvil se apila en una sola columna.
+
+Retro Studio combina el visualizador **MilkDrop** implementado por [Butterchurn](https://github.com/jberg/butterchurn) con presets de [Butterchurn Presets](https://github.com/jberg/butterchurn-presets), un espectro de 48 bandas, EQ ajustable de diez bandas y la cola real del reproductor. Ambos bundles y sus avisos MIT están versionados localmente en `vendor/`; se descargan de forma diferida al entrar al modo retro y quedan en caché para usos posteriores.
+
+El EQ y el análisis reactivo solo pueden procesar **audio directo del mismo documento**, así que:
 
 - **Funciona** en pistas de audio directo (Openverse/Freesound, Jamendo, Commons) y en videos libres de Wikimedia Commons, siempre que el servidor responda con CORS. Antes de conectar un medio se hace una prueba `fetch` en modo CORS; si falla, la pista se reproduce sin EQ y se avisa en el panel.
-- **No funciona con YouTube**: el reproductor vive en un iframe de otro origen y la IFrame API no expone su audio. No hay forma de ecualizarlo desde la página.
+- **YouTube conserva sus controles y reproducción**, pero el visualizador pasa a modo ambiente y el EQ no modifica esa señal: el reproductor vive en un iframe de otro origen y la IFrame API no expone su audio.
 - **Puente de audio**: con una pista de YouTube en reproducción, el botón *Buscar versión de audio del mismo tema* busca el mismo título en Openverse y Jamendo, elige el candidato con mejor coincidencia de título/artista/duración, verifica CORS y reemplaza la entrada de la cola para que el EQ sí se aplique.
 
-El ecualizador y el crossfade son excluyentes: mientras el EQ está activo se desactiva el crossfade para no rutear dos elementos a la vez.
+Los controles Winamp (play/pausa, anterior, siguiente, volumen, seek, playlist, quitar pistas y vaciar cola) operan sobre la misma cola que el modo moderno. El ecualizador y el crossfade son excluyentes: mientras el audio está ruteado por Web Audio se desactiva el crossfade para no conectar dos elementos a la vez.
 
 ## Despliegue
 

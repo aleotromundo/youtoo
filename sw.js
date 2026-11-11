@@ -1,4 +1,4 @@
-const CACHE_NAME = 'nowarfy-shell-v56';
+const CACHE_NAME = 'nowarfy-shell-v57';
 const NAVIGATION_TIMEOUT_MS = 5000;
 // Recursos que se sirven desde caché al instante y se revalidan en segundo plano.
 const REVALIDATED_PATHS = new Set([
@@ -6,7 +6,9 @@ const REVALIDATED_PATHS = new Set([
   '/styles.css',
   '/styles-secondary.css',
   '/styles-classic.css',
-  '/styles-custom-playlists.css'
+  '/styles-custom-playlists.css',
+  '/vendor/butterchurn-2.6.7.min.js',
+  '/vendor/butterchurn-presets-2.4.7.min.js'
 ]);
 const APP_SHELL = [
   '/',

@@ -91,9 +91,12 @@
     <noscript><link rel="stylesheet" href="styles-secondary.css"></noscript>
     <link rel="stylesheet" href="styles.css">
     <link rel="stylesheet" href="styles-custom-playlists.css">
+    <link rel="stylesheet" href="styles-classic.css">
+    <link rel="preload" href="/modules/classic.js" as="script">
 
 </head>
 <body class="mode-youtoo">
+    <script>try { if (localStorage.getItem('nowarfy_classic') === '1') { document.body.classList.remove('mode-youtoo'); document.body.classList.add('mode-classic'); } } catch (_) {}</script>
 
     <div class="ambient-artwork-background" id="ambientArtworkBackground" aria-hidden="true"></div>
     <div class="main-container">
@@ -156,15 +159,111 @@
 
         <div class="content-area">
             <div class="search-container">
-                <div class="search-wrap">
-                    <i class="fas fa-magnifying-glass"></i>
-                    <input type="text" class="search-input" id="searchInput" name="nowarfy-search" autocomplete="new-password" readonly onfocus="this.removeAttribute('readonly')" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="Buscá música, videos, recetas y más..." oninput="handleSearchInput()" onkeydown="handleSearchKeydown(event)" aria-label="Buscar música, videos, recetas y más">
-                    <button type="button" class="search-clear" id="searchClear" onclick="clearSearch()" aria-label="Limpiar búsqueda"><i class="fas fa-xmark"></i></button>
+                <div class="search-toolbar">
+                    <div class="search-wrap">
+                        <i class="fas fa-magnifying-glass"></i>
+                        <input type="text" class="search-input" id="searchInput" name="nowarfy-search" autocomplete="new-password" readonly onfocus="this.removeAttribute('readonly')" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="Buscá música, videos, recetas y más..." oninput="handleSearchInput()" onkeydown="handleSearchKeydown(event)" aria-label="Buscar música, videos, recetas y más">
+                        <button type="button" class="search-clear" id="searchClear" onclick="clearSearch()" aria-label="Limpiar búsqueda"><i class="fas fa-xmark"></i></button>
+                    </div>
+                    <button type="button" id="retroModeToggle" class="retro-mode-toggle" role="switch" aria-checked="false" aria-label="Cambiar al modo retro estilo Winamp">
+                        <span class="retro-toggle-disc" aria-hidden="true"><i class="fas fa-compact-disc"></i></span>
+                        <span class="retro-toggle-copy"><strong>Estilo de interfaz</strong><small id="retroModeCaption">MODERNO · YOUTOO</small></span>
+                    </button>
                 </div>
             </div>
             <nav class="taste-rail" aria-label="Categorías para descubrir">
                 <div class="taste-chips" id="tasteChips"></div>
             </nav>
+            <section id="retroStudio" class="retro-studio" hidden aria-label="Reproductor retro de YouToo">
+                <div class="retro-left">
+                    <section class="retro-window retro-viz-window" aria-label="Visualizador MilkDrop">
+                        <header class="retro-titlebar">
+                            <span class="retro-titlebar-main"><i class="fas fa-wave-square" aria-hidden="true"></i> YOUTOO MILKDROP VISUALIZER</span>
+                            <span class="retro-titlebar-actions">
+                                <button type="button" id="retroPresetNext" title="Cambiar preset visual" aria-label="Cambiar preset visual"><i class="fas fa-shuffle" aria-hidden="true"></i></button>
+                                <button type="button" id="retroFullscreen" title="Pantalla completa" aria-label="Pantalla completa"><i class="fas fa-expand" aria-hidden="true"></i></button>
+                            </span>
+                        </header>
+                        <div class="retro-visualizer-shell" id="retroVisualizerShell">
+                            <div class="retro-art-wash" id="retroArtWash" aria-hidden="true"></div>
+                            <canvas id="retroVisualizerCanvas" class="retro-visualizer-canvas" aria-label="Visualizador gráfico MilkDrop"></canvas>
+                            <canvas id="retroFallbackCanvas" class="retro-fallback-canvas" hidden aria-hidden="true"></canvas>
+                            <div class="retro-viz-vignette" aria-hidden="true"></div>
+                            <span id="retroAudioState" class="retro-audio-state" role="status" aria-live="polite">Elegí una pista para conectar la señal</span>
+                            <div class="retro-viz-hud">
+                                <span class="retro-viz-caption"><small>PRESET ACTIVO</small><strong id="retroPresetName">MilkDrop · preparando señal</strong></span>
+                                <span id="retroSourceBadge" class="retro-source-badge" data-kind="idle">LISTO</span>
+                            </div>
+                        </div>
+                        <div class="retro-spectrum-bars" id="retroSpectrumBars" aria-hidden="true"></div>
+                    </section>
+                    <section class="retro-window retro-eq-window" aria-label="Ecualizador de diez bandas">
+                        <header class="retro-titlebar">
+                            <span class="retro-titlebar-main"><i class="fas fa-sliders" aria-hidden="true"></i> YOUTOO EQUALIZER</span>
+                            <span class="retro-titlebar-actions"><button type="button" id="retroEqToggle" aria-pressed="false"><span data-eq-label>EQ OFF</span></button></span>
+                        </header>
+                        <div class="retro-eq-body">
+                            <div class="retro-eq-controls">
+                                <div class="retro-eq-controls-left"><span class="retro-eq-label">PRESET</span><select id="retroEqPreset" class="retro-select" aria-label="Preset de ecualizador">
+                                    <option value="flat">Plano</option><option value="rock">Rock</option><option value="bass">Graves</option><option value="vocal">Voz</option><option value="electronic">Electro</option>
+                                </select></div>
+                                <span class="retro-eq-controls-right"><span class="retro-eq-label">±12 dB</span></span>
+                            </div>
+                            <div class="retro-eq-bands" id="retroEqBands"></div>
+                            <p class="retro-eq-note" id="retroEqNote" data-state="info">El EQ procesa audio directo compatible con CORS; YouTube conserva su reproducción normal.</p>
+                        </div>
+                    </section>
+                </div>
+                <div class="retro-right">
+                    <section class="retro-window retro-player-window" aria-label="Controles de reproducción">
+                        <header class="retro-titlebar">
+                            <span class="retro-titlebar-main"><i class="fas fa-compact-disc" aria-hidden="true"></i> WINAMP · YOUTOO PLAYER</span>
+                            <span class="retro-titlebar-actions"><span id="retroTrackNumber" class="retro-track-number">SIN PISTA</span></span>
+                        </header>
+                        <div class="retro-player-body">
+                            <div class="retro-player-screen">
+                                <div class="retro-art-frame">
+                                    <span class="retro-art-placeholder" aria-hidden="true"><i class="fas fa-compact-disc"></i></span>
+                                    <img id="retroArtwork" alt="" loading="lazy" hidden>
+                                </div>
+                                <div class="retro-player-copy">
+                                    <strong id="retroTrackTitle" class="retro-track-title">Esperando una pista</strong>
+                                    <span id="retroTrackArtist" class="retro-track-artist">YouToo · Retro Studio</span>
+                                </div>
+                                <span id="retroClockTime" class="retro-clock">0:00</span>
+                            </div>
+                            <div class="retro-progress-row">
+                                <span id="retroCurrentTime">0:00</span>
+                                <input type="range" id="retroSeek" class="retro-seek" min="0" max="1000" value="0" disabled aria-label="Posición de reproducción" oninput="previewRetroSeek(this.value)" onchange="commitRetroSeek(this.value)">
+                                <span id="retroTotalTime">0:00</span>
+                            </div>
+                            <div class="retro-transport" aria-label="Controles del reproductor">
+                                <button type="button" onclick="prevSong()" title="Anterior" aria-label="Pista anterior"><i class="fas fa-backward-step" aria-hidden="true"></i></button>
+                                <button type="button" onclick="togglePlay()" id="retroPlayToggle" class="retro-play-button" aria-label="Reproducir"><i class="fas fa-play" aria-hidden="true"></i></button>
+                                <button type="button" onclick="nextSong(true)" title="Siguiente" aria-label="Pista siguiente"><i class="fas fa-forward-step" aria-hidden="true"></i></button>
+                            </div>
+                            <div class="retro-volume-row">
+                                <i class="fas fa-volume-low retro-volume-icon" aria-hidden="true"></i>
+                                <input type="range" id="retroVolume" min="0" max="1" step="0.01" value="0.7" aria-label="Volumen" oninput="previewRetroVolume(this.value)">
+                                <span class="retro-volume-value">VOL</span>
+                                <span id="retroVolumeValue" class="retro-volume-value">70%</span>
+                            </div>
+                        </div>
+                    </section>
+                    <section class="retro-window retro-playlist-window" aria-label="Playlist actual">
+                        <header class="retro-titlebar">
+                            <span class="retro-playlist-heading"><i class="fas fa-list" aria-hidden="true"></i><span>WINAMP PLAYLIST</span><span id="retroQueueCount" class="retro-queue-count">0 pistas</span></span>
+                            <span class="retro-playlist-actions">
+                                <button type="button" id="retroShuffle" aria-label="Alternar reproducción aleatoria" title="Reproducción aleatoria" aria-pressed="false">MEZCLAR</button>
+                                <button type="button" id="retroContinuous" aria-label="Alternar reproducción continua" title="Reproducción continua">CONTINUA</button>
+                                <button type="button" id="retroClearQueue" aria-label="Vaciar Playlist" title="Vaciar Playlist">VACIAR</button>
+                            </span>
+                        </header>
+                        <ol id="retroPlaylist" class="retro-playlist" aria-label="Pistas en cola"></ol>
+                    </section>
+                </div>
+            </section>
+            <script>if (document.body.classList.contains('mode-classic')) { const retroStudio = document.getElementById('retroStudio'); if (retroStudio) retroStudio.hidden = false; }</script>
             <noscript>
                 <section aria-label="Sobre YouToo">
                     <h1>Buscá videos, música, recetas y más</h1>

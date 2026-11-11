@@ -8,7 +8,8 @@
         'reserve.js',
         'playback-queue.js',
         'lyrics-video.js',
-        'player-pwa.js'
+        'player-pwa.js',
+        'classic.js'
     ];
     const base = '/modules/';
     const loader = document.getElementById('loader');
