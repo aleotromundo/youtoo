@@ -64,15 +64,16 @@
             prevUv += normalize(p+0.0001)*(-0.004-0.018*energy-0.028*beat);
             prevUv += 0.014*vec2(sin(q.y*5.0+uTime),cos(q.x*5.0-uTime))*intensity;
             vec3 prev=texture(uPrev,fract(prevUv)).rgb;
-            float decay=0.955-0.018*beat-0.012*bass;
+            float decay=0.91-0.022*beat-0.012*bass;
             prev*=decay;
             vec3 ink=palette(clouds+filament*0.17+uTime*0.025+phase,phase);
-            float mask=(0.06+0.20*clouds+0.48*filament+0.25*tendrils+0.34*ring)*(0.55+energy*1.7);
+            float mask=(0.025+0.085*clouds+0.22*filament+0.12*tendrils+0.16*ring)*(0.42+energy*0.92);
             mask*=smoothstep(1.32,0.05,r);
             vec3 color=prev+ink*mask;
-            color+=palette(spiral/TAU+clouds+phase,phase)*ring*(0.12+beat*0.9);
-            color+=vec3(0.08,0.15,0.28)*pow(max(0.0,1.0-r),3.0)*(0.2+high);
-            outColor=vec4(max(color,0.0),1.0);
+            color+=palette(spiral/TAU+clouds+phase,phase)*ring*(0.035+beat*0.24);
+            color+=vec3(0.03,0.06,0.12)*pow(max(0.0,1.0-r),3.0)*(0.2+high*0.45);
+            // El feedback se almacena en RGBA8: limitarlo evita que la imagen se queme a blanco.
+            outColor=vec4(clamp(color,0.0,0.88),1.0);
         }
     `;
 

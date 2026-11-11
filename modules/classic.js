@@ -1019,6 +1019,9 @@
         buildSpectrumBars();
         updateModeToggle();
         attachExistingMedia();
+        document.addEventListener('pointerdown', () => {
+            if (audioContext && audioContext.state === 'suspended') audioContext.resume().catch(() => {});
+        }, { passive: true });
 
         $('retroModeToggle').addEventListener('click', () => setRetroMode(!isRetro()));
         $('retroPresetNext')?.addEventListener('click', chooseRandomPreset);
