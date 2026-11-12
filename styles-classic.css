@@ -176,6 +176,20 @@ body.mode-classic .retro-studio { scroll-margin-top: 76px; }
 .retro-visualizer-shell:-webkit-full-screen::before {
     display: none;
 }
+.retro-visualizer-shell:fullscreen > *:not(.retro-visualizer-canvas):not(.retro-fallback-canvas),
+.retro-visualizer-shell:-webkit-full-screen > *:not(.retro-visualizer-canvas):not(.retro-fallback-canvas) {
+    display: none !important;
+}
+.retro-visualizer-shell:fullscreen .retro-visualizer-canvas:not([hidden]),
+.retro-visualizer-shell:-webkit-full-screen .retro-visualizer-canvas:not([hidden]),
+.retro-visualizer-shell:fullscreen .retro-fallback-canvas:not([hidden]),
+.retro-visualizer-shell:-webkit-full-screen .retro-fallback-canvas:not([hidden]) {
+    display: block;
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+}
 .retro-visualizer-shell:fullscreen .retro-audio-state,
 .retro-visualizer-shell:-webkit-full-screen .retro-audio-state {
     top: 14px;
