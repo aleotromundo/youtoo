@@ -593,30 +593,27 @@
     }
 
     function isFullscreen() {
-        return Boolean(document.fullscreenElement || document.webkitFullscreenElement);
+        return Boolean(document.body.classList.contains('retro-viz-focus') || document.fullscreenElement || document.webkitFullscreenElement);
     }
 
     function toggleFullscreen() {
         const target = $('retroVisualizerShell');
         if (!target) return;
+        const body = document.body;
+        if (body.classList.contains('retro-viz-focus')) {
+            body.classList.remove('retro-viz-focus');
+            scheduleResize();
+            return;
+        }
         if (isFullscreen()) {
             const exit = document.exitFullscreen || document.webkitExitFullscreen;
             try { const task = exit && exit.call(document); if (task && task.catch) task.catch(() => {}); } catch (_) {}
             return;
         }
-        // El contenedor es más compatible que pedir fullscreen sobre un canvas.
-        // CSS oculta todo lo demás mientras conserva únicamente la superficie.
-        const request = target.requestFullscreen || target.webkitRequestFullscreen;
-        if (typeof request !== 'function') {
-            setAudioState('Este navegador no permite pantalla completa desde la app.', 'warning');
-            return;
-        }
-        try {
-            const task = request.call(target);
-            if (task && task.catch) task.catch(() => setAudioState('El navegador bloqueó la pantalla completa.', 'warning'));
-        } catch (_) {
-            setAudioState('El navegador bloqueó la pantalla completa.', 'warning');
-        }
+        // Fullscreen propio: no depende de permisos ni de que el navegador
+        // acepte requestFullscreen sobre un canvas o un div.
+        body.classList.add('retro-viz-focus');
+        scheduleResize();
     }
 
     function setFallbackMode(message) {
@@ -1608,6 +1605,9 @@
             if (event?.target?.closest?.('button, input, a, select')) return;
             toggleFullscreen();
         };
+        document.addEventListener('keydown', (event) => {
+            if (event.key === 'Escape' && document.body.classList.contains('retro-viz-focus')) toggleFullscreen();
+        });
         window.nextRetroPreset = () => chooseRandomPreset(true);
         // Diagnóstico del visualizador (tamaño real del buffer, preset y tiempos).
         window.nowarfyVisualizerDebug = () => {
