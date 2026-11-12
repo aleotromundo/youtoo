@@ -308,6 +308,15 @@
 
     
 
+    function syncCaptureButton() {
+        const button = $('retroCaptureBtn');
+        if (!button) return;
+        const active = Boolean(captureAnalyser);
+        button.classList.toggle('is-active', active);
+        button.setAttribute('aria-pressed', String(active));
+        button.title = active ? 'Detener la captura de audio' : 'Capturar el audio de esta pestaña (YouTube, iframes)';
+    }
+
     // Grafo de análisis efectivo: audio directo del reproductor o captura de pestaña.
     function analysisGraph() {
         const song = currentSong();

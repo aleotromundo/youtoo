@@ -13,7 +13,7 @@
     ];
     // Versionado explícito para que una PWA o un Service Worker no reutilice
     // un módulo retro anterior después de un despliegue.
-    const ASSET_VERSION = '20261112-1147';
+    const ASSET_VERSION = '20261112-1156';
     const base = '/modules/';
     const loader = document.getElementById('loader');
     const message = document.getElementById('loaderMessage');
