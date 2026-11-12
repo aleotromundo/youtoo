@@ -291,8 +291,8 @@ body.mode-classic .retro-studio { scroll-margin-top: 76px; }
 @keyframes retro-track-card {
     0% { opacity: 0; transform: translate(-50%, -50%) scale(.92); filter: blur(8px); }
     14% { opacity: 1; transform: translate(-50%, -50%) scale(1); filter: blur(0); }
-    80% { opacity: 1; transform: translate(-50%, -50%) scale(1); filter: blur(0); }
-    100% { opacity: 0; transform: translate(-50%, -50%) scale(1.03); filter: blur(4px); }
+    72% { opacity: 1; transform: translate(-50%, -50%) scale(1); filter: blur(0); animation-timing-function: cubic-bezier(.5, 0, .9, .5); }
+    100% { opacity: 0; transform: translate(-50%, -50%) scale(2.4); filter: blur(10px); }
 }
 @media (prefers-reduced-motion: reduce) { .retro-track-card.is-on { animation-name: retro-track-card-soft; } }
 @keyframes retro-track-card-soft { 0%, 100% { opacity: 0; } 12%, 84% { opacity: 1; } }
