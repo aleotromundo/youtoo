@@ -605,13 +605,26 @@
             scheduleResize();
             return;
         }
-        if (isFullscreen()) {
+        if (document.fullscreenElement || document.webkitFullscreenElement) {
             const exit = document.exitFullscreen || document.webkitExitFullscreen;
             try { const task = exit && exit.call(document); if (task && task.catch) task.catch(() => {}); } catch (_) {}
             return;
         }
-        // Fullscreen propio: no depende de permisos ni de que el navegador
-        // acepte requestFullscreen sobre un canvas o un div.
+        // Primero usamos la pantalla completa real. Si el navegador la rechaza,
+        // usamos el modo propio como respaldo.
+        const request = target.requestFullscreen || target.webkitRequestFullscreen;
+        if (typeof request === 'function') {
+            try {
+                const task = request.call(target);
+                if (task && typeof task.catch === 'function') {
+                    task.catch(() => {
+                        body.classList.add('retro-viz-focus');
+                        scheduleResize();
+                    });
+                }
+                return;
+            } catch (_) {}
+        }
         body.classList.add('retro-viz-focus');
         scheduleResize();
     }
@@ -1605,8 +1618,14 @@
             if (event?.target?.closest?.('button, input, a, select')) return;
             toggleFullscreen();
         };
+        const visualizerShell = $('retroVisualizerShell');
+        visualizerShell?.addEventListener('dblclick', (event) => {
+            if (event.target?.closest?.('button, input, a, select')) return;
+            event.preventDefault();
+            toggleFullscreen();
+        });
         document.addEventListener('keydown', (event) => {
-            if (event.key === 'Escape' && document.body.classList.contains('retro-viz-focus')) toggleFullscreen();
+            if (event.key === 'Escape' && isFullscreen()) toggleFullscreen();
         });
         window.nextRetroPreset = () => chooseRandomPreset(true);
         // Diagnóstico del visualizador (tamaño real del buffer, preset y tiempos).
