@@ -177,7 +177,7 @@ body.mode-classic .retro-studio { scroll-margin-top: 76px; }
     display: none;
 }
 .retro-visualizer-shell:fullscreen > *:not(.retro-visualizer-canvas):not(.retro-fallback-canvas):not(.retro-track-card),
-.retro-visualizer-shell:-webkit-full-screen > *:not(.retro-visualizer-canvas):not(.retro-fallback-canvas):not(.retro-track-card) {
+.retro-visualizer-shell:-webkit-full-screen > *:not(.retro-visualizer-canvas):not(.retro-fallback-canvas):not(.retro-track-card):not(.retro-touch-fx) {
     display: none !important;
 }
 .retro-visualizer-shell:fullscreen .retro-visualizer-canvas:not([hidden]),
@@ -262,6 +262,15 @@ body.mode-classic .retro-studio { scroll-margin-top: 76px; }
 .retro-audio-state:focus-visible { outline: 1px solid var(--retro-lime); outline-offset: 2px; }
 .retro-audio-state[data-state="live"] { color: #b1ff9e; border-color: rgba(49, 244, 27, .32); }
 .retro-audio-state[data-state="warning"] { color: #ffcf72; border-color: rgba(255, 207, 114, .38); }
+.retro-touch-fx {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 4;
+    touch-action: none;
+    cursor: crosshair;
+}
 /* Tarjeta de pista: aparece al dar play y se desvanece a los 5 s. */
 .retro-track-card {
     position: absolute;

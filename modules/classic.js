@@ -1849,6 +1849,155 @@
         if (media) attachMediaEvents(media);
     }
 
+    /*
+     * Efectos táctiles: al tocar o arrastrar aparecen chispas, ondas y lluvia
+     * de partículas. No cambia el preset ni lo que MilkDrop está mostrando.
+     */
+    function setupTouchFx() {
+        const shell = $('retroVisualizerShell');
+        if (!shell || $('retroTouchFx')) return;
+        const fx = document.createElement('canvas');
+        fx.id = 'retroTouchFx';
+        fx.className = 'retro-touch-fx';
+        fx.setAttribute('aria-hidden', 'true');
+        shell.appendChild(fx);
+        const ctx = fx.getContext('2d');
+        const particles = [];
+        const ripples = [];
+        const MAX_PARTICLES = 700;
+        let width = 0;
+        let height = 0;
+        let dpr = 1;
+        let frame = 0;
+        let last = 0;
+        let down = false;
+        let lastPoint = null;
+
+        const resize = () => {
+            const rect = fx.getBoundingClientRect();
+            if (!rect.width || !rect.height) return;
+            dpr = Math.min(2, window.devicePixelRatio || 1);
+            width = rect.width;
+            height = rect.height;
+            fx.width = Math.round(width * dpr);
+            fx.height = Math.round(height * dpr);
+            ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        };
+
+        const hueFor = () => (Math.random() < 0.72 ? 95 + Math.random() * 60 : 38 + Math.random() * 18);
+
+        const spark = (x, y, speed, lift) => {
+            if (particles.length >= MAX_PARTICLES) return;
+            const angle = Math.random() * Math.PI * 2;
+            const power = speed * (0.45 + Math.random() * 0.9);
+            particles.push({
+                x, y,
+                vx: Math.cos(angle) * power,
+                vy: Math.sin(angle) * power - lift,
+                life: 0,
+                max: 0.9 + Math.random() * 1.1,
+                size: 1 + Math.random() * 2.2,
+                hue: hueFor()
+            });
+        };
+
+        const burst = (x, y, strength) => {
+            const count = Math.round(26 + strength * 22);
+            for (let i = 0; i < count; i += 1) spark(x, y, 120 + strength * 220, 140 + Math.random() * 120);
+            ripples.push({ x, y, r: 6, max: 70 + strength * 90, life: 0, hue: hueFor(), width: 2.4 });
+            ripples.push({ x, y, r: 6, max: 40 + strength * 60, life: -0.14, hue: hueFor(), width: 1.4 });
+        };
+
+        const trail = (from, to) => {
+            const dx = to.x - from.x;
+            const dy = to.y - from.y;
+            const steps = Math.min(4, Math.max(1, Math.round(Math.hypot(dx, dy) / 26)));
+            for (let i = 1; i <= steps; i += 1) {
+                const x = from.x + (dx * i) / steps;
+                const y = from.y + (dy * i) / steps;
+                spark(x, y, 40, 60);
+            }
+        };
+
+        const tick = (now) => {
+            const dt = Math.min(0.05, Math.max(0, (now - last) / 1000));
+            last = now;
+            ctx.clearRect(0, 0, width, height);
+            ctx.globalCompositeOperation = 'lighter';
+
+            for (let i = ripples.length - 1; i >= 0; i -= 1) {
+                const ring = ripples[i];
+                ring.life += dt;
+                if (ring.life < 0) continue;
+                ring.r += dt * 260;
+                const t = ring.life / 0.9;
+                if (t >= 1) { ripples.splice(i, 1); continue; }
+                ctx.globalAlpha = (1 - t) * 0.8;
+                ctx.strokeStyle = `hsl(${ring.hue}, 100%, 62%)`;
+                ctx.lineWidth = ring.width;
+                ctx.beginPath();
+                ctx.arc(ring.x, ring.y, Math.min(ring.r, ring.max), 0, Math.PI * 2);
+                ctx.stroke();
+            }
+
+            for (let i = particles.length - 1; i >= 0; i -= 1) {
+                const p = particles[i];
+                p.life += dt;
+                if (p.life >= p.max) { particles.splice(i, 1); continue; }
+                p.vy += 420 * dt;
+                p.vx *= 1 - 1.2 * dt;
+                p.vy *= 1 - 0.4 * dt;
+                p.x += p.vx * dt;
+                p.y += p.vy * dt;
+                const alpha = 1 - p.life / p.max;
+                ctx.globalAlpha = alpha;
+                ctx.fillStyle = `hsl(${p.hue}, 100%, 70%)`;
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, p.size * (0.6 + alpha * 0.6), 0, Math.PI * 2);
+                ctx.fill();
+            }
+
+            ctx.globalAlpha = 1;
+            ctx.globalCompositeOperation = 'source-over';
+            if (particles.length || ripples.length) frame = requestAnimationFrame(tick);
+            else { frame = 0; ctx.clearRect(0, 0, width, height); }
+        };
+
+        const kick = () => {
+            if (frame) return;
+            last = performance.now();
+            frame = requestAnimationFrame(tick);
+        };
+
+        const pointFrom = (event) => {
+            const rect = fx.getBoundingClientRect();
+            return { x: event.clientX - rect.left, y: event.clientY - rect.top };
+        };
+
+        fx.addEventListener('pointerdown', (event) => {
+            resize();
+            down = true;
+            const point = pointFrom(event);
+            burst(point.x, point.y, 1);
+            lastPoint = point;
+            try { fx.setPointerCapture(event.pointerId); } catch (_) {}
+            kick();
+        });
+        fx.addEventListener('pointermove', (event) => {
+            if (!down) return;
+            const point = pointFrom(event);
+            if (lastPoint) trail(lastPoint, point);
+            lastPoint = point;
+            kick();
+        });
+        const release = () => { down = false; lastPoint = null; };
+        fx.addEventListener('pointerup', release);
+        fx.addEventListener('pointercancel', release);
+        window.addEventListener('resize', resize, { passive: true });
+        if (typeof ResizeObserver === 'function') new ResizeObserver(resize).observe(shell);
+        resize();
+    }
+
     function init() {
         if (!$('retroModeToggle') || !$('retroStudio')) return;
         try {
@@ -1882,6 +2031,7 @@
 
         syncCaptureButton();
         $('retroPresetNext')?.addEventListener('click', () => chooseRandomPreset(true));
+        setupTouchFx();
         // Fin de pista (audio directo o YouTube): apagado suave del visualizador.
         window.addEventListener('nowarfy:track-ended', () => {
             if (!isRetro() || vizPresence <= 0) return;
