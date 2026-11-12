@@ -1483,6 +1483,8 @@ async function recoverAutomaticQueue(targetQid) {
 function queueAutomaticAdvance(reason = 'ended') {
     const targetQid = currentPlayingQid;
     if (!targetQid || playbackStoppedByUser || automaticAdvanceTargetQid === targetQid) return;
+    // Avisa al visualizador para que se apague suave al terminar la pista.
+    try { window.dispatchEvent(new CustomEvent('nowarfy:track-ended', { detail: { reason } })); } catch (_) {}
     const skipUnplayableYouTubeTrack = reason === 'youtube-error';
     if (!continuousPlayback && !skipUnplayableYouTubeTrack) {
         isPlaying = false;

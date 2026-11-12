@@ -56,12 +56,13 @@
     // Presencia del visualizador: 0 = apagado, 1 = visible. Sube al dar play,
     // se congela en pausa y baja gradualmente en stop.
     const VIZ_FADE_IN_TAU = 0.9;
-    const VIZ_FADE_OUT_TAU = 1.6;
+    const VIZ_FADE_OUT_TAU = 1.1;
     let vizPresence = 0;
     let vizLastFrameAt = 0;
     let vizLastPlayingAt = 0;
     let vizWatchdog = 0;
     let vizTrackKey = '';
+    let vizEnding = false;
     let vizPlayingFlag = false;
     let vizTrackCardTimer = 0;
     let transitionTimer = 0;
@@ -1714,6 +1715,16 @@
         if (!isRetro() || document.hidden) return;
         const dt = Math.min(0.1, Math.max(0, (now - vizLastFrameAt) / 1000));
         vizLastFrameAt = now;
+        // Fin de pista: la imagen se apaga suave; si sigue otra pista, vuelve a entrar.
+        if (vizEnding) {
+            vizPresence *= Math.exp(-dt / VIZ_FADE_OUT_TAU);
+            if (vizPresence < 0.01) { vizPresence = 0; vizEnding = false; }
+            applyVizPresence();
+            if (vizEnding) {
+                renderFrameId = requestAnimationFrame(renderLoop);
+                return;
+            }
+        }
         if (!vizIsPlaying()) {
             // Pausa: el loop no se reprograma y el último cuadro queda congelado.
             // Stop: el lienzo se apaga de a poco, nunca de golpe.
@@ -1839,6 +1850,12 @@
 
         syncCaptureButton();
         $('retroPresetNext')?.addEventListener('click', () => chooseRandomPreset(true));
+        // Fin de pista (audio directo o YouTube): apagado suave del visualizador.
+        window.addEventListener('nowarfy:track-ended', () => {
+            if (!isRetro() || vizPresence <= 0) return;
+            vizEnding = true;
+            if (!renderFrameId) renderFrameId = requestAnimationFrame(renderLoop);
+        });
         $('retroFullscreen')?.addEventListener('click', toggleFullscreen);
         $('retroVolume')?.addEventListener('input', (event) => {
             const mainVolume = $('volumeSlider');
