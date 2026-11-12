@@ -53,6 +53,14 @@
     let blackFrameChecks = 0;
     let lastBlackFrameCheckAt = 0;
     let lastAmbientMode = false;
+    // Presencia del visualizador: 0 = apagado, 1 = visible. Sube al dar play,
+    // se congela en pausa y baja gradualmente en stop.
+    const VIZ_FADE_IN_TAU = 0.9;
+    const VIZ_FADE_OUT_TAU = 1.6;
+    let vizPresence = 0;
+    let vizLastFrameAt = 0;
+    let vizLastPlayingAt = 0;
+    let vizWatchdog = 0;
     let transitionTimer = 0;
     let transitionLocked = false;
     let queueSignature = '';
@@ -1505,9 +1513,56 @@
         }
     }
 
+    function vizIsPlaying() {
+        try { return typeof isPlaying !== 'undefined' && Boolean(isPlaying); } catch (_) { return false; }
+    }
+
+    function vizIsStoppedByUser() {
+        try { return typeof playbackStoppedByUser !== 'undefined' && Boolean(playbackStoppedByUser); } catch (_) { return false; }
+    }
+
+    function applyVizPresence() {
+        const opacity = vizPresence.toFixed(3);
+        ['retroVisualizerCanvas', 'retroFallbackCanvas'].forEach((id) => {
+            const el = $(id);
+            if (el && el.style.opacity !== opacity) el.style.opacity = opacity;
+        });
+    }
+
+    // Arranca el loop solo cuando hay reproducción; en pausa queda detenido.
+    function ensureVisualizerLoop() {
+        if (renderFrameId || !isRetro() || document.hidden) return;
+        if (!vizIsPlaying()) return;
+        vizLastFrameAt = performance.now();
+        renderFrameId = requestAnimationFrame(renderLoop);
+    }
+
     function renderLoop(now) {
         renderFrameId = 0;
         if (!isRetro() || document.hidden) return;
+        const dt = Math.min(0.1, Math.max(0, (now - vizLastFrameAt) / 1000));
+        vizLastFrameAt = now;
+        if (!vizIsPlaying()) {
+            // Pausa: el loop no se reprograma y el último cuadro queda congelado.
+            // Stop: el lienzo se apaga de a poco, nunca de golpe.
+            if (vizIsStoppedByUser() || !currentSong()) {
+                vizPresence *= Math.exp(-dt / VIZ_FADE_OUT_TAU);
+                if (vizPresence < 0.004) vizPresence = 0;
+                applyVizPresence();
+                if (vizPresence > 0) renderFrameId = requestAnimationFrame(renderLoop);
+            }
+            return;
+        }
+        // Si hubo un hueco sin frames (pausa o pestaña oculta), los presets no
+        // cambian por ese tiempo: el reloj de dwell y de blend se corre.
+        const gap = vizLastPlayingAt ? now - vizLastPlayingAt : 0;
+        if (gap > 250) {
+            lastPresetChangeAt += gap - 16;
+            blendUntil += gap - 16;
+        }
+        vizLastPlayingAt = now;
+        vizPresence += (1 - vizPresence) * (1 - Math.exp(-dt / VIZ_FADE_IN_TAU));
+        applyVizPresence();
         try {
             updateMusicDirector(now);
             if (butterchurn) {
@@ -1722,8 +1777,12 @@
                 const song = currentSong();
                 if (song && song.url && String(song.type) !== 'yt') void prepareCurrentVisualizationTrack();
                 void initButterchurn();
+                applyVizPresence();
                 renderFrameId = requestAnimationFrame(renderLoop);
             }
+            // Vigila el arranque de la reproducción para encender el visualizador
+            // (y que pausa / stop se respeten sin depender de otros eventos).
+            if (!vizWatchdog) vizWatchdog = window.setInterval(ensureVisualizerLoop, 250);
         } catch (_) {}
     }
 

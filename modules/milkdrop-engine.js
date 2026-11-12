@@ -416,15 +416,14 @@
             const height = Math.max(2, Math.round((rect.height || 360) * ratio));
             if (width === this.width && height === this.height) return;
 
+            const previousWidth = this.width;
+            const previousHeight = this.height;
+            const previousBuffers = this.buffers;
             this.width = width;
             this.height = height;
             this.canvas.width = width;
             this.canvas.height = height;
             const gl = this.gl;
-            this.buffers.forEach((pair) => {
-                gl.deleteFramebuffer(pair.fbo);
-                gl.deleteTexture(pair.texture);
-            });
             this.buffers = [];
 
             // RGBA8 es renderizable en WebGL2 móvil y escritorio sin depender de extensiones HDR.
@@ -445,11 +444,24 @@
                 this.buffers.push({ texture, fbo });
             }
 
-            gl.bindFramebuffer(gl.FRAMEBUFFER, this.buffers[0].fbo);
-            gl.clearColor(0, 0, 0, 1);
-            gl.clear(gl.COLOR_BUFFER_BIT);
-            gl.bindFramebuffer(gl.FRAMEBUFFER, this.buffers[1].fbo);
-            gl.clear(gl.COLOR_BUFFER_BIT);
+            // Si ya había imagen, se copia escalada al buffer nuevo: el cambio de
+            // tamaño (fullscreen, rotación, zoom) no deja un cuadro negro.
+            const hadFrame = previousBuffers.length === 2 && previousWidth > 0 && previousHeight > 0;
+            for (let index = 0; index < 2; index += 1) {
+                if (hadFrame) {
+                    gl.bindFramebuffer(gl.READ_FRAMEBUFFER, previousBuffers[index].fbo);
+                    gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER, this.buffers[index].fbo);
+                    gl.blitFramebuffer(0, 0, previousWidth, previousHeight, 0, 0, width, height, gl.COLOR_BUFFER_BIT, gl.LINEAR);
+                } else {
+                    gl.bindFramebuffer(gl.FRAMEBUFFER, this.buffers[index].fbo);
+                    gl.clearColor(0, 0, 0, 1);
+                    gl.clear(gl.COLOR_BUFFER_BIT);
+                }
+            }
+            previousBuffers.forEach((pair) => {
+                gl.deleteFramebuffer(pair.fbo);
+                gl.deleteTexture(pair.texture);
+            });
             gl.bindFramebuffer(gl.FRAMEBUFFER, null);
             gl.viewport(0, 0, width, height);
         }
