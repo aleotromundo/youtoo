@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="es">
+<head><meta charset="utf-8"><title>one-test</title></head>
+<body>
+<script src="/vendor/milkdrop-preset-converter-0.1.2.min.js"></script>
+<script>
+(async function () {
+  const post = (line) => { try { fetch('/report', { method: 'POST', body: line }); } catch (_) {} };
+  const params = new URLSearchParams(location.search);
+  const id = params.get('id') || 'p0001';
+  const fix = params.get('fix') === '1';
+  try {
+    const man = await (await fetch('/presets/manifest.json')).json();
+    const entry = man.presets.find((p) => p.id === id);
+    const bytes = new Uint8Array(await (await fetch(entry.file)).arrayBuffer());
+    let text = '';
+    for (let i = 0; i < bytes.length; i += 8192) text += String.fromCharCode.apply(null, bytes.subarray(i, i + 8192));
+
+    if (fix) {
+      // Une ecuaciones partidas: una línea que empieza con operador continúa la anterior.
+      const lines = text.split(/\r?\n/);
+      const out = [];
+      for (const line of lines) {
+        const m = /^([A-Za-z0-9_]+)=(.*)$/.exec(line);
+        if (m && /^[+\-*/.]/.test(m[2].trim()) && out.length) {
+          const prev = /^([A-Za-z0-9_]+)=(.*)$/.exec(out[out.length - 1]);
+          if (prev) {
+            const family = (k) => k.replace(/_\d+$/, '');
+            if (family(prev[1]) === family(m[1]) || /per_(frame|point|vertex|pixel)/.test(m[1])) {
+              out[out.length - 1] = prev[1] + '=' + prev[2] + ' ' + m[2].trim();
+              continue;
+            }
+          }
+        }
+        out.push(line);
+      }
+      text = out.join('\n');
+    }
+
+    let preset = window.milkdropPresetConverter.convertPreset(text);
+    if (preset && typeof preset.then === 'function') preset = await preset;
+    post('ONE OK ' + id + ' fix=' + (fix ? 1 : 0) + ' keys=' + Object.keys(preset).length + ' name=' + entry.name);
+  } catch (error) {
+    post('ONE FAIL ' + id + ' fix=' + (fix ? 1 : 0) + ' :: ' + (error && error.message));
+  }
+})();
+</script>
+</body>
+</html>
