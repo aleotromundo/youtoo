@@ -593,40 +593,23 @@
     }
 
     function isFullscreen() {
-        return Boolean(document.body.classList.contains('retro-viz-focus') || document.fullscreenElement || document.webkitFullscreenElement);
+        return Boolean(document.fullscreenElement || document.webkitFullscreenElement);
     }
 
     function toggleFullscreen() {
         const target = $('retroVisualizerShell');
         if (!target) return;
-        const body = document.body;
-        if (body.classList.contains('retro-viz-focus')) {
-            body.classList.remove('retro-viz-focus');
-            scheduleResize();
-            return;
-        }
-        if (document.fullscreenElement || document.webkitFullscreenElement) {
+        if (isFullscreen()) {
             const exit = document.exitFullscreen || document.webkitExitFullscreen;
             try { const task = exit && exit.call(document); if (task && task.catch) task.catch(() => {}); } catch (_) {}
             return;
         }
-        // Primero usamos la pantalla completa real. Si el navegador la rechaza,
-        // usamos el modo propio como respaldo.
         const request = target.requestFullscreen || target.webkitRequestFullscreen;
-        if (typeof request === 'function') {
-            try {
-                const task = request.call(target);
-                if (task && typeof task.catch === 'function') {
-                    task.catch(() => {
-                        body.classList.add('retro-viz-focus');
-                        scheduleResize();
-                    });
-                }
-                return;
-            } catch (_) {}
+        if (typeof request !== 'function') {
+            setAudioState('Este navegador no permite pantalla completa.', 'warning');
+            return;
         }
-        body.classList.add('retro-viz-focus');
-        scheduleResize();
+        try { const task = request.call(target); if (task && task.catch) task.catch(() => {}); } catch (_) {}
     }
 
     function setFallbackMode(message) {
@@ -1618,10 +1601,8 @@
             if (event?.target?.closest?.('button, input, a, select')) return;
             toggleFullscreen();
         };
-        const visualizerShell = $('retroVisualizerShell');
-        visualizerShell?.addEventListener('dblclick', (event) => {
+        $('retroVisualizerShell')?.addEventListener('dblclick', (event) => {
             if (event.target?.closest?.('button, input, a, select')) return;
-            event.preventDefault();
             toggleFullscreen();
         });
         document.addEventListener('keydown', (event) => {
