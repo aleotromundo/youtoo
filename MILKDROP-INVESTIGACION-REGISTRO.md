@@ -20,7 +20,8 @@ Motor activo actual:
 - Warp procedural.
 - Ruido/FBM.
 - Bloom y aberración cromática.
-- Audio multibanda: graves, medios, agudos y beat.
+- Audio multibanda por rangos de frecuencia en Hz, con suavizado de ataque/liberación.
+- Detección de transientes por spectral flux y estimación aproximada de tempo.
 - Escenas generativas con semillas.
 - Fallback de micrófono cuando YouTube/CORS no permite analizar el audio interno.
 
@@ -35,7 +36,7 @@ Importante: Butterchurn dejó de ser el renderer activo. Puede quedar como refer
 
 ## Problemas todavía abiertos
 
-1. El análisis musical todavía es básico. Falta beat tracking estable, BPM, compás, transientes, fraseo y detección de secciones.
+1. El análisis musical todavía es básico. Hay detección de transientes y estimación aproximada de BPM, pero falta validar beat tracking estable, compás, fraseo y detección de secciones.
 2. Las escenas actuales son generativas, pero todavía no tienen una gramática visual suficientemente rica.
 3. El feedback está limitado a un pipeline principal; faltan capas visuales especializadas.
 4. Falta un sistema de variaciones que combine familias visuales completas sin destruir coherencia.
@@ -244,3 +245,11 @@ No volver a implementar cambios pequeños basados solo en nombres de presets o m
 5. ¿Mantiene rendimiento y audio en Android?
 
 Si no responde claramente a una de ellas, probablemente sea un adorno y no una mejora del motor.
+
+## Avance de implementación — 2026-11-11
+
+La revisión del motor encontró máscaras `smoothstep` con bordes invertidos, bandas calculadas por fracciones lineales de la FFT, cambios de escena disparados por casi cada golpe y una ruta de audio que podía depender de la conexión del analizador. Se corrigieron las máscaras para usar transiciones GLSL definidas, se calcularon graves/medios/agudos por rangos de frecuencia, se añadió detección de transientes por spectral flux con una estimación de tempo todavía provisional y se limitaron los cambios automáticos de escena para priorizar continuidad. El suavizado de escena ahora depende del tiempo transcurrido entre frames, el control manual avanza la escena generativa y la salida de audio se conecta antes que la rama de análisis; si falla el `AnalyserNode`, se desactiva solo la rama visual y el bucle mantiene activo el canvas alternativo. La semilla enviada al shader está acotada para evitar perder precisión.
+
+La validación local incluye comprobaciones de sintaxis y diff, una prueba sintética de transientes/tempo/escenas y un smoke test de compilación y render GLSL con Chromium y WebGL2 por software. No reemplaza la prueba de reproducción, FPS, consumo y apariencia en GPU móvil/Android real.
+
+Esto es una mejora incremental, no el cierre de los problemas abiertos: todavía hace falta escuchar y medir el comportamiento en Android y escritorio, mejorar el seguimiento del pulso/fraseo, enriquecer las familias visuales y adaptar la carga de GPU según rendimiento.

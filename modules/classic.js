@@ -301,31 +301,49 @@
     }
 
     function routeGraph(graph) {
-        if (!graph || !audioContext) return;
+        if (!graph || !audioContext) return false;
         stopMicrophoneFallback();
         disconnectButterchurnInput();
         if (activeGraph && activeGraph !== graph) disconnectGraph(activeGraph);
         disconnectGraph(graph);
 
         try {
+            // Primero se asegura una ruta audible independiente del visualizador.
+            graph.source.connect(audioContext.destination);
+        } catch (error) {
+            console.warn('[YouToo] No se pudo restablecer la salida de audio:', error);
+            setAudioState('No se pudo restablecer la salida de audio del navegador.', 'warning');
+            return false;
+        }
+
+        if (graph.analysisUnavailable) {
+            activeGraph = null;
+            setAudioState('El audio sigue sonando · análisis visual no disponible.', 'warning');
+            return false;
+        }
+
+        try {
             graph.source.connect(graph.analyser);
             graph.analyser.connect(graph.silentGain);
             graph.silentGain.connect(audioContext.destination);
-
-            const output = graph.source;
-
-            // El camino de salida y el analizador de Butterchurn son ramas distintas: no duplica ni silencia el audio.
-            output.connect(audioContext.destination);
             if (isRetro() && butterchurn) {
-                butterchurn.connectAudio(output);
-                activeButterchurnInput = output;
+                butterchurn.connectAudio(graph.source);
+                activeButterchurnInput = graph.source;
             }
             if (milkdropEngine) milkdropEngine.attachAnalyser(graph.analyser);
             activeGraph = graph;
             if (audioContext.state === 'suspended') audioContext.resume().catch(() => {});
+            return true;
         } catch (error) {
-            console.warn('[YouToo] No se pudo enrutar el audio:', error);
-            setAudioState('No se pudo iniciar el visualizador de audio; la reproducción normal sigue activa.', 'warning');
+            // No desconectar graph.source: su salida directa ya está conectada al destino.
+            try { graph.analyser.disconnect(); } catch (_) {}
+            try { graph.silentGain.disconnect(); } catch (_) {}
+            disconnectButterchurnInput();
+            activeGraph = null;
+            console.warn('[YouToo] No se pudo iniciar el análisis visual:', error);
+            setAudioState('El audio sigue sonando · no se pudo activar el análisis visual.', 'warning');
+            if (audioContext.state === 'suspended') audioContext.resume().catch(() => {});
+            return false;
         }
     }
 
@@ -344,8 +362,7 @@
         }
         const graph = makeAudioGraph(media);
         if (!graph) return;
-        routeGraph(graph);
-        setAudioState('Señal directa · visualizador reactivo', 'live');
+        if (routeGraph(graph)) setAudioState('Señal directa · visualizador reactivo', 'live');
     }
 
     function releaseMediaGraph(media) {
@@ -465,6 +482,10 @@
     }
 
     function chooseRandomPreset() {
+        if (milkdropEngine && typeof milkdropEngine.nextScene === 'function') {
+            milkdropEngine.nextScene();
+            return;
+        }
         if (!presetNames.length) return;
         const start = Math.floor(Math.random() * presetNames.length);
         for (let offset = 0; offset < presetNames.length; offset += 1) {
@@ -605,6 +626,7 @@
             const context = ensureAudioContext();
             if (!context) throw new Error('El navegador no dispone de Web Audio');
             milkdropEngine = new window.NowarfyMilkdropEngine(canvas);
+            milkdropEngine.onSceneChange = (index) => presetTitle(`YouToo Generative · escena ${String(index).padStart(2, '0')}`);
             if (activeGraph) milkdropEngine.attachAnalyser(activeGraph.analyser);
             setButterchurnMode();
             presetTitle('YouToo Generative · feedback engine');
@@ -663,14 +685,34 @@
         }
     }
 
+    function disableGraphAnalysis(graph, error) {
+        if (!graph) return;
+        graph.analysisUnavailable = true;
+        try { graph.source.disconnect(graph.analyser); } catch (_) {}
+        try { graph.analyser.disconnect(); } catch (_) {}
+        try { graph.silentGain.disconnect(); } catch (_) {}
+        if (activeGraph === graph) activeGraph = null;
+        try { milkdropEngine?.attachAnalyser(null); } catch (_) {}
+        disconnectButterchurnInput();
+        console.warn('[YouToo] Se desactivó el análisis visual; se conserva la salida de audio:', error);
+        setAudioState('El audio sigue sonando · visualizador en modo ambiente.', 'warning');
+    }
+
     function updateSpectrum(now) {
         const bars = $('retroSpectrumBars');
         if (!bars) return;
         const children = bars.children;
         const song = currentSong();
         const useAmbient = !activeGraph || !song || String(song.type) === 'yt' || lastAmbientMode;
-        const frequency = activeGraph && !useAmbient ? activeGraph.frequencies : null;
-        if (frequency) activeGraph.analyser.getByteFrequencyData(frequency);
+        const graph = activeGraph && !useAmbient ? activeGraph : null;
+        let frequency = graph ? graph.frequencies : null;
+        if (frequency) {
+            try { graph.analyser.getByteFrequencyData(frequency); }
+            catch (error) {
+                disableGraphAnalysis(graph, error);
+                frequency = null;
+            }
+        }
         for (let index = 0; index < children.length; index += 1) {
             let intensity;
             if (frequency) {
@@ -711,8 +753,14 @@
             ctx.restore();
         }
         const song = currentSong();
-        const graph = activeGraph && song && String(song.type) !== 'yt' ? activeGraph : null;
-        if (graph) graph.analyser.getByteFrequencyData(graph.frequencies);
+        let graph = activeGraph && song && String(song.type) !== 'yt' ? activeGraph : null;
+        if (graph) {
+            try { graph.analyser.getByteFrequencyData(graph.frequencies); }
+            catch (error) {
+                disableGraphAnalysis(graph, error);
+                graph = null;
+            }
+        }
         for (let ring = 0; ring < 3; ring += 1) {
             ctx.beginPath();
             ctx.strokeStyle = `hsla(${(now / 65 + ring * 82) % 360}, 95%, ${48 + ring * 7}%, ${0.2 - ring * 0.035})`;
@@ -1021,28 +1069,34 @@
     function renderLoop(now) {
         renderFrameId = 0;
         if (!isRetro() || document.hidden) return;
-        updateMusicDirector(now);
-        if (milkdropEngine) {
-            try { milkdropEngine.render(now); }
-            catch (error) {
-                console.warn('[YouToo] Falló el motor generativo:', error);
-                milkdropEngine = null;
-                setFallbackMode('Se activó el visualizador alternativo.');
+        try {
+            updateMusicDirector(now);
+            if (milkdropEngine) {
+                try { milkdropEngine.render(now); }
+                catch (error) {
+                    console.warn('[YouToo] Falló el motor generativo:', error);
+                    milkdropEngine = null;
+                    setFallbackMode('Se activó el visualizador alternativo.');
+                }
+            } else if (butterchurn) {
+                try { butterchurn.render(); }
+                catch (error) {
+                    console.warn('[YouToo] Falló el render MilkDrop:', error);
+                    butterchurn = null;
+                    setFallbackMode('Se activó el visualizador alternativo.');
+                }
             }
-        } else if (butterchurn) {
-            try { butterchurn.render(); }
-            catch (error) {
-                console.warn('[YouToo] Falló el render MilkDrop:', error);
-                butterchurn = null;
-                setFallbackMode('Se activó el visualizador alternativo.');
-            }
+            resizeVisualizer();
+            updateSpectrum(now);
+            drawFallback(now);
+            if (now - lastUiSyncAt > 280) syncDeck(false);
+            if (butterchurn && presetNames.length > 1 && now - lastPresetChangeAt > 32000) chooseRandomPreset();
+        } catch (error) {
+            console.warn('[YouToo] Falló un ciclo del visualizador:', error);
+            try { setFallbackMode('Se activó el visualizador alternativo.'); } catch (_) {}
+        } finally {
+            if (isRetro() && !document.hidden) renderFrameId = requestAnimationFrame(renderLoop);
         }
-        resizeVisualizer();
-        updateSpectrum(now);
-        drawFallback(now);
-        if (now - lastUiSyncAt > 280) syncDeck(false);
-        if (butterchurn && presetNames.length > 1 && now - lastPresetChangeAt > 32000) chooseRandomPreset();
-        renderFrameId = requestAnimationFrame(renderLoop);
     }
 
     function previewSeek(value) {

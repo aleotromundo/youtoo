@@ -86,9 +86,9 @@ En *Cuenta* hay un panel colapsable (solo visible con sesión iniciada) que mues
 
 Junto al buscador está el interruptor entre la interfaz moderna y **Retro Studio**, una vista de escritorio inspirada en Winamp. El cambio incluye una transformación visual de tres segundos. En escritorio distribuye el visualizador en el 40% izquierdo y el reproductor/playlist en el 60% derecho; en móvil se apila en una sola columna.
 
-Retro Studio combina el visualizador **MilkDrop** implementado por [Butterchurn](https://github.com/jberg/butterchurn) con presets de [Butterchurn Presets](https://github.com/jberg/butterchurn-presets), un espectro de 48 bandas y la cola real del reproductor. Ambos bundles y sus avisos MIT están versionados localmente en `vendor/`; se descargan de forma diferida al entrar al modo retro y quedan en caché para usos posteriores.
+Retro Studio utiliza un renderer propio **WebGL2** en `modules/milkdrop-engine.js`: feedback ping-pong, warp procedural, ruido FBM, bloom, aberración cromática y análisis reactivo por bandas. La detección de transientes modula la imagen y las escenas cambian con menor frecuencia para conservar continuidad; el botón de escena permite adelantar el cambio manualmente. El espectro de 48 bandas y la cola comparten la reproducción principal. Los bundles de Butterchurn que siguen en `vendor/` son legado y no forman parte del renderer activo.
 
-No incluye ecualizador. El visualizador puede reaccionar al audio directo del mismo documento cuando su servidor permite acceso CORS; si no, la pista igual se reproduce y el visualizador usa modo ambiente.
+No incluye ecualizador. El visualizador puede reaccionar al audio directo del mismo documento cuando su servidor permite acceso CORS; si no, la pista igual se reproduce y el visualizador usa modo ambiente. Si falla el análisis o WebGL, se intenta conservar la salida audible de forma independiente y activar el canvas alternativo.
 
 - **YouTube conserva su reproducción normal**, pero el visualizador usa modo ambiente: el reproductor vive en un iframe de otro origen y la IFrame API no entrega el audio a la página.
 
