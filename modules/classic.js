@@ -608,10 +608,15 @@
         // CSS oculta todo lo demás mientras conserva únicamente la superficie.
         const request = target.requestFullscreen || target.webkitRequestFullscreen;
         if (typeof request !== 'function') {
-            setAudioState('Este navegador no permite pantalla completa.', 'warning');
+            setAudioState('Este navegador no permite pantalla completa desde la app.', 'warning');
             return;
         }
-        try { const task = request.call(target); if (task && task.catch) task.catch(() => {}); } catch (_) {}
+        try {
+            const task = request.call(target);
+            if (task && task.catch) task.catch(() => setAudioState('El navegador bloqueó la pantalla completa.', 'warning'));
+        } catch (_) {
+            setAudioState('El navegador bloqueó la pantalla completa.', 'warning');
+        }
     }
 
     function setFallbackMode(message) {
