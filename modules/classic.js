@@ -483,7 +483,8 @@
             butterchurn.loadPreset(preset, Number.isFinite(transition) ? transition : 3.0);
             activePresetName = nameOrId;
             lastPresetChangeAt = performance.now();
-            presetTitle(presetLibrary ? presetLibrary.label(nameOrId) : nameOrId);
+            const info = presetLibrary ? presetLibrary.entry(nameOrId) : null;
+            presetTitle(info ? `${info.name}${info.hlsl ? ' · MD2 (aprox.)' : ''}` : nameOrId);
             try { localStorage.setItem(VIZ_PRESET_KEY, nameOrId); } catch (_) {}
             return true;
         } catch (error) {
@@ -700,7 +701,7 @@
                     const library = await ensurePresetLibrary();
                     let stored = '';
                     try { stored = localStorage.getItem(VIZ_PRESET_KEY) || ''; } catch (_) {}
-                    const startId = presetNames.includes(stored) ? stored : library.pickRandom();
+                    const startId = presetNames.includes(stored) ? stored : (library.pickRandom('', 'md1') || library.pickRandom());
                     if (startId) await switchPreset(startId, 0);
                     void library.prefetch(4);
                 } catch (error) {

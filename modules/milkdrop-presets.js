@@ -142,7 +142,8 @@
         const api = await ensureConverter();
         const fn = api.convertPreset || (api.default && api.default.convertPreset);
         if (typeof fn !== 'function') throw new Error('convertPreset no disponible');
-        const preset = fn(text);
+        let preset = fn(text);
+        if (preset && typeof preset.then === 'function') preset = await preset;
         if (!preset || typeof preset !== 'object') throw new Error('El conversor devolvió un preset inválido');
         try {
             Object.defineProperty(preset, '__youtoo', {
@@ -211,9 +212,11 @@
     }
 
     // 65% del tiempo elige entre los mejor valorados; el resto recorre todo el pack.
-    function pickRandom(exclude) {
-        const list = entries();
-        if (!list.length) return null;
+    function pickRandom(exclude, engine) {
+        const all = entries();
+        if (!all.length) return null;
+        const filtered = engine ? all.filter((item) => item.engine === engine) : all;
+        const list = filtered.length ? filtered : all;
         const pool = list.length > 40 && Math.random() < 0.65 ? list.slice(0, Math.ceil(list.length * 0.35)) : list;
         for (let attempt = 0; attempt < 24; attempt += 1) {
             const candidate = pool[Math.floor(Math.random() * pool.length)];
