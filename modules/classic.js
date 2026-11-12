@@ -202,163 +202,18 @@
         try { graph.silentGain.disconnect(); } catch (_) {}
     }
 
-    function stopMicrophoneFallback() {
-        const hadInput = Boolean(microphoneSource) && activeButterchurnInput === microphoneSource;
-        try { microphoneSource?.disconnect(); } catch (_) {}
-        try { microphoneAnalyser?.disconnect(); } catch (_) {}
-        try { microphoneStream?.getTracks().forEach((track) => track.stop()); } catch (_) {}
-        const wasExternal = externalGraph && microphoneAnalyser && externalGraph.analyser === microphoneAnalyser;
-        microphoneStream = null;
-        microphoneSource = null;
-        microphoneAnalyser = null;
-        if (wasExternal) externalGraph = null;
-        if (hadInput) disconnectButterchurnInput();
-        if (hadInput && butterchurn) connectButterchurnInput();
-        try { milkdropEngine?.attachAnalyser(activeGraph ? activeGraph.analyser : null); } catch (_) {}
-    }
+    
 
-    async function startMicrophoneFallback(deviceId) {
-        if (microphoneAnalyser) {
-            setAudioState('Micrófono activo · señal reactiva', 'live');
-            return true;
-        }
-        if (!navigator.mediaDevices?.getUserMedia) {
-            setAudioState('Este navegador no permite usar el micrófono.', 'warning');
-            return false;
-        }
-        try {
-            const context = ensureAudioContext();
-            if (!context) throw new Error('Web Audio no disponible');
-            const audioConstraints = {
-                echoCancellation: false,
-                noiseSuppression: false,
-                autoGainControl: false
-            };
-            if (deviceId) audioConstraints.deviceId = { exact: deviceId };
-            microphoneStream = await navigator.mediaDevices.getUserMedia({ audio: audioConstraints });
-            microphoneSource = context.createMediaStreamSource(microphoneStream);
-            microphoneAnalyser = context.createAnalyser();
-            microphoneAnalyser.fftSize = 2048;
-            microphoneAnalyser.smoothingTimeConstant = 0.64;
-            const silentGain = context.createGain();
-            silentGain.gain.value = 0;
-            microphoneSource.connect(microphoneAnalyser);
-            microphoneAnalyser.connect(silentGain);
-            silentGain.connect(context.destination);
-            externalGraph = { analyser: microphoneAnalyser, frequencies: new Uint8Array(microphoneAnalyser.frequencyBinCount), external: true };
-            if (butterchurn) {
-                try {
-                    butterchurn.connectAudio(microphoneSource);
-                    activeButterchurnInput = microphoneSource;
-                } catch (error) {
-                    console.warn('[YouToo] No se pudo enrutar el micrófono al visualizador:', error);
-                }
-            }
-            milkdropEngine?.attachAnalyser(microphoneAnalyser);
-            if (context.state === 'suspended') await context.resume().catch(() => {});
-            // Guarda la preferencia del dispositivo.
-            try {
-                const track = microphoneStream.getAudioTracks()[0];
-                const settings = track && track.getSettings ? track.getSettings() : {};
-                const id = settings.deviceId || deviceId;
-                if (id) localStorage.setItem('nowarfy_mic_device', id);
-            } catch (_) {}
-            setAudioState('Micrófono / cable virtual activo · señal reactiva', 'live');
-            return true;
-        } catch (error) {
-            stopMicrophoneFallback();
-            console.warn('[YouToo] No se pudo activar el micrófono:', error);
-            setAudioState('No se pudo activar el micrófono; revisá el permiso del navegador.', 'warning');
-            return false;
-        }
-    }
+    
 
-    function stopTabAudioCapture(silent) {
-        const hadInput = Boolean(captureSource) && activeButterchurnInput === captureSource;
-        try { captureSource?.disconnect(); } catch (_) {}
-        try { captureAnalyser?.disconnect(); } catch (_) {}
-        try { captureStream?.getTracks().forEach((track) => track.stop()); } catch (_) {}
-        captureStream = null;
-        captureSource = null;
-        captureAnalyser = null;
-        captureFrequencies = null;
-        externalGraph = null;
-        if (hadInput) disconnectButterchurnInput();
-        try { milkdropEngine?.attachAnalyser(activeGraph ? activeGraph.analyser : null); } catch (_) {}
-        if (hadInput && butterchurn) connectButterchurnInput();
-        syncCaptureButton();
-        if (!silent) setAudioState('Captura detenida · modo ambiente', 'warning');
-    }
+    
 
     /**
      * Captura el audio de la pestaña con getDisplayMedia. Es la única forma de
      * analizar el sonido de un iframe de YouTube: el navegador entrega la mezcla
      * de salida de la pestaña como un MediaStream que sí pasa por Web Audio.
      */
-    async function startTabAudioCapture() {
-        if (captureAnalyser) {
-            setAudioState('Audio de la pestaña capturado · visualizador reactivo', 'live');
-            return true;
-        }
-        if (!navigator.mediaDevices?.getDisplayMedia) {
-            setAudioState('Este navegador no permite capturar el audio de la pestaña.', 'warning');
-            return false;
-        }
-        let stream = null;
-        try {
-            const context = ensureAudioContext();
-            if (!context) throw new Error('Web Audio no disponible');
-            stream = await navigator.mediaDevices.getDisplayMedia({
-                video: true,
-                audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false },
-                preferCurrentTab: true,
-                selfBrowserSurface: 'include',
-                surfaceSwitching: 'exclude',
-                systemAudio: 'include'
-            });
-            const audioTracks = stream.getAudioTracks();
-            if (!audioTracks.length) {
-                try { stream.getTracks().forEach((track) => track.stop()); } catch (_) {}
-                setAudioState('Falta activar "Compartir audio" al elegir la pestaña.', 'warning');
-                return false;
-            }
-            captureStream = stream;
-            captureSource = context.createMediaStreamSource(stream);
-            captureAnalyser = context.createAnalyser();
-            captureAnalyser.fftSize = 2048;
-            captureAnalyser.smoothingTimeConstant = 0.62;
-            captureFrequencies = new Uint8Array(captureAnalyser.frequencyBinCount);
-            captureSource.connect(captureAnalyser);
-            externalGraph = { analyser: captureAnalyser, frequencies: captureFrequencies, external: true };
-            if (butterchurn) {
-                try {
-                    butterchurn.connectAudio(captureSource);
-                    activeButterchurnInput = captureSource;
-                } catch (error) {
-                    console.warn('[YouToo] No se pudo enrutar la captura al visualizador:', error);
-                }
-            }
-            try { milkdropEngine?.attachAnalyser(captureAnalyser); } catch (_) {}
-            audioTracks.forEach((track) => {
-                track.addEventListener('ended', () => {
-                    stopTabAudioCapture(true);
-                    setAudioState('La captura terminó · modo ambiente', 'warning');
-                });
-            });
-            if (context.state === 'suspended') await context.resume().catch(() => {});
-            syncCaptureButton();
-            setAudioState('Audio de la pestaña capturado · visualizador reactivo', 'live');
-            return true;
-        } catch (error) {
-            try { stream?.getTracks().forEach((track) => track.stop()); } catch (_) {}
-            console.warn('[YouToo] No se pudo capturar el audio de la pestaña:', error);
-            const cancelled = error && (error.name === 'NotAllowedError' || error.name === 'AbortError');
-            setAudioState(cancelled
-                ? 'Captura cancelada · el visualizador sigue en modo ambiente'
-                : 'No se pudo capturar el audio de la pestaña.', 'warning');
-            return false;
-        }
-    }
+    
 
     
 
@@ -368,7 +223,7 @@
 
     async function triggerMicCapture() {
         if (microphoneAnalyser) {
-            stopMicrophoneFallback();
+
             if (captureAnalyser) syncCaptureButton();
             setAudioState('Micrófono detenido · modo ambiente', 'warning');
             syncMicButton();
@@ -396,12 +251,7 @@
         button.title = active ? 'Detener micrófono / cable virtual' : 'Usar micrófono o cable de audio virtual (VB-Cable)';
     }
 
-    async function captureBestSignal() {
-        if (microphoneAnalyser) { stopMicrophoneFallback(); syncMicButton(); }
-        if (captureAnalyser) { stopTabAudioCapture(); return; }
-        const ok = await startTabAudioCapture();
-        if (!ok && !navigator.mediaDevices?.getDisplayMedia) void startMicrophoneFallback();
-    }
+    
     async function populateMicDevices() {
         const select = $('retroMicDevice');
         if (!select || !navigator.mediaDevices?.enumerateDevices) return;
@@ -427,20 +277,13 @@
         select.hidden = false;
     }
 
-    function syncCaptureButton() {
-        const button = $('retroCaptureBtn');
-        if (!button) return;
-        const active = Boolean(captureAnalyser);
-        button.classList.toggle('is-active', active);
-        button.setAttribute('aria-pressed', String(active));
-        button.title = active ? 'Detener la captura de audio' : 'Capturar el audio de esta pestaña (YouTube, iframes)';
-    }
+    
 
     // Grafo de análisis efectivo: audio directo del reproductor o captura de pestaña.
     function analysisGraph() {
         const song = currentSong();
         if (activeGraph && song && String(song.type) !== 'yt') return activeGraph;
-        return externalGraph;
+        return null;
     }
 
     async function prepareMediaLoad(media, url) {
@@ -529,7 +372,7 @@
 
     function routeGraph(graph) {
         if (!graph || !audioContext) return false;
-        stopMicrophoneFallback();
+        
         disconnectButterchurnInput();
         if (activeGraph && activeGraph !== graph) disconnectGraph(activeGraph);
         disconnectGraph(graph);
@@ -1287,8 +1130,8 @@
         if (!force && now - lastUiSyncAt < 280) return;
         lastUiSyncAt = now;
         const song = currentSong();
-        if (force && song && String(song.type) === 'yt' && !microphoneAnalyser) {
-            setAudioState('Señal interna no disponible · tocá para usar el micrófono', 'warning');
+        if (force && song && String(song.type) === 'yt') {
+            setAudioState('Modo ambiente · señal simulada', 'warning');
         }
         const title = song?.title || 'Esperando una pista';
         const artist = song?.artist || song?.channelTitle || 'YouToo · Retro Studio';
@@ -1544,7 +1387,7 @@
         } else {
             if (renderFrameId) cancelAnimationFrame(renderFrameId);
             renderFrameId = 0;
-            stopMicrophoneFallback();
+
             disconnectButterchurnInput();
             if (activeGraph) routeGraph(activeGraph);
         }
@@ -1629,7 +1472,7 @@
         }, { passive: true });
 
         $('retroModeToggle').addEventListener('click', () => setRetroMode(!isRetro()));
-        const triggerCapture = () => { void captureBestSignal(); };
+        const triggerCapture = () => {};
         $('retroAudioState')?.addEventListener('click', triggerCapture);
         $('retroAudioState')?.setAttribute('role', 'button');
         $('retroAudioState')?.setAttribute('tabindex', '0');
@@ -1640,7 +1483,7 @@
         $('retroMicBtn')?.addEventListener('click', triggerMicCapture);
         $('retroMicDevice')?.addEventListener('change', async (event) => {
             if (microphoneAnalyser) {
-                stopMicrophoneFallback();
+    
                 await startMicrophoneFallback(event.target.value || undefined);
                 syncMicButton();
             }

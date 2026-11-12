@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="es">
+<head><meta charset="utf-8"><title>blacktest</title></head>
+<body>
+<canvas id="c" width="256" height="144"></canvas>
+<script src="/vendor/butterchurn-2.6.7.min.js"></script>
+<script src="/modules/milkdrop-presets.js"></script>
+<script>
+(async function () {
+  const run = new URLSearchParams(location.search).get('run') || 'bt';
+  const post = (line) => { try { fetch('/report', { method: 'POST', body: run + ' ' + line }); } catch (_) {} };
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  try {
+    await window.NowarfyPresetLibrary.load();
+    const AC = window.AudioContext || window.webkitAudioContext;
+    const ctx = new AC();
+    await ctx.resume().catch(() => {});
+    const analyser = ctx.createAnalyser();
+    analyser.fftSize = 1024;
+    const bus = ctx.createGain();
+    bus.gain.value = 0.6;
+    bus.connect(analyser);
+    const sink = ctx.createGain(); sink.gain.value = 0;
+    analyser.connect(sink); sink.connect(ctx.destination);
+    [55, 110, 220, 440, 880].forEach((f, i) => {
+      const o = ctx.createOscillator(); const g = ctx.createGain();
+      o.frequency.value = f; g.gain.value = 0.3 / (i + 1);
+      o.connect(g); g.connect(bus); o.start();
+    });
+
+    const BC = window.butterchurn.createVisualizer ? window.butterchurn : window.butterchurn.default;
+    const canvas = document.getElementById('c');
+    const viz = BC.createVisualizer(ctx, canvas, { width: 256, height: 144, pixelRatio: 1 });
+    viz.connectAudio(analyser);
+
+    const probe = document.createElement('canvas');
+    probe.width = 64; probe.height = 36;
+    const pctx = probe.getContext('2d');
+
+    function brightness() {
+      pctx.drawImage(canvas, 0, 0, 64, 36);
+      const px = pctx.getImageData(0, 0, 64, 36).data;
+      let sum = 0;
+      for (let i = 0; i < px.length; i += 4) sum += px[i] + px[i + 1] + px[i + 2];
+      return sum / (px.length / 4) / 3 / 255;
+    }
+
+    const ids = window.NowarfyPresetLibrary.ids();
+    const black = [];
+    let ok = 0;
+    const started = Date.now();
+    for (let i = 0; i < ids.length; i++) {
+      const id = ids[i];
+      const entry = window.NowarfyPresetLibrary.entry(id);
+      try {
+        const preset = await window.NowarfyPresetLibrary.get(id);
+        if (!preset) throw new Error('conv fail');
+        viz.loadPreset(preset, 0);
+        // warmup
+        for (let f = 0; f < 8; f++) { viz.render(); await sleep(16); }
+        const b = brightness();
+        if (b < 0.02) {
+          black.push(id + ' :: ' + (entry ? entry.name : id) + ' :: brightness=' + b.toFixed(4));
+          post('BLACK ' + id + ' :: ' + (entry ? entry.name : id) + ' :: b=' + b.toFixed(4));
+        } else {
+          ok++;
+        }
+      } catch (e) {
+        post('ERR ' + id + ' :: ' + (e && e.message));
+      }
+      if ((i + 1) % 50 === 0) post('BLACKTEST ' + (i + 1) + '/' + ids.length + ' ok=' + ok + ' black=' + black.length + ' (' + Math.round((Date.now() - started) / 1000) + 's)');
+    }
+    post('BLACKTEST DONE total=' + ids.length + ' ok=' + ok + ' black=' + black.length + ' seg=' + Math.round((Date.now() - started) / 1000));
+    black.forEach((l) => post('BLACK ' + l));
+    document.title = 'DONE black=' + black.length;
+  } catch (e) {
+    post('FATAL ' + (e && e.message));
+  }
+})();
+</script>
+</body>
+</html>
