@@ -61,6 +61,8 @@
     let vizLastFrameAt = 0;
     let vizLastPlayingAt = 0;
     let vizWatchdog = 0;
+    let vizTrackKey = '';
+    let vizTrackCardTimer = 0;
     let transitionTimer = 0;
     let transitionLocked = false;
     let queueSignature = '';
@@ -1517,6 +1519,21 @@
         try { return typeof isPlaying !== 'undefined' && Boolean(isPlaying); } catch (_) { return false; }
     }
 
+    // Muestra título y artista en el centro del visualizador durante 5 s.
+    function showTrackCard(song) {
+        const card = $('retroTrackCard');
+        if (!card || !song) return;
+        const title = $('retroTrackCardTitle');
+        const artist = $('retroTrackCardArtist');
+        if (title) title.textContent = song.title || '';
+        if (artist) artist.textContent = song.artist || song.channelTitle || '';
+        card.classList.remove('is-on');
+        void card.offsetWidth;
+        card.classList.add('is-on');
+        window.clearTimeout(vizTrackCardTimer);
+        vizTrackCardTimer = window.setTimeout(() => card.classList.remove('is-on'), 5000);
+    }
+
     function vizIsStoppedByUser() {
         try { return typeof playbackStoppedByUser !== 'undefined' && Boolean(playbackStoppedByUser); } catch (_) { return false; }
     }
@@ -1559,6 +1576,13 @@
         if (gap > 250) {
             lastPresetChangeAt += gap - 16;
             blendUntil += gap - 16;
+        }
+        // Título y artista al dar play, al reanudar o al cambiar de pista.
+        const song = currentSong();
+        const trackKey = song ? String(song.url || song.title || '') : '';
+        if (song && (gap > 250 || trackKey !== vizTrackKey)) {
+            vizTrackKey = trackKey;
+            showTrackCard(song);
         }
         vizLastPlayingAt = now;
         vizPresence += (1 - vizPresence) * (1 - Math.exp(-dt / VIZ_FADE_IN_TAU));

@@ -262,6 +262,40 @@ body.mode-classic .retro-studio { scroll-margin-top: 76px; }
 .retro-audio-state:focus-visible { outline: 1px solid var(--retro-lime); outline-offset: 2px; }
 .retro-audio-state[data-state="live"] { color: #b1ff9e; border-color: rgba(49, 244, 27, .32); }
 .retro-audio-state[data-state="warning"] { color: #ffcf72; border-color: rgba(255, 207, 114, .38); }
+/* Tarjeta de pista: aparece al dar play y se desvanece a los 5 s. */
+.retro-track-card {
+    position: absolute;
+    z-index: 6;
+    left: 50%;
+    top: 50%;
+    width: min(86%, 620px);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    padding: 14px 20px;
+    text-align: center;
+    pointer-events: none;
+    opacity: 0;
+    transform: translate(-50%, -50%);
+}
+.retro-track-card strong, .retro-track-card span {
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.retro-track-card strong { font-size: clamp(18px, 3vw, 30px); color: #f4f7ff; text-shadow: 0 0 18px rgba(49, 244, 27, .45), 0 2px 10px rgba(0, 0, 0, .85); letter-spacing: .02em; }
+.retro-track-card span { font-size: clamp(12px, 1.6vw, 16px); color: #b1ff9e; text-shadow: 0 2px 8px rgba(0, 0, 0, .9); letter-spacing: .14em; text-transform: uppercase; }
+.retro-track-card.is-on { animation: retro-track-card 5s ease both; }
+@keyframes retro-track-card {
+    0% { opacity: 0; transform: translate(-50%, -50%) scale(.92); filter: blur(8px); }
+    14% { opacity: 1; transform: translate(-50%, -50%) scale(1); filter: blur(0); }
+    80% { opacity: 1; transform: translate(-50%, -50%) scale(1); filter: blur(0); }
+    100% { opacity: 0; transform: translate(-50%, -50%) scale(1.03); filter: blur(4px); }
+}
+@media (prefers-reduced-motion: reduce) { .retro-track-card.is-on { animation-name: retro-track-card-soft; } }
+@keyframes retro-track-card-soft { 0%, 100% { opacity: 0; } 12%, 84% { opacity: 1; } }
 .retro-viz-hud {
     position: absolute;
     z-index: 5;
