@@ -51,6 +51,7 @@
     let presetCycle = [];
     let presetCyclePosition = 0;
     let blackFrameChecks = 0;
+    let flatFrameChecks = 0;
     let lastBlackFrameCheckAt = 0;
     let lastAmbientMode = false;
     // Presencia del visualizador: 0 = apagado, 1 = visible. Sube al dar play,
@@ -698,6 +699,8 @@
             const pixel = new Uint8Array(4);
             let luminance = 0;
             let visible = 0;
+            let minValue = 1;
+            let maxValue = 0;
             const points = 12;
             for (let index = 0; index < points; index += 1) {
                 const x = Math.min(canvas.width - 1, Math.floor((index + 0.5) / points * canvas.width));
@@ -706,9 +709,27 @@
                 const value = (pixel[0] * 0.2126 + pixel[1] * 0.7152 + pixel[2] * 0.0722) / 255;
                 luminance += value;
                 if (value > 0.018) visible += 1;
+                if (value < minValue) minValue = value;
+                if (value > maxValue) maxValue = value;
             }
-            if (luminance / points < 0.006 && visible === 0) blackFrameChecks += 1;
-            else blackFrameChecks = 0;
+            const mean = luminance / points;
+            const spread = maxValue - minValue;
+            if (mean < 0.006 && visible === 0) {
+                blackFrameChecks += 1;
+                flatFrameChecks = 0;
+            } else if (mean > 0.02 && spread < 0.012) {
+                // Color plano: el preset se congeló en un solo tono.
+                flatFrameChecks += 1;
+                blackFrameChecks = 0;
+            } else {
+                blackFrameChecks = 0;
+                flatFrameChecks = 0;
+            }
+            if (flatFrameChecks >= 3) {
+                flatFrameChecks = 0;
+                recoverFlatFrame();
+                return;
+            }
             if (blackFrameChecks >= 4) {
                 const broken = activePresetName;
                 blackFrameChecks = 0;
@@ -723,9 +744,20 @@
         }
     }
 
+    // Un preset atascado en un color plano no se borra: se fusiona con otro
+    // para que la imagen vuelva a moverse. Si la fusión tampoco sirve, pasa al siguiente.
+    function recoverFlatFrame() {
+        const current = activePresetName;
+        presetTitle('Preset atascado · fusionando');
+        if (current && presetCollection && presetCollection[current]
+            && loadUniquePreset(current, performance.now(), 0.85)) return;
+        chooseRandomPreset(true);
+    }
+
     function markPresetStarted(id, blend) {
         const now = performance.now();
         lastPresetChangeAt = now;
+        flatFrameChecks = 0;
         presetDwellMs = PRESET_DWELL_MS;
         blendUntil = now + Math.max(1200, (Number(blend) || 0) * 1000);
         blackFrameChecks = 0;
