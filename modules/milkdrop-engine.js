@@ -147,6 +147,7 @@
             this.lastBeatAt = -Infinity;
             this.lastSceneAt = 0;
             this.lastFrameAt = 0;
+            this.lastAmbientBeat = -1;
             this.randomState = Math.floor(Math.random() * 4294967296) >>> 0;
             this.seed = this.randomState / 4294967296;
             this.scene = new Float32Array([0.5, 0.7, 0.0, 0.8]);
@@ -154,6 +155,13 @@
             this.sceneIndex = 0;
             this.onSceneChange = null;
             this.contextLost = false;
+            // Perfil estimado para fuentes que no exponen su audio (por ejemplo,
+            // el iframe de YouTube). No pretende reconstruir el audio: fija una
+            // métrica musical estable para que el movimiento tenga pulso y estilo.
+            this.ambientProfile = {
+                bpm: 112, energy: 0.56, bass: 0.58, mid: 0.55, high: 0.52,
+                hue: 0.52, swing: 0.08, label: 'pop'
+            };
 
             canvas.addEventListener('webglcontextlost', (event) => {
                 event.preventDefault();
@@ -232,6 +240,18 @@
             this.beatsAtLastScene = 0;
         }
 
+        setAmbientProfile(profile) {
+            if (!profile || typeof profile !== 'object') return;
+            this.ambientProfile = { ...this.ambientProfile, ...profile };
+            const bpm = Number(this.ambientProfile.bpm);
+            this.ambientProfile.bpm = Math.max(40, Math.min(200, Number.isFinite(bpm) ? bpm : 112));
+            this.targetScene[0] = Number(this.ambientProfile.hue) || 0.52;
+            this.targetScene[1] = 0.35 + (Number(this.ambientProfile.energy) || 0.56) * 0.9;
+            this.targetScene[2] = Number(this.ambientProfile.phase) || 0;
+            this.targetScene[3] = 0.62 + (Number(this.ambientProfile.energy) || 0.56) * 0.45;
+            this.lastAmbientBeat = -1;
+        }
+
         frequencyRange(minHz, maxHz, binHz) {
             const nyquist = binHz * (this.frequency?.length || 1);
             const start = Math.max(1, Math.floor(minHz / binHz));
@@ -255,11 +275,35 @@
 
         updateAudio(time, deltaSeconds) {
             if (!this.analyser || !this.frequency || !this.bandRanges) {
+                const profile = this.ambientProfile;
+                const beatPosition = (time / 60000 * profile.bpm) % 1;
+                const barPosition = (time / 60000 * profile.bpm) % 4;
+                // Pulso con ataque corto y release suave: evita el “flash” aleatorio
+                // y conserva una sensación de compás aun sin acceso al iframe.
+                const beatPulse = Math.pow(Math.max(0, 1 - beatPosition) * (0.82 + 0.18 * Math.cos(barPosition * Math.PI)), 3.2);
+                const slow = 0.5 + 0.5 * Math.sin(time * 0.001 * (0.35 + profile.swing));
+                const target = [
+                    profile.bass * (0.34 + 0.56 * beatPulse),
+                    profile.mid * (0.30 + 0.38 * (0.5 + 0.5 * Math.sin(time * 0.001 * 1.7 + 1.2)) + 0.16 * beatPulse),
+                    profile.high * (0.24 + 0.34 * slow + 0.22 * Math.pow(beatPulse, 2)),
+                ];
                 for (let band = 0; band < 3; band += 1) {
-                    this.smooth[band] *= Math.exp(-deltaSeconds / 0.28);
+                    const alpha = 1 - Math.exp(-deltaSeconds / (band === 0 ? 0.075 : 0.14));
+                    this.smooth[band] += (target[band] - this.smooth[band]) * alpha;
                     this.audio[band] = this.smooth[band];
                 }
-                this.audio[3] *= Math.exp(-deltaSeconds / 0.16);
+                this.audio[3] = Math.max(beatPulse, this.audio[3] * Math.exp(-deltaSeconds / 0.12));
+                const beatNumber = Math.floor(time / 60000 * profile.bpm);
+                if (beatNumber !== this.lastAmbientBeat) {
+                    this.lastAmbientBeat = beatNumber;
+                    this.beatCount += 1;
+                    // Cambia de escena por frase, no por cada golpe: hay variedad
+                    // constante sin destruir la continuidad visual.
+                    if (this.beatCount > 1 && this.beatCount % 16 === 0) {
+                        this.newScene(profile.energy, time);
+                        this.beatsAtLastScene = this.beatCount;
+                    }
+                }
                 return false;
             }
 
@@ -355,10 +399,11 @@
                 return this.randomState / 4294967296;
             };
             this.seed = random();
-            this.targetScene[0] = (this.sceneIndex % 7) / 7;
+            const profile = this.ambientProfile;
+            this.targetScene[0] = ((Number(profile.hue) || 0.52) + (this.sceneIndex % 5) * 0.075) % 1;
             this.targetScene[1] = 0.35 + random() * 0.95 + Math.min(0.2, Math.max(0, energy) * 0.2);
-            this.targetScene[2] = random() * 6.28;
-            this.targetScene[3] = 0.62 + random() * 0.62;
+            this.targetScene[2] = (Number(profile.phase) || 0) + random() * 6.28;
+            this.targetScene[3] = 0.62 + random() * 0.62 + (Number(profile.energy) || 0.56) * 0.18;
             this.lastSceneAt = Number.isFinite(time) ? time : 0;
             if (typeof this.onSceneChange === 'function') this.onSceneChange(this.sceneIndex);
         }

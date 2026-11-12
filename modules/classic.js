@@ -64,6 +64,7 @@
     let captureAnalyser = null;
     let captureFrequencies = null;
     let externalGraph = null;
+    let ambientProfileKey = '';
     const musicDirector = {
         low: 0,
         mid: 0,
@@ -88,6 +89,34 @@
             if (typeof queue !== 'undefined' && Array.isArray(queue) && typeof currentIndex !== 'undefined') return queue[currentIndex] || null;
         } catch (_) {}
         return null;
+    }
+
+    // YouTube no entrega el audio del iframe a la página. Usamos la información
+    // pública que sí llega en el resultado para elegir una gramática musical
+    // estable; el ritmo es una estimación, no un análisis del audio real.
+    function detectAmbientProfile(song) {
+        const text = `${song?.title || ''} ${song?.artist || ''} ${song?.channelTitle || ''} ${song?.description || ''} ${song?.genre || ''}`.toLocaleLowerCase();
+        const profiles = [
+            { key: 'electronic', words: /electr(?:onic|ónica)|techno|house|trance|edm|dubstep|drum\s*[&+]?\s*bass|dnb|dance/, label: 'electrónica', bpm: 128, energy: .88, bass: .9, mid: .62, high: .74, hue: .72, swing: .04 },
+            { key: 'rock', words: /rock|metal|punk|grunge|hardcore|metallica|nirvana|slipknot|foo\s*fighters|manowar/, label: 'rock', bpm: 142, energy: .86, bass: .84, mid: .78, high: .58, hue: .04, swing: .12 },
+            { key: 'hiphop', words: /hip\s*-?hop|rap|trap|boom\s*bap|drill|freestyle/, label: 'hip-hop', bpm: 92, energy: .72, bass: .92, mid: .58, high: .42, hue: .58, swing: .22 },
+            { key: 'latin', words: /reggaeton|salsa|cumbia|bachata|merengue|latin|latino|urbano/, label: 'latino', bpm: 98, energy: .8, bass: .82, mid: .76, high: .62, hue: .1, swing: .2 },
+            { key: 'jazz', words: /jazz|blues|soul|funk|motown|swing/, label: 'jazz / soul', bpm: 104, energy: .58, bass: .62, mid: .82, high: .64, hue: .2, swing: .28 },
+            { key: 'classical', words: /classical|clásic|orchestra|orquesta|symphony|sinfonía|piano|violin|bach|mozart|beethoven/, label: 'clásica', bpm: 72, energy: .38, bass: .3, mid: .64, high: .76, hue: .38, swing: .06 },
+            { key: 'chill', words: /ambient|chill|lofi|lo-fi|acoustic|acústic|ballad|balada|relax|sleep|meditation/, label: 'chill', bpm: 78, energy: .3, bass: .36, mid: .48, high: .5, hue: .55, swing: .1 },
+            { key: 'pop', words: /pop|official\s+music\s+video|videoclip|cover|live/, label: 'pop', bpm: 112, energy: .58, bass: .58, mid: .7, high: .62, hue: .86, swing: .1 }
+        ];
+        return profiles.find((profile) => profile.words.test(text)) || profiles[profiles.length - 1];
+    }
+
+    function applyAmbientProfile(song) {
+        if (!milkdropEngine || !song || String(song.type) !== 'yt') return;
+        const profile = detectAmbientProfile(song);
+        const key = `${song.url || song.title}:${profile.key}`;
+        if (key === ambientProfileKey) return;
+        ambientProfileKey = key;
+        milkdropEngine.setAmbientProfile?.(profile);
+        presetTitle(`Ambiente · ${profile.label} · ${profile.bpm} BPM estimado`);
     }
 
     function activeMedia() {
@@ -943,6 +972,11 @@
     }
 
     async function initGenerativeEngine() {
+        if (milkdropEngine) {
+            setButterchurnMode();
+            if (activeGraph) milkdropEngine.attachAnalyser(activeGraph.analyser);
+            return;
+        }
         try {
             await loadScriptOnce('/modules/milkdrop-engine.js', 'milkdrop-engine');
             const canvas = $('retroVisualizerCanvas');
@@ -1130,8 +1164,15 @@
         if (!force && now - lastUiSyncAt < 280) return;
         lastUiSyncAt = now;
         const song = currentSong();
+        if (song && String(song.type) === 'yt') {
+            // El grafo de la pista anterior no debe hacer que YouTube parezca
+            // tener análisis real: en este caso usamos el pulso estimado.
+            milkdropEngine?.attachAnalyser(null);
+        }
+        applyAmbientProfile(song);
         if (force && song && String(song.type) === 'yt') {
-            setAudioState('Modo ambiente · señal simulada', 'warning');
+            const profile = detectAmbientProfile(song);
+            setAudioState(`YouTube · perfil ${profile.label} · pulso de ${profile.bpm} BPM estimado`, 'warning');
         }
         const title = song?.title || 'Esperando una pista';
         const artist = song?.artist || song?.channelTitle || 'YouToo · Retro Studio';
@@ -1380,7 +1421,9 @@
             renderPlaylist();
             syncDeck(true);
             if (activeGraph) routeGraph(activeGraph);
-            void initButterchurn();
+            // Retro Studio usa como renderer principal el motor WebGL2 propio:
+            // feedback persistente, escenas generativas y reacción multibanda.
+            void initGenerativeEngine();
             const song = currentSong();
             if (song && song.url && String(song.type) !== 'yt') void prepareCurrentVisualizationTrack();
             if (!renderFrameId) renderFrameId = requestAnimationFrame(renderLoop);
@@ -1601,7 +1644,7 @@
                 setRetroMode(true, { initial: true });
                 const song = currentSong();
                 if (song && song.url && String(song.type) !== 'yt') void prepareCurrentVisualizationTrack();
-                void initButterchurn();
+                void initGenerativeEngine();
                 renderFrameId = requestAnimationFrame(renderLoop);
             }
         } catch (_) {}
