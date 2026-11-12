@@ -230,6 +230,8 @@
     }
 
     function disconnectButterchurnInput() {
+        // El pulso simulado se mantiene estable: solo se detiene con una señal real.
+        if (synth && activeButterchurnInput === synth.bus) return;
         if (!butterchurn || !activeButterchurnInput) {
             activeButterchurnInput = null;
             return;
@@ -449,6 +451,7 @@
             graph.analyser.connect(graph.silentGain);
             graph.silentGain.connect(audioContext.destination);
             if (isRetro() && butterchurn) {
+                stopSyntheticPulse();
                 butterchurn.connectAudio(graph.source);
                 activeButterchurnInput = graph.source;
             }
@@ -966,6 +969,7 @@
         if (!butterchurn) return;
         const input = captureSource || (activeGraph && activeGraph.source);
         if (!input) return;
+        stopSyntheticPulse();
         try {
             butterchurn.connectAudio(input);
             activeButterchurnInput = input;
@@ -1516,6 +1520,110 @@
         }
     }
 
+    /*
+     * Pulso simulado: cuando no hay audio analizable (YouTube no entrega la
+     * señal), MilkDrop recibe un ritmo constante a los BPM estimados. El bus
+     * nunca se conecta a la salida: no suena, solo alimenta al visualizador.
+     */
+    let synth = null;
+
+    function stopSyntheticPulse() {
+        if (!synth) return;
+        const current = synth;
+        synth = null;
+        window.clearInterval(current.timer);
+        try { if (butterchurn && activeButterchurnInput === current.bus) butterchurn.disconnectAudio(current.bus); } catch (_) {}
+        if (activeButterchurnInput === current.bus) activeButterchurnInput = null;
+        current.sources.forEach((node) => { try { node.stop?.(); } catch (_) {} try { node.disconnect(); } catch (_) {} });
+        try { current.bus.disconnect(); } catch (_) {}
+    }
+
+    function ensureSyntheticPulse(profile) {
+        if (!audioContext || !butterchurn || !profile) return;
+        if (synth && synth.bpm === profile.bpm) return;
+        stopSyntheticPulse();
+        const ctx = audioContext;
+        const bpm = Math.max(60, Math.min(200, Number(profile.bpm) || 112));
+        const energy = Math.max(0.35, Math.min(1, Number(profile.energy) || 0.6));
+        const swing = Math.max(0, Math.min(0.3, Number(profile.swing) || 0));
+        const bus = ctx.createGain();
+        bus.gain.value = 1;
+
+        const kick = ctx.createOscillator();
+        kick.type = 'sine';
+        const kickGain = ctx.createGain();
+        kickGain.gain.value = 0;
+        kick.connect(kickGain);
+        kickGain.connect(bus);
+        kick.start();
+
+        const buffer = ctx.createBuffer(1, Math.floor(ctx.sampleRate), ctx.sampleRate);
+        const data = buffer.getChannelData(0);
+        for (let i = 0; i < data.length; i += 1) data[i] = Math.random() * 2 - 1;
+        const noise = ctx.createBufferSource();
+        noise.buffer = buffer;
+        noise.loop = true;
+        const hat = ctx.createBiquadFilter();
+        hat.type = 'highpass';
+        hat.frequency.value = 6500;
+        const hatGain = ctx.createGain();
+        hatGain.gain.value = 0;
+        const snare = ctx.createBiquadFilter();
+        snare.type = 'bandpass';
+        snare.frequency.value = 1900;
+        snare.Q.value = 0.9;
+        const snareGain = ctx.createGain();
+        snareGain.gain.value = 0;
+        noise.connect(hat);
+        hat.connect(hatGain);
+        hatGain.connect(bus);
+        noise.connect(snare);
+        snare.connect(snareGain);
+        snareGain.connect(bus);
+        noise.start();
+
+        const beat = 60 / bpm;
+        const sixteenth = beat / 4;
+        let nextStep = ctx.currentTime + 0.05;
+        let step = 0;
+        const schedule = () => {
+            while (nextStep < ctx.currentTime + 0.18) {
+                const t = nextStep;
+                const beatIndex = Math.floor(step / 4) % 4;
+                const sub = step % 4;
+                if (sub === 0) {
+                    // Bombo en cada tiempo (fuerte en 1 y 3), caída de tono.
+                    const level = (beatIndex % 2 === 0 ? 1 : 0.6) * energy;
+                    kickGain.gain.setValueAtTime(level, t);
+                    kickGain.gain.exponentialRampToValueAtTime(0.001, t + 0.24);
+                    kick.frequency.setValueAtTime(150, t);
+                    kick.frequency.exponentialRampToValueAtTime(44, t + 0.2);
+                    if (beatIndex % 2 === 1) {
+                        snareGain.gain.setValueAtTime(0.55 * energy, t);
+                        snareGain.gain.exponentialRampToValueAtTime(0.001, t + 0.2);
+                    }
+                }
+                if (sub === 2) {
+                    const hatAt = t + swing * sixteenth;
+                    hatGain.gain.setValueAtTime(0.32 * energy, hatAt);
+                    hatGain.gain.exponentialRampToValueAtTime(0.001, hatAt + 0.06);
+                }
+                nextStep += sixteenth;
+                step += 1;
+            }
+        };
+        schedule();
+        const timer = window.setInterval(schedule, 50);
+        synth = { bpm: profile.bpm, bus, timer, sources: [kick, noise] };
+        try {
+            butterchurn.connectAudio(bus);
+            activeButterchurnInput = bus;
+        } catch (error) {
+            console.warn('[YouToo] No se pudo conectar el pulso simulado:', error);
+            stopSyntheticPulse();
+        }
+    }
+
     function vizIsPlaying() {
         try { return typeof isPlaying !== 'undefined' && Boolean(isPlaying); } catch (_) { return false; }
     }
@@ -1559,6 +1667,7 @@
             }
         }
         vizPlayingFlag = playing;
+        if (!playing && synth) stopSyntheticPulse();
         if (renderFrameId || !isRetro() || document.hidden) return;
         if (!playing) return;
         vizLastFrameAt = performance.now();
@@ -1596,6 +1705,7 @@
             showTrackCard(song);
         }
         vizLastPlayingAt = now;
+        if (butterchurn && !activeButterchurnInput) ensureSyntheticPulse(detectAmbientProfile(currentSong()));
         vizPresence += (1 - vizPresence) * (1 - Math.exp(-dt / VIZ_FADE_IN_TAU));
         applyVizPresence();
         try {
