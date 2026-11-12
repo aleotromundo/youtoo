@@ -14,6 +14,7 @@
     const IDB_NAME = 'nowarfy-milkdrop-presets';
     const IDB_STORE = 'converted';
     const IDB_VERSION = 5;
+    const BLACKLIST_STORAGE_KEY = 'youtoo_milkdrop_blacklist_v1';
 
     let manifest = null;
     let manifestPromise = null;
@@ -29,6 +30,24 @@
     const converted = new Map();   // id -> preset JSON listo para Butterchurn
     const inflight = new Map();    // id -> Promise en curso
     const failed = new Map();      // id -> error
+
+    function loadBlacklisted() {
+        try {
+            const stored = JSON.parse(localStorage.getItem(BLACKLIST_STORAGE_KEY) || '[]');
+            if (Array.isArray(stored)) stored.filter((id) => typeof id === 'string').forEach((id) => {
+                failed.set(id, new Error('preset descartado por salida negra'));
+            });
+        } catch (_) {}
+    }
+
+    function saveBlacklisted(id) {
+        try {
+            const stored = JSON.parse(localStorage.getItem(BLACKLIST_STORAGE_KEY) || '[]');
+            const list = Array.isArray(stored) ? stored.filter((value) => typeof value === 'string') : [];
+            if (!list.includes(id)) list.push(id);
+            localStorage.setItem(BLACKLIST_STORAGE_KEY, JSON.stringify(list.slice(-128)));
+        } catch (_) {}
+    }
 
     function loadScriptOnce(path, marker) {
         return new Promise((resolve, reject) => {
@@ -200,6 +219,7 @@
             }
             manifest = data;
             manifest.byId = new Map(data.presets.map((entry) => [entry.id, entry]));
+            loadBlacklisted();
             return manifest;
         })().catch((error) => {
             manifestPromise = null;
@@ -391,7 +411,13 @@
 
     // Marca un preset como no utilizable (conversión o render fallido) para saltarlo.
     function markBroken(id, reason) {
-        if (id) failed.set(id, new Error(reason || 'preset descartado'));
+        if (!id) return;
+        failed.set(id, new Error(reason || 'preset descartado'));
+        if (reason === 'black-output') saveBlacklisted(id);
+    }
+
+    function isUsable(id) {
+        return Boolean(id) && !failed.has(id);
     }
 
     function entries() {
@@ -422,10 +448,11 @@
             const candidate = pool[Math.floor(Math.random() * pool.length)];
             if (!candidate) continue;
             if (candidate.id === exclude) continue;
-            if (failed.has(candidate.id)) continue;
+            if (!isUsable(candidate.id)) continue;
             return candidate.id;
         }
-        return pool.length ? pool[0].id : null;
+        const fallback = pool.find((item) => item && item.id !== exclude && isUsable(item.id));
+        return fallback ? fallback.id : null;
     }
 
     // Calienta la caché en segundo plano para que el salto entre presets sea inmediato.
@@ -458,6 +485,7 @@
         get,
         peek,
         markBroken,
+        isUsable,
         ids,
         label,
         entry,

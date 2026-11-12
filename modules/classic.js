@@ -7,9 +7,8 @@
     const LEGACY_PRESET_KEY = 'nowarfy_retro_eq_preset_v1';
     const TRANSITION_MS = 3000;
     const MAX_VISIBLE_TRACKS = 400;
-    // Cada preset se queda entre 45 s y 1 min 35 s antes de buscar otro.
-    const PRESET_DWELL_MIN = 45000;
-    const PRESET_DWELL_MAX = 95000;
+    // Cada preset dura exactamente 30 s; la mezcla empieza al cambiar de preset.
+    const PRESET_DWELL_MS = 30000;
     const PRESET_HISTORY_MAX = 24;
     // Un blend de MilkDrop ronda los 2-4 s; no se permite cortarlo antes.
     const PRESET_BLEND_MIN = 3.0;
@@ -49,6 +48,10 @@
     let blendUntil = 0;
     let presetHistory = [];
     let queuedPresetId = '';
+    let presetCycle = [];
+    let presetCyclePosition = 0;
+    let blackFrameChecks = 0;
+    let lastBlackFrameCheckAt = 0;
     let lastAmbientMode = false;
     let transitionTimer = 0;
     let transitionLocked = false;
@@ -644,11 +647,51 @@
         if (el) el.textContent = name || 'MilkDrop · esperando señal';
     }
 
+    // Un preset que deja el framebuffer prácticamente negro durante varios
+    // segundos se descarta y no vuelve a entrar en la vuelta actual.
+    function inspectPresetFrame(now) {
+        if (!butterchurn || !activePresetName || now - lastPresetChangeAt < 6500
+            || now - lastBlackFrameCheckAt < 1200) return;
+        lastBlackFrameCheckAt = now;
+        try {
+            const canvas = $('retroVisualizerCanvas');
+            const gl = canvas && (canvas.getContext('webgl2') || canvas.getContext('webgl'));
+            if (!gl || !canvas.width || !canvas.height) return;
+            const pixel = new Uint8Array(4);
+            let luminance = 0;
+            let visible = 0;
+            const points = 12;
+            for (let index = 0; index < points; index += 1) {
+                const x = Math.min(canvas.width - 1, Math.floor((index + 0.5) / points * canvas.width));
+                const y = Math.min(canvas.height - 1, Math.floor((0.35 + ((index * 7) % points) / points) * canvas.height));
+                gl.readPixels(x, y, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, pixel);
+                const value = (pixel[0] * 0.2126 + pixel[1] * 0.7152 + pixel[2] * 0.0722) / 255;
+                luminance += value;
+                if (value > 0.018) visible += 1;
+            }
+            if (luminance / points < 0.006 && visible === 0) blackFrameChecks += 1;
+            else blackFrameChecks = 0;
+            if (blackFrameChecks >= 4) {
+                const broken = activePresetName;
+                blackFrameChecks = 0;
+                presetLibrary?.markBroken(broken, 'black-output');
+                presetCycle = presetCycle.filter((id) => id !== broken);
+                presetTitle('Preset descartado · salida negra');
+                chooseRandomPreset(true);
+            }
+        } catch (_) {
+            // readPixels no está disponible en algunos WebGL móviles; no afecta
+            // al render ni convierte esa limitación en un falso descarte.
+        }
+    }
+
     function markPresetStarted(id, blend) {
         const now = performance.now();
         lastPresetChangeAt = now;
-        presetDwellMs = PRESET_DWELL_MIN + Math.random() * (PRESET_DWELL_MAX - PRESET_DWELL_MIN);
+        presetDwellMs = PRESET_DWELL_MS;
         blendUntil = now + Math.max(1200, (Number(blend) || 0) * 1000);
+        blackFrameChecks = 0;
+        lastBlackFrameCheckAt = now;
         if (id) {
             presetHistory.push(id);
             if (presetHistory.length > PRESET_HISTORY_MAX) presetHistory.shift();
@@ -663,14 +706,31 @@
         else window.setTimeout(run, 1600);
     }
 
-    // Elige un preset evitando los últimos vistos, para que no se repitan seguido.
+    // Baraja una bolsa completa: ningún preset vuelve a aparecer hasta agotar
+    // los disponibles de la vuelta actual.
+    function resetPresetCycle() {
+        if (!presetLibrary) return;
+        presetCycle = presetLibrary.ids().slice();
+        for (let index = presetCycle.length - 1; index > 0; index -= 1) {
+            const other = Math.floor(Math.random() * (index + 1));
+            [presetCycle[index], presetCycle[other]] = [presetCycle[other], presetCycle[index]];
+        }
+        presetCyclePosition = 0;
+    }
+
     function pickNextPresetId() {
         if (!presetLibrary) return '';
-        for (let attempt = 0; attempt < 10; attempt += 1) {
-            const id = presetLibrary.pickRandom(activePresetName);
-            if (id && !presetHistory.includes(id)) return id;
+        if (!presetCycle.length || presetCyclePosition >= presetCycle.length) resetPresetCycle();
+        while (presetCyclePosition < presetCycle.length) {
+            const id = presetCycle[presetCyclePosition++];
+            if (id !== activePresetName && presetLibrary.isUsable(id)) return id;
         }
-        return presetLibrary.pickRandom(activePresetName) || '';
+        resetPresetCycle();
+        while (presetCyclePosition < presetCycle.length) {
+            const id = presetCycle[presetCyclePosition++];
+            if (id !== activePresetName && presetLibrary.isUsable(id)) return id;
+        }
+        return '';
     }
 
     /*
@@ -736,11 +796,7 @@
         let target = takeQueuedPresetId();
         if (!target) target = pickNextPresetId();
         if (!target && presetNames.length) {
-            const start = Math.floor(Math.random() * presetNames.length);
-            for (let offset = 0; offset < presetNames.length; offset += 1) {
-                const candidate = presetNames[(start + offset) % presetNames.length];
-                if (candidate !== activePresetName) { target = candidate; break; }
-            }
+            target = pickNextPresetId();
         }
         if (!target) return;
         void switchPreset(target).then((ok) => {
@@ -883,6 +939,7 @@
             const data = await library.load();
             presetLibrary = library;
             presetNames = library.ids();
+            resetPresetCycle();
             console.info('[YouToo] Presets MilkDrop reales:', data.count,
                 '· HLSL:', data.stats && data.stats.with_hlsl,
                 '· solo ecuaciones:', data.stats && data.stats.equations_only);
@@ -950,11 +1007,13 @@
                     const library = await ensurePresetLibrary();
                     let stored = '';
                     try { stored = localStorage.getItem(VIZ_PRESET_KEY) || ''; } catch (_) {}
-                    const startId = presetNames.includes(stored) ? stored : (library.pickRandom('', 'md1') || library.pickRandom());
+                    const startId = presetNames.includes(stored) && library.isUsable(stored)
+                        ? stored
+                        : (library.pickRandom('', 'md1') || library.pickRandom());
                     if (startId) await switchPreset(startId, 0);
                     // Si el primer preset elegido no convierte, se prueban otros.
                     for (let attempt = 0; attempt < 3 && !activePresetName; attempt += 1) {
-                        const fallbackId = library.pickRandom('');
+                        const fallbackId = pickNextPresetId() || library.pickRandom('');
                         if (fallbackId) await switchPreset(fallbackId, 0);
                     }
                     // El calentamiento de caché se deja para cuando no haya tráfico.
@@ -1458,7 +1517,7 @@
                     console.warn('[YouToo] Falló el render MilkDrop (' + renderFailures + '):', error);
                     if (presetLibrary) presetLibrary.markBroken(activePresetName, 'render');
                     if (renderFailures <= 3 && presetNames.length) {
-                        const nextId = presetLibrary ? presetLibrary.pickRandom(activePresetName) : '';
+                        const nextId = pickNextPresetId();
                         if (nextId) void switchPreset(nextId);
                     } else {
                         butterchurn = null;
@@ -1473,6 +1532,7 @@
                     setFallbackMode('Se activó el visualizador alternativo.');
                 }
             }
+            inspectPresetFrame(now);
             resizeVisualizer();
             updateSpectrum(now);
             drawFallback(now);
