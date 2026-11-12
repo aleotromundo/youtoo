@@ -1850,8 +1850,9 @@
     }
 
     /*
-     * Efectos táctiles: al tocar o arrastrar aparecen chispas, ondas y lluvia
-     * de partículas. No cambia el preset ni lo que MilkDrop está mostrando.
+     * Efectos táctiles: cada toque dispara uno de 12 estilos de chispas. Se
+     * recorren en orden aleatorio sin repetir hasta completar la vuelta. No
+     * cambia el preset ni lo que MilkDrop está mostrando.
      */
     function setupTouchFx() {
         const shell = $('retroVisualizerShell');
@@ -1863,7 +1864,7 @@
         shell.appendChild(fx);
         const ctx = fx.getContext('2d');
         const particles = [];
-        const MAX_PARTICLES = 700;
+        const MAX_PARTICLES = 900;
         let width = 0;
         let height = 0;
         let dpr = 1;
@@ -1871,6 +1872,8 @@
         let last = 0;
         let down = false;
         let lastPoint = null;
+        let bag = [];
+        let lastStyle = -1;
 
         const resize = () => {
             const rect = fx.getBoundingClientRect();
@@ -1883,36 +1886,62 @@
             ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
         };
 
-        const hueFor = () => (Math.random() < 0.72 ? 95 + Math.random() * 60 : 38 + Math.random() * 18);
+        const rnd = (a, b) => a + Math.random() * (b - a);
+        const greenHue = () => (Math.random() < 0.72 ? rnd(95, 155) : rnd(38, 56));
+        const add = (p) => { if (particles.length < MAX_PARTICLES) particles.push(p); };
+        const base = (x, y, hue, life) => ({ x, y, vx: 0, vy: 0, g: 0, drag: 1, life: 0, max: life, size: 1.2 + Math.random() * 2, hue, shape: 'dot', spin: 0, w: 0, wobble: 0, wf: 0, orbit: null });
 
-        const spark = (x, y, speed, lift) => {
-            if (particles.length >= MAX_PARTICLES) return;
-            const angle = Math.random() * Math.PI * 2;
-            const power = speed * (0.45 + Math.random() * 0.9);
-            particles.push({
-                x, y,
-                vx: Math.cos(angle) * power,
-                vy: Math.sin(angle) * power - lift,
-                life: 0,
-                max: 0.9 + Math.random() * 1.1,
-                size: 1 + Math.random() * 2.2,
-                hue: hueFor()
-            });
+        // 12 estilos. Cada uno recibe el punto y la fuerza del toque.
+        const styles = [
+            // 0 · Estallido radial clásico
+            (x, y, s) => { for (let i = 0; i < 40 * s; i += 1) { const a = rnd(0, 6.283), v = rnd(120, 340) * s; const p = base(x, y, greenHue(), rnd(0.9, 2)); p.vx = Math.cos(a) * v; p.vy = Math.sin(a) * v - rnd(120, 240); p.g = 420; p.drag = 0.98; add(p); } },
+            // 1 · Fuente hacia arriba
+            (x, y, s) => { for (let i = 0; i < 34 * s; i += 1) { const p = base(x, y, greenHue(), rnd(1.2, 2.2)); p.vx = rnd(-120, 120) * s; p.vy = rnd(-520, -300) * s; p.g = 520; p.drag = 0.99; add(p); } },
+            // 2 · Lluvia que cae en forma de rayas
+            (x, y, s) => { for (let i = 0; i < 26 * s; i += 1) { const p = base(x + rnd(-60, 60), y - rnd(0, 30), greenHue(), rnd(1, 1.8)); p.shape = 'streak'; p.vx = rnd(-14, 14); p.vy = rnd(160, 260); p.g = 60; add(p); } },
+            // 3 · Espiral que se abre
+            (x, y, s) => { for (let i = 0; i < 36 * s; i += 1) { const p = base(x, y, greenHue(), rnd(1.4, 2.2)); p.orbit = { origin: { x, y }, a: (i / 36) * 6.283, r: 4, w: rnd(3, 5) * (i % 2 ? 1 : -1), k: rnd(120, 200) }; add(p); } },
+            // 4 · Estrella de rayos rápidos
+            (x, y, s) => { const rays = 6 + Math.round(2 * s); for (let r = 0; r < rays; r += 1) { const a = (r / rays) * 6.283; for (let k = 0; k < 3; k += 1) { const p = base(x, y, 60, rnd(0.45, 0.7)); p.shape = 'streak'; p.hue = greenHue(); p.vx = Math.cos(a) * rnd(340, 480) * (1 - k * 0.15); p.vy = Math.sin(a) * rnd(340, 480) * (1 - k * 0.15); p.drag = 0.93; add(p); } } },
+            // 5 · Chispas doradas que parpadean
+            (x, y, s) => { for (let i = 0; i < 30 * s; i += 1) { const a = rnd(0, 6.283), v = rnd(60, 200); const p = base(x, y, rnd(38, 52), rnd(1.2, 2)); p.vx = Math.cos(a) * v; p.vy = Math.sin(a) * v; p.g = 90; p.drag = 0.97; p.wobble = 1; p.wf = rnd(14, 22); p.size = rnd(1, 2.2); add(p); } },
+            // 6 · Cometas con cola
+            (x, y, s) => { for (let i = 0; i < 9 * s; i += 1) { const p = base(x, y, greenHue(), rnd(0.8, 1.3)); p.shape = 'streak'; const a = rnd(-0.6, 0.6); p.vx = Math.cos(a) * rnd(420, 560); p.vy = Math.sin(a) * rnd(420, 560); p.drag = 0.975; add(p); } },
+            // 7 · Confeti que gira
+            (x, y, s) => { for (let i = 0; i < 26 * s; i += 1) { const p = base(x, y, greenHue(), rnd(1.8, 2.8)); p.shape = 'rect'; p.vx = rnd(-200, 200) * s; p.vy = rnd(-300, -120) * s; p.g = 260; p.drag = 0.96; p.w = rnd(-10, 10); p.size = rnd(2.5, 4.5); add(p); } },
+            // 8 · Brasas que suben con humo luminoso
+            (x, y, s) => { for (let i = 0; i < 22 * s; i += 1) { const p = base(x + rnd(-30, 30), y, rnd(20, 40), rnd(2.2, 3.2)); p.vx = rnd(-30, 30); p.vy = rnd(-120, -60); p.drag = 0.99; p.wobble = 1; p.wf = rnd(2, 4); p.size = rnd(3, 6); add(p); } },
+            // 9 · Estallido denso con destello
+            (x, y, s) => { for (let i = 0; i < 70 * s; i += 1) { const a = rnd(0, 6.283), v = rnd(200, 480) * s; const p = base(x, y, greenHue(), rnd(0.35, 0.7)); p.vx = Math.cos(a) * v; p.vy = Math.sin(a) * v; p.drag = 0.92; p.size = rnd(1, 1.8); add(p); } const flash = base(x, y, 90, 0.18); flash.size = 26 * s; add(flash); },
+            // 10 · Ola horizontal
+            (x, y, s) => { for (let i = 0; i < 40 * s; i += 1) { const p = base(x + rnd(-40, 40), y + rnd(-6, 6), greenHue(), rnd(1.1, 1.8)); p.vx = (i % 2 ? 1 : -1) * rnd(120, 220); p.vy = rnd(-40, 40); p.drag = 0.985; p.wobble = 1; p.wf = rnd(6, 9); p.size = rnd(1.4, 2.4); add(p); } },
+            // 11 · Cruces que titilan y caen
+            (x, y, s) => { for (let i = 0; i < 24 * s; i += 1) { const p = base(x, y, greenHue(), rnd(1.2, 2)); p.shape = 'plus'; p.vx = rnd(-160, 160); p.vy = rnd(-240, -80); p.g = 300; p.drag = 0.97; p.w = rnd(-6, 6); p.size = rnd(2, 3.5); add(p); } }
+        ];
+
+        const nextStyle = () => {
+            if (!bag.length) {
+                bag = styles.map((_, index) => index);
+                for (let i = bag.length - 1; i > 0; i -= 1) { const j = Math.floor(Math.random() * (i + 1)); [bag[i], bag[j]] = [bag[j], bag[i]]; }
+                if (bag[0] === lastStyle && bag.length > 1) [bag[0], bag[1]] = [bag[1], bag[0]];
+            }
+            lastStyle = bag.shift();
+            return lastStyle;
         };
 
-        const burst = (x, y, strength) => {
-            const count = Math.round(26 + strength * 22);
-            for (let i = 0; i < count; i += 1) spark(x, y, 120 + strength * 220, 140 + Math.random() * 120);
-        };
+        const triggerStyle = (x, y, strength) => styles[nextStyle()](x, y, Math.max(0.6, Math.min(1.4, strength)));
 
         const trail = (from, to) => {
             const dx = to.x - from.x;
             const dy = to.y - from.y;
             const steps = Math.min(4, Math.max(1, Math.round(Math.hypot(dx, dy) / 26)));
             for (let i = 1; i <= steps; i += 1) {
-                const x = from.x + (dx * i) / steps;
-                const y = from.y + (dy * i) / steps;
-                spark(x, y, 40, 60);
+                const p = base(from.x + (dx * i) / steps, from.y + (dy * i) / steps, greenHue(), rnd(0.5, 0.9));
+                p.vx = rnd(-30, 30);
+                p.vy = rnd(-60, 20);
+                p.g = 120;
+                p.size = 1.2;
+                add(p);
             }
         };
 
@@ -1921,24 +1950,57 @@
             last = now;
             ctx.clearRect(0, 0, width, height);
             ctx.globalCompositeOperation = 'lighter';
-
             for (let i = particles.length - 1; i >= 0; i -= 1) {
                 const p = particles[i];
                 p.life += dt;
                 if (p.life >= p.max) { particles.splice(i, 1); continue; }
-                p.vy += 420 * dt;
-                p.vx *= 1 - 1.2 * dt;
-                p.vy *= 1 - 0.4 * dt;
-                p.x += p.vx * dt;
-                p.y += p.vy * dt;
-                const alpha = 1 - p.life / p.max;
-                ctx.globalAlpha = alpha;
+                const t = p.life / p.max;
+                const alpha = 1 - t;
+                if (p.orbit) {
+                    p.orbit.a += p.orbit.w * dt;
+                    p.orbit.r += p.orbit.k * dt;
+                    p.x = p.orbit.origin.x + Math.cos(p.orbit.a) * p.orbit.r;
+                    p.y = p.orbit.origin.y + Math.sin(p.orbit.a) * p.orbit.r;
+                } else {
+                    p.vy += p.g * dt;
+                    p.vx *= Math.pow(p.drag, dt * 60);
+                    p.vy *= Math.pow(p.drag, dt * 60);
+                    if (p.wobble) p.x += Math.sin(p.life * p.wf) * 36 * dt;
+                    p.x += p.vx * dt;
+                    p.y += p.vy * dt;
+                }
+                p.spin += p.w * dt;
+                ctx.globalAlpha = Math.max(0, alpha) * (p.wobble ? 0.5 + 0.5 * Math.sin(p.life * 30) : 1);
                 ctx.fillStyle = `hsl(${p.hue}, 100%, 70%)`;
-                ctx.beginPath();
-                ctx.arc(p.x, p.y, p.size * (0.6 + alpha * 0.6), 0, Math.PI * 2);
-                ctx.fill();
+                ctx.strokeStyle = ctx.fillStyle;
+                if (p.shape === 'streak') {
+                    ctx.lineWidth = 1.6;
+                    ctx.beginPath();
+                    ctx.moveTo(p.x, p.y);
+                    ctx.lineTo(p.x - p.vx * 0.05, p.y - p.vy * 0.05);
+                    ctx.stroke();
+                } else if (p.shape === 'rect') {
+                    ctx.save();
+                    ctx.translate(p.x, p.y);
+                    ctx.rotate(p.spin);
+                    ctx.fillRect(-p.size, -p.size * 0.5, p.size * 2, p.size);
+                    ctx.restore();
+                } else if (p.shape === 'plus') {
+                    ctx.save();
+                    ctx.translate(p.x, p.y);
+                    ctx.rotate(p.spin);
+                    ctx.lineWidth = 1.4;
+                    ctx.beginPath();
+                    ctx.moveTo(-p.size, 0); ctx.lineTo(p.size, 0);
+                    ctx.moveTo(0, -p.size); ctx.lineTo(0, p.size);
+                    ctx.stroke();
+                    ctx.restore();
+                } else {
+                    ctx.beginPath();
+                    ctx.arc(p.x, p.y, Math.max(0.5, p.size * (0.6 + alpha * 0.6)), 0, Math.PI * 2);
+                    ctx.fill();
+                }
             }
-
             ctx.globalAlpha = 1;
             ctx.globalCompositeOperation = 'source-over';
             if (particles.length) frame = requestAnimationFrame(tick);
@@ -1960,7 +2022,7 @@
             resize();
             down = true;
             const point = pointFrom(event);
-            burst(point.x, point.y, 1);
+            triggerStyle(point.x, point.y, 1);
             lastPoint = point;
             try { fx.setPointerCapture(event.pointerId); } catch (_) {}
             kick();
