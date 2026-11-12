@@ -18,6 +18,9 @@
     let milkdropEngine = null;
     let presetCollection = null;
     let presetNames = [];
+    let presetLibrary = null;
+    let presetLibraryPromise = null;
+    let visualizerInitPromise = null;
     let activePresetName = '';
     let activeButterchurnInput = null;
     let assetLoadPromise = null;
@@ -466,17 +469,25 @@
         if (el) el.textContent = name || 'MilkDrop · esperando señal';
     }
 
-    function switchPreset(name) {
-        if (!butterchurn || !presetCollection || !presetCollection[name]) return false;
+    async function switchPreset(nameOrId, transition) {
+        if (!butterchurn || !nameOrId) return false;
+        if (!presetCollection) presetCollection = Object.create(null);
+        let preset = presetCollection[nameOrId];
+        if (!preset) {
+            if (!presetLibrary) return false;
+            preset = await presetLibrary.get(nameOrId);
+            if (!preset || !butterchurn) return false;
+            presetCollection[nameOrId] = preset;
+        }
         try {
-            butterchurn.loadPreset(presetCollection[name], 3.0);
-            activePresetName = name;
+            butterchurn.loadPreset(preset, Number.isFinite(transition) ? transition : 3.0);
+            activePresetName = nameOrId;
             lastPresetChangeAt = performance.now();
-            presetTitle(name);
-            try { localStorage.setItem(VIZ_PRESET_KEY, name); } catch (_) {}
+            presetTitle(presetLibrary ? presetLibrary.label(nameOrId) : nameOrId);
+            try { localStorage.setItem(VIZ_PRESET_KEY, nameOrId); } catch (_) {}
             return true;
         } catch (error) {
-            console.warn('[YouToo] Preset MilkDrop no compatible:', name, error);
+            console.warn('[YouToo] Preset MilkDrop no compatible:', nameOrId, error);
             return false;
         }
     }
@@ -486,13 +497,17 @@
             milkdropEngine.nextScene();
             return;
         }
-        if (!presetNames.length) return;
-        const start = Math.floor(Math.random() * presetNames.length);
-        for (let offset = 0; offset < presetNames.length; offset += 1) {
-            const name = presetNames[(start + offset) % presetNames.length];
-            if (name !== activePresetName && (loadUniquePreset(name, performance.now(), 0.52) || switchPreset(name))) return;
+        if (!butterchurn) return;
+        let target = presetLibrary ? presetLibrary.pickRandom(activePresetName) : '';
+        if (!target && presetNames.length) {
+            const start = Math.floor(Math.random() * presetNames.length);
+            for (let offset = 0; offset < presetNames.length; offset += 1) {
+                const candidate = presetNames[(start + offset) % presetNames.length];
+                if (candidate !== activePresetName) { target = candidate; break; }
+            }
         }
-        loadUniquePreset(presetNames[start], performance.now(), 0.52) || switchPreset(presetNames[start]);
+        if (!target) return;
+        if (!loadUniquePreset(target, performance.now(), 0.52)) void switchPreset(target);
     }
 
     function copyPreset(preset) {
@@ -618,7 +633,99 @@
         }
     }
 
+    async function ensurePresetLibrary() {
+        if (presetLibrary) return presetLibrary;
+        if (presetLibraryPromise) return presetLibraryPromise;
+        presetLibraryPromise = (async () => {
+            await loadScriptOnce('/modules/milkdrop-presets.js', 'milkdrop-presets');
+            const library = window.NowarfyPresetLibrary;
+            if (!library) throw new Error('Biblioteca de presets no disponible');
+            const data = await library.load();
+            presetLibrary = library;
+            presetNames = library.ids();
+            console.info('[YouToo] Presets MilkDrop reales:', data.count,
+                '· HLSL:', data.stats && data.stats.with_hlsl,
+                '· solo ecuaciones:', data.stats && data.stats.equations_only);
+            return library;
+        })().catch((error) => {
+            presetLibraryPromise = null;
+            throw error;
+        });
+        return presetLibraryPromise;
+    }
+
+    function connectButterchurnInput() {
+        if (!butterchurn || !activeGraph) return;
+        try {
+            butterchurn.connectAudio(activeGraph.source);
+            activeButterchurnInput = activeGraph.source;
+        } catch (error) {
+            console.warn('[YouToo] No se pudo conectar la señal de audio al visualizador:', error);
+        }
+    }
+
     async function initButterchurn() {
+        if (butterchurn) { setButterchurnMode(); return; }
+        if (visualizerInitPromise) return visualizerInitPromise;
+        visualizerInitPromise = (async () => {
+            try {
+                await loadButterchurnAssets();
+                const canvas = $('retroVisualizerCanvas');
+                if (!canvas) throw new Error('Lienzo del visualizador no disponible');
+                const context = ensureAudioContext();
+                if (!context) throw new Error('El navegador no dispone de Web Audio');
+                const core = window.butterchurn && window.butterchurn.createVisualizer
+                    ? window.butterchurn
+                    : (window.butterchurn && window.butterchurn.default);
+                if (!core || typeof core.createVisualizer !== 'function') throw new Error('Butterchurn no disponible');
+
+                const rect = canvas.getBoundingClientRect();
+                const pixelRatio = Math.min(2, Math.max(1, Number(window.devicePixelRatio) || 1));
+                if (!renderWidth || !renderHeight) {
+                    renderWidth = Math.max(1, Math.round((rect.width || 640) * pixelRatio));
+                    renderHeight = Math.max(1, Math.round((rect.height || 360) * pixelRatio));
+                }
+
+                butterchurn = core.createVisualizer(context, canvas, {
+                    width: renderWidth,
+                    height: renderHeight,
+                    pixelRatio: 1,
+                    textureRatio: 1
+                });
+                setButterchurnMode();
+                presetTitle('MilkDrop · cargando presets…');
+                connectButterchurnInput();
+
+                try {
+                    const library = await ensurePresetLibrary();
+                    let stored = '';
+                    try { stored = localStorage.getItem(VIZ_PRESET_KEY) || ''; } catch (_) {}
+                    const startId = presetNames.includes(stored) ? stored : library.pickRandom();
+                    if (startId) await switchPreset(startId, 0);
+                    void library.prefetch(4);
+                } catch (error) {
+                    console.warn('[YouToo] No se pudo cargar el pack real; se usan los presets incluidos:', error);
+                    const bundled = window.butterchurnPresets && (window.butterchurnPresets.default || window.butterchurnPresets);
+                    const presets = bundled && typeof bundled.getPresets === 'function' ? bundled.getPresets() : null;
+                    if (presets) {
+                        presetCollection = Object.create(null);
+                        Object.keys(presets).forEach((name) => { presetCollection[name] = presets[name]; });
+                        presetNames = Object.keys(presets);
+                        if (presetNames.length) await switchPreset(presetNames[0], 0);
+                    }
+                }
+
+                if (!renderFrameId && isRetro()) renderFrameId = requestAnimationFrame(renderLoop);
+            } catch (error) {
+                console.warn('[YouToo] Motor MilkDrop no disponible, se usa el motor generativo:', error);
+                butterchurn = null;
+                await initGenerativeEngine();
+            }
+        })().finally(() => { visualizerInitPromise = null; });
+        return visualizerInitPromise;
+    }
+
+    async function initGenerativeEngine() {
         try {
             await loadScriptOnce('/modules/milkdrop-engine.js', 'milkdrop-engine');
             const canvas = $('retroVisualizerCanvas');
@@ -1071,18 +1178,18 @@
         if (!isRetro() || document.hidden) return;
         try {
             updateMusicDirector(now);
-            if (milkdropEngine) {
-                try { milkdropEngine.render(now); }
-                catch (error) {
-                    console.warn('[YouToo] Falló el motor generativo:', error);
-                    milkdropEngine = null;
-                    setFallbackMode('Se activó el visualizador alternativo.');
-                }
-            } else if (butterchurn) {
+            if (butterchurn) {
                 try { butterchurn.render(); }
                 catch (error) {
                     console.warn('[YouToo] Falló el render MilkDrop:', error);
                     butterchurn = null;
+                    void initGenerativeEngine();
+                }
+            } else if (milkdropEngine) {
+                try { milkdropEngine.render(now); }
+                catch (error) {
+                    console.warn('[YouToo] Falló el motor generativo:', error);
+                    milkdropEngine = null;
                     setFallbackMode('Se activó el visualizador alternativo.');
                 }
             }
@@ -1212,8 +1319,10 @@
 
         renderPlaylist();
         syncDeck(true);
+        let forceRetro = false;
+        try { forceRetro = new URLSearchParams(window.location.search).get('retro') === '1'; } catch (_) {}
         try {
-            if (localStorage.getItem(MODE_KEY) === '1' || document.body.classList.contains('mode-classic')) {
+            if (forceRetro || localStorage.getItem(MODE_KEY) === '1' || document.body.classList.contains('mode-classic')) {
                 setRetroMode(true, { initial: true });
                 const song = currentSong();
                 if (song && song.url && String(song.type) !== 'yt') void prepareCurrentVisualizationTrack();
