@@ -1904,8 +1904,10 @@
         const burst = (x, y, strength) => {
             const count = Math.round(26 + strength * 22);
             for (let i = 0; i < count; i += 1) spark(x, y, 120 + strength * 220, 140 + Math.random() * 120);
-            ripples.push({ x, y, r: 6, max: 70 + strength * 90, life: 0, hue: hueFor(), width: 2.4 });
-            ripples.push({ x, y, r: 6, max: 40 + strength * 60, life: -0.14, hue: hueFor(), width: 1.4 });
+            // Tamaño relativo a la pantalla para que los anillos se vean siempre.
+            const reach = Math.max(120, Math.min(width, height) * 0.42) * (0.75 + strength * 0.4);
+            ripples.push({ x, y, r: 10, max: reach, life: 0, hue: hueFor(), width: 4 });
+            ripples.push({ x, y, r: 10, max: reach * 0.6, life: -0.12, hue: hueFor(), width: 2.5 });
         };
 
         const trail = (from, to) => {
@@ -1929,11 +1931,11 @@
                 const ring = ripples[i];
                 ring.life += dt;
                 if (ring.life < 0) continue;
-                ring.r += dt * 260;
-                const t = ring.life / 0.9;
+                ring.r += dt * 320;
+                const t = ring.life / 1.1;
                 if (t >= 1) { ripples.splice(i, 1); continue; }
-                ctx.globalAlpha = (1 - t) * 0.8;
-                ctx.strokeStyle = `hsl(${ring.hue}, 100%, 62%)`;
+                ctx.globalAlpha = Math.min(1, (1 - t) * 1.2);
+                ctx.strokeStyle = `hsl(${ring.hue}, 100%, 72%)`;
                 ctx.lineWidth = ring.width;
                 ctx.beginPath();
                 ctx.arc(ring.x, ring.y, Math.min(ring.r, ring.max), 0, Math.PI * 2);
