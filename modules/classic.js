@@ -1538,10 +1538,6 @@
         syncCaptureButton();
         $('retroPresetNext')?.addEventListener('click', () => chooseRandomPreset(true));
         $('retroFullscreen')?.addEventListener('click', toggleFullscreen);
-        $('retroVisualizerShell')?.addEventListener('dblclick', (event) => {
-            if (event.target?.closest?.('button, input, a, select')) return;
-            toggleFullscreen();
-        });
         $('retroVolume')?.addEventListener('input', (event) => {
             const mainVolume = $('volumeSlider');
             if (mainVolume) mainVolume.value = event.target.value;
@@ -1603,6 +1599,10 @@
             onMediaPlaying: connectCurrentMedia
         };
         window.toggleRetroMode = () => setRetroMode(!isRetro());
+        window.toggleRetroFullscreen = (event) => {
+            if (event?.target?.closest?.('button, input, a, select')) return;
+            toggleFullscreen();
+        };
         window.nextRetroPreset = () => chooseRandomPreset(true);
         // Diagnóstico del visualizador (tamaño real del buffer, preset y tiempos).
         window.nowarfyVisualizerDebug = () => {

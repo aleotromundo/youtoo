@@ -184,7 +184,7 @@
                                 <button type="button" id="retroFullscreen" title="Pantalla completa" aria-label="Pantalla completa"><i class="fas fa-expand" aria-hidden="true"></i></button>
                             </span>
                         </header>
-                        <div class="retro-visualizer-shell" id="retroVisualizerShell">
+                        <div class="retro-visualizer-shell" id="retroVisualizerShell" ondblclick="window.toggleRetroFullscreen?.(event)">
                             <div class="retro-art-wash" id="retroArtWash" aria-hidden="true"></div>
                             <canvas id="retroVisualizerCanvas" class="retro-visualizer-canvas" aria-label="Visualizador gráfico MilkDrop"></canvas>
                             <canvas id="retroFallbackCanvas" class="retro-fallback-canvas" hidden aria-hidden="true"></canvas>
