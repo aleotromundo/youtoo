@@ -109,7 +109,7 @@
     // pública que sí llega en el resultado para elegir una gramática musical
     // estable; el ritmo es una estimación, no un análisis del audio real.
     function detectAmbientProfile(song) {
-        const text = `${song?.title || ''} ${song?.artist || ''} ${song?.channelTitle || ''} ${song?.description || ''} ${song?.genre || ''}`.toLocaleLowerCase();
+        const text = `${song?.title || ''} ${song?.artist || ''} ${song?.channelTitle || ''} ${song?.description || ''} ${song?.genre || ''} ${song?._musicTags || ''}`.toLocaleLowerCase();
         const profiles = [
             { key: 'electronic', words: /electr(?:onic|ónica)|techno|house|trance|edm|dubstep|drum\s*[&+]?\s*bass|dnb|dance/, label: 'electrónica', bpm: 128, energy: .88, bass: .9, mid: .62, high: .74, hue: .72, swing: .04 },
             { key: 'rock', words: /rock|metal|punk|grunge|hardcore|metallica|nirvana|slipknot|foo\s*fighters|manowar/, label: 'rock', bpm: 142, energy: .86, bass: .84, mid: .78, high: .58, hue: .04, swing: .12 },
@@ -123,11 +123,34 @@
         return profiles.find((profile) => profile.words.test(text)) || profiles[profiles.length - 1];
     }
 
-    function applyAmbientProfile(song) {
+    // Etiquetas de género públicas en segundo plano: afinan el perfil cuando llegan.
+    const musicTagCache = new Map();
+    function fetchMusicTags(song) {
+        const key = String(song.url || song.title || '');
+        if (musicTagCache.has(key)) return musicTagCache.get(key);
+        const query = new URLSearchParams({ title: song.title || '', artist: song.artist || song.channelTitle || '' });
+        const request = fetch(`/api/music-tags?${query.toString()}`)
+            .then((response) => (response.ok ? response.json() : null))
+            .catch(() => null);
+        musicTagCache.set(key, request);
+        return request;
+    }
+
+    function enrichAmbientProfile(song) {
+        if (!song || String(song.type) !== 'yt' || song._musicTags !== undefined) return;
+        song._musicTags = '';
+        fetchMusicTags(song).then((data) => {
+            if (!data || !Array.isArray(data.genres) || !data.genres.length) return;
+            song._musicTags = data.genres.join(' ');
+            if (currentSong() === song) applyAmbientProfile(song, true);
+        });
+    }
+
+    function applyAmbientProfile(song, force) {
         if (!milkdropEngine || !song || String(song.type) !== 'yt') return;
         const profile = detectAmbientProfile(song);
         const key = `${song.url || song.title}:${profile.key}`;
-        if (key === ambientProfileKey) return;
+        if (key === ambientProfileKey && !force) return;
         ambientProfileKey = key;
         milkdropEngine.setAmbientProfile?.(profile);
         presetTitle(`Ambiente · ${profile.label} · ${profile.bpm} BPM estimado`);
@@ -1259,6 +1282,7 @@
             milkdropEngine?.attachAnalyser(null);
         }
         applyAmbientProfile(song);
+        enrichAmbientProfile(song);
         if (force && song && String(song.type) === 'yt') {
             const profile = detectAmbientProfile(song);
             setAudioState(`YouTube · perfil ${profile.label} · pulso de ${profile.bpm} BPM estimado`, 'warning');
