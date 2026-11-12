@@ -542,7 +542,8 @@
         const canvas = $('retroVisualizerCanvas');
         if (!canvas) return;
         const fallback = $('retroFallbackCanvas');
-        const host = $('retroVisualizerShell') || canvas.parentElement;
+        const fullscreenSurface = document.fullscreenElement === canvas || document.webkitFullscreenElement === canvas;
+        const host = fullscreenSurface ? canvas : ($('retroVisualizerShell') || canvas.parentElement);
         const rect = (host || canvas).getBoundingClientRect();
         if (!rect.width || !rect.height) return;
         const cssWidth = Math.max(1, Math.round(rect.width));
@@ -603,12 +604,16 @@
             try { const task = exit && exit.call(document); if (task && task.catch) task.catch(() => {}); } catch (_) {}
             return;
         }
-        const request = target.requestFullscreen || target.webkitRequestFullscreen;
+        // Pantalla completa limpia: solo el canvas, sin HUD ni controles del panel.
+        const canvas = $('retroVisualizerCanvas');
+        const fallback = $('retroFallbackCanvas');
+        const surface = canvas && !canvas.hidden ? canvas : (fallback && !fallback.hidden ? fallback : canvas);
+        const request = surface && (surface.requestFullscreen || surface.webkitRequestFullscreen);
         if (typeof request !== 'function') {
             setAudioState('Este navegador no permite pantalla completa.', 'warning');
             return;
         }
-        try { const task = request.call(target); if (task && task.catch) task.catch(() => {}); } catch (_) {}
+        try { const task = request.call(surface); if (task && task.catch) task.catch(() => {}); } catch (_) {}
     }
 
     function setFallbackMode(message) {

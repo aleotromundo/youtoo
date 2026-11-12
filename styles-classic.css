@@ -196,6 +196,18 @@ body.mode-classic .retro-studio { scroll-margin-top: 76px; }
 .retro-visualizer-canvas[hidden], .retro-fallback-canvas[hidden] { display: none; }
 .retro-visualizer-canvas { z-index: 2; }
 .retro-fallback-canvas { z-index: 2; }
+/* El modo fullscreen se aplica al canvas activo, no a toda la ventana retro. */
+.retro-visualizer-canvas:fullscreen,
+.retro-visualizer-canvas:-webkit-full-screen,
+.retro-fallback-canvas:fullscreen,
+.retro-fallback-canvas:-webkit-full-screen {
+    position: fixed;
+    z-index: 999999;
+    inset: 0;
+    width: 100vw;
+    height: 100vh;
+    background: #000;
+}
 .retro-art-wash {
     position: absolute;
     z-index: 1;
