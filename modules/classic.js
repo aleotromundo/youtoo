@@ -203,15 +203,21 @@
     }
 
     function stopMicrophoneFallback() {
+        const hadInput = Boolean(microphoneSource) && activeButterchurnInput === microphoneSource;
         try { microphoneSource?.disconnect(); } catch (_) {}
         try { microphoneAnalyser?.disconnect(); } catch (_) {}
         try { microphoneStream?.getTracks().forEach((track) => track.stop()); } catch (_) {}
+        const wasExternal = externalGraph && microphoneAnalyser && externalGraph.analyser === microphoneAnalyser;
         microphoneStream = null;
         microphoneSource = null;
         microphoneAnalyser = null;
+        if (wasExternal) externalGraph = null;
+        if (hadInput) disconnectButterchurnInput();
+        if (hadInput && butterchurn) connectButterchurnInput();
+        try { milkdropEngine?.attachAnalyser(activeGraph ? activeGraph.analyser : null); } catch (_) {}
     }
 
-    async function startMicrophoneFallback() {
+    async function startMicrophoneFallback(deviceId) {
         if (microphoneAnalyser) {
             setAudioState('Micrófono activo · señal reactiva', 'live');
             return true;
@@ -223,7 +229,13 @@
         try {
             const context = ensureAudioContext();
             if (!context) throw new Error('Web Audio no disponible');
-            microphoneStream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false } });
+            const audioConstraints = {
+                echoCancellation: false,
+                noiseSuppression: false,
+                autoGainControl: false
+            };
+            if (deviceId) audioConstraints.deviceId = { exact: deviceId };
+            microphoneStream = await navigator.mediaDevices.getUserMedia({ audio: audioConstraints });
             microphoneSource = context.createMediaStreamSource(microphoneStream);
             microphoneAnalyser = context.createAnalyser();
             microphoneAnalyser.fftSize = 2048;
@@ -233,9 +245,25 @@
             microphoneSource.connect(microphoneAnalyser);
             microphoneAnalyser.connect(silentGain);
             silentGain.connect(context.destination);
+            externalGraph = { analyser: microphoneAnalyser, frequencies: new Uint8Array(microphoneAnalyser.frequencyBinCount), external: true };
+            if (butterchurn) {
+                try {
+                    butterchurn.connectAudio(microphoneSource);
+                    activeButterchurnInput = microphoneSource;
+                } catch (error) {
+                    console.warn('[YouToo] No se pudo enrutar el micrófono al visualizador:', error);
+                }
+            }
             milkdropEngine?.attachAnalyser(microphoneAnalyser);
             if (context.state === 'suspended') await context.resume().catch(() => {});
-            setAudioState('Micrófono activo · señal reactiva', 'live');
+            // Guarda la preferencia del dispositivo.
+            try {
+                const track = microphoneStream.getAudioTracks()[0];
+                const settings = track && track.getSettings ? track.getSettings() : {};
+                const id = settings.deviceId || deviceId;
+                if (id) localStorage.setItem('nowarfy_mic_device', id);
+            } catch (_) {}
+            setAudioState('Micrófono / cable virtual activo · señal reactiva', 'live');
             return true;
         } catch (error) {
             stopMicrophoneFallback();
@@ -332,10 +360,71 @@
         }
     }
 
+    
+
+    
+
+    
+
+    async function triggerMicCapture() {
+        if (microphoneAnalyser) {
+            stopMicrophoneFallback();
+            if (captureAnalyser) syncCaptureButton();
+            setAudioState('Micrófono detenido · modo ambiente', 'warning');
+            syncMicButton();
+            return;
+        }
+        if (captureAnalyser) stopTabAudioCapture(true);
+        await populateMicDevices();
+        const select = $('retroMicDevice');
+        const deviceId = select ? select.value : '';
+        const ok = await startMicrophoneFallback(deviceId || undefined);
+        syncMicButton();
+        if (ok) {
+            const track = microphoneStream && microphoneStream.getAudioTracks()[0];
+            const label = track && track.label ? track.label : 'micrófono';
+            setAudioState('Micrófono activo (' + label + ') · señal reactiva', 'live');
+        }
+    }
+
+    function syncMicButton() {
+        const button = $('retroMicBtn');
+        if (!button) return;
+        const active = Boolean(microphoneAnalyser);
+        button.classList.toggle('is-active', active);
+        button.setAttribute('aria-pressed', String(active));
+        button.title = active ? 'Detener micrófono / cable virtual' : 'Usar micrófono o cable de audio virtual (VB-Cable)';
+    }
+
     async function captureBestSignal() {
+        if (microphoneAnalyser) { stopMicrophoneFallback(); syncMicButton(); }
         if (captureAnalyser) { stopTabAudioCapture(); return; }
         const ok = await startTabAudioCapture();
         if (!ok && !navigator.mediaDevices?.getDisplayMedia) void startMicrophoneFallback();
+    }
+    async function populateMicDevices() {
+        const select = $('retroMicDevice');
+        if (!select || !navigator.mediaDevices?.enumerateDevices) return;
+        let devices = [];
+        try { devices = await navigator.mediaDevices.enumerateDevices(); } catch (_) { devices = []; }
+        const audioInputs = devices.filter((d) => d.kind === 'audioinput');
+        select.innerHTML = '';
+        if (!audioInputs.length) {
+            const opt = document.createElement('option');
+            opt.value = '';
+            opt.textContent = 'Sin dispositivos';
+            select.appendChild(opt);
+            return;
+        }
+        const saved = (() => { try { return localStorage.getItem('nowarfy_mic_device') || ''; } catch (_) { return ''; } })();
+        audioInputs.forEach((device, index) => {
+            const opt = document.createElement('option');
+            opt.value = device.deviceId;
+            opt.textContent = device.label || ('Micrófono ' + (index + 1));
+            if (saved && device.deviceId === saved) opt.selected = true;
+            select.appendChild(opt);
+        });
+        select.hidden = false;
     }
 
     function syncCaptureButton() {
@@ -1548,6 +1637,15 @@
             if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); triggerCapture(); }
         });
         $('retroCaptureBtn')?.addEventListener('click', triggerCapture);
+        $('retroMicBtn')?.addEventListener('click', triggerMicCapture);
+        $('retroMicDevice')?.addEventListener('change', async (event) => {
+            if (microphoneAnalyser) {
+                stopMicrophoneFallback();
+                await startMicrophoneFallback(event.target.value || undefined);
+                syncMicButton();
+            }
+        });
+
         syncCaptureButton();
         $('retroPresetNext')?.addEventListener('click', () => chooseRandomPreset(true));
         $('retroFullscreen')?.addEventListener('click', toggleFullscreen);

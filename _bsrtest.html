@@ -1,0 +1,22 @@
+<!DOCTYPE html><html><head><meta charset='utf-8'></head><body>
+<script>
+(async function(){
+  const post=(l)=>{try{fetch('/report',{method:'POST',body:l});}catch(_){}};
+  const src = await (await fetch('/_wrapped.js')).text();
+  const inner = src.slice(src.indexOf('{\n')+2, src.lastIndexOf('\n}'));
+  const lines = inner.split('\n');
+  let lo=1, hi=lines.length;
+  while (lo < hi) {
+    const mid = Math.floor((lo+hi)/2);
+    const test = 'function __t() {\n' + lines.slice(0,mid).join('\n') + '\n}';
+    try { new Function(test); lo = mid+1; }
+    catch(e) { hi = mid; }
+  }
+  post('FIRSTFAIL at inner line ' + lo);
+  post('LINE :: ' + (lines[lo-1]||'').slice(0,200));
+  for (let i = Math.max(0, lo-4); i < Math.min(lines.length, lo+3); i++) {
+    post('CTX ' + (i+1) + ' :: ' + lines[i].slice(0,160));
+  }
+  post('END');
+})();
+</script></body></html>

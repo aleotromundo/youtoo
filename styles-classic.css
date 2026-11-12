@@ -501,3 +501,16 @@ body.mode-transitioning .retro-studio { animation: retro-console-arrive 3s cubic
     .retro-transition-fx.is-active .retro-fx-caption { animation-duration: .5s !important; }
     .retro-spectrum-bars i { transition: none; }
 }
+
+/* Selector de dispositivo de entrada (micrófono / cable virtual) */
+.retro-mic-device {
+    max-width: 110px;
+    height: 18px;
+    border: 1px solid #757b8b;
+    border-radius: 3px;
+    background: #181b23;
+    color: #d7dce8;
+    font-size: .58rem;
+    cursor: pointer;
+}
+.retro-mic-device[hidden] { display: none; }
