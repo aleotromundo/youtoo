@@ -7,6 +7,17 @@
     const LEGACY_PRESET_KEY = 'nowarfy_retro_eq_preset_v1';
     const TRANSITION_MS = 3000;
     const MAX_VISIBLE_TRACKS = 400;
+    // Cada preset se queda entre 45 s y 1 min 35 s antes de buscar otro.
+    const PRESET_DWELL_MIN = 45000;
+    const PRESET_DWELL_MAX = 95000;
+    const PRESET_HISTORY_MAX = 24;
+    // Un blend de MilkDrop ronda los 2-4 s; no se permite cortarlo antes.
+    const PRESET_BLEND_MIN = 3.0;
+    const PRESET_BLEND_MAX = 4.4;
+    // Más de 1.5x de densidad de píxeles no se nota y cuesta GPU en 4K.
+    const MAX_PIXEL_RATIO = 1.5;
+    // Tope de píxeles del buffer para sostener 60 fps en pantalla completa 4K.
+    const MAX_RENDER_PIXELS = 3200000;
 
     const $ = (id) => document.getElementById(id);
     const corsResults = new Map();
@@ -29,8 +40,15 @@
     let renderFrameId = 0;
     let renderWidth = 0;
     let renderHeight = 0;
+    let resizeFrame = 0;
     let lastUiSyncAt = 0;
     let lastPresetChangeAt = 0;
+    // Duración de cada preset: MilkDrop cambia cada 15 s por defecto, pero acá
+    // se deja respirar bastante más para que la escena no se sienta cortada.
+    let presetDwellMs = 0;
+    let blendUntil = 0;
+    let presetHistory = [];
+    let queuedPresetId = '';
     let lastAmbientMode = false;
     let transitionTimer = 0;
     let transitionLocked = false;
@@ -539,28 +557,97 @@
         return assetLoadPromise;
     }
 
+    function currentPixelRatio() {
+        const dpr = Number(window.devicePixelRatio) || 1;
+        // Cuartos de paso: evita reasignar el buffer por cambios mínimos del zoom.
+        return Math.min(MAX_PIXEL_RATIO, Math.max(1, Math.round(dpr * 4) / 4));
+    }
+
+    // Densidad efectiva: nunca supera el presupuesto de píxeles de la pantalla.
+    function renderPixelRatio(cssWidth, cssHeight) {
+        const base = currentPixelRatio();
+        const area = Math.max(1, cssWidth * cssHeight);
+        if (area * base * base <= MAX_RENDER_PIXELS) return base;
+        return Math.max(0.7, Math.sqrt(MAX_RENDER_PIXELS / area));
+    }
+
+    /*
+     * MilkDrop dibuja en un feedback buffer del tamaño exacto del lienzo. Todo
+     * el pipeline de Butterchurn trabaja en píxeles reales: canvas.width/height,
+     * texsize y el viewport de renderToScreen deben coincidir. Por eso se pasa
+     * el tamaño en píxeles del dispositivo y pixelRatio fijo en 1.
+     */
     function resizeVisualizer() {
         const canvas = $('retroVisualizerCanvas');
         if (!canvas) return;
-        const rect = canvas.getBoundingClientRect();
+        const fallback = $('retroFallbackCanvas');
+        const host = $('retroVisualizerShell') || canvas.parentElement;
+        const rect = (host || canvas).getBoundingClientRect();
         if (!rect.width || !rect.height) return;
-        const pixelRatio = Math.min(2, Math.max(1, Number(window.devicePixelRatio) || 1));
-        const width = Math.max(1, Math.round(rect.width * pixelRatio));
-        const height = Math.max(1, Math.round(rect.height * pixelRatio));
-        if (width === renderWidth && height === renderHeight) return;
+        const cssWidth = Math.max(1, Math.round(rect.width));
+        const cssHeight = Math.max(1, Math.round(rect.height));
+        const pixelRatio = renderPixelRatio(cssWidth, cssHeight);
+        const width = Math.round(cssWidth * pixelRatio);
+        const height = Math.round(cssHeight * pixelRatio);
+        const fallbackNeedsSize = Boolean(fallback && !fallback.hidden
+            && (fallback.width !== width || fallback.height !== height));
+        if (!fallbackNeedsSize && width === renderWidth && height === renderHeight
+            && canvas.width === width && canvas.height === height) return;
         renderWidth = width;
         renderHeight = height;
+        if (canvas.width !== width) canvas.width = width;
+        if (canvas.height !== height) canvas.height = height;
         if (butterchurn) {
-            try { butterchurn.setRendererSize(width, height); } catch (_) {}
+            try { butterchurn.setRendererSize(width, height, { pixelRatio: 1 }); } catch (_) {}
         } else if (milkdropEngine) {
             try { milkdropEngine.resize(); } catch (_) {}
-        } else {
-            const fallback = $('retroFallbackCanvas');
-            if (fallback) {
-                fallback.width = width;
-                fallback.height = height;
-            }
+        } else if (fallback && !fallback.hidden) {
+            fallback.width = width;
+            fallback.height = height;
         }
+    }
+
+    // Agrupa los avisos de resize/fullscreen en un solo cuadro.
+    function scheduleResize() {
+        if (resizeFrame) return;
+        resizeFrame = requestAnimationFrame(() => {
+            resizeFrame = 0;
+            resizeVisualizer();
+        });
+    }
+
+    // El DPR cambia al mover la ventana entre monitores o al hacer zoom.
+    function watchPixelRatio() {
+        if (!window.matchMedia) return;
+        try {
+            const query = window.matchMedia(`(resolution: ${window.devicePixelRatio || 1}dppx)`);
+            const onChange = () => {
+                resizeVisualizer();
+                watchPixelRatio();
+            };
+            if (query.addEventListener) query.addEventListener('change', onChange, { once: true });
+            else if (query.addListener) query.addListener(onChange);
+        } catch (_) {}
+    }
+
+    function isFullscreen() {
+        return Boolean(document.fullscreenElement || document.webkitFullscreenElement);
+    }
+
+    function toggleFullscreen() {
+        const target = $('retroVisualizerShell');
+        if (!target) return;
+        if (isFullscreen()) {
+            const exit = document.exitFullscreen || document.webkitExitFullscreen;
+            try { const task = exit && exit.call(document); if (task && task.catch) task.catch(() => {}); } catch (_) {}
+            return;
+        }
+        const request = target.requestFullscreen || target.webkitRequestFullscreen;
+        if (typeof request !== 'function') {
+            setAudioState('Este navegador no permite pantalla completa.', 'warning');
+            return;
+        }
+        try { const task = request.call(target); if (task && task.catch) task.catch(() => {}); } catch (_) {}
     }
 
     function setFallbackMode(message) {
@@ -586,6 +673,49 @@
         if (el) el.textContent = name || 'MilkDrop · esperando señal';
     }
 
+    function markPresetStarted(id, blend) {
+        const now = performance.now();
+        lastPresetChangeAt = now;
+        presetDwellMs = PRESET_DWELL_MIN + Math.random() * (PRESET_DWELL_MAX - PRESET_DWELL_MIN);
+        blendUntil = now + Math.max(1200, (Number(blend) || 0) * 1000);
+        if (id) {
+            presetHistory.push(id);
+            if (presetHistory.length > PRESET_HISTORY_MAX) presetHistory.shift();
+        }
+    }
+
+    // Prepara un preset cuando la página está inactiva, para no cortar frames.
+    function schedulePrefetch(id) {
+        if (!id || !presetLibrary) return;
+        const run = () => { void presetLibrary.get(id); };
+        if (window.requestIdleCallback) window.requestIdleCallback(run, { timeout: 6000 });
+        else window.setTimeout(run, 1600);
+    }
+
+    // Elige un preset evitando los últimos vistos, para que no se repitan seguido.
+    function pickNextPresetId() {
+        if (!presetLibrary) return '';
+        for (let attempt = 0; attempt < 10; attempt += 1) {
+            const id = presetLibrary.pickRandom(activePresetName);
+            if (id && !presetHistory.includes(id)) return id;
+        }
+        return presetLibrary.pickRandom(activePresetName) || '';
+    }
+
+    /*
+     * Toma el preset que quedó preparado al entrar al actual. Si ya no sirve
+     * (es el actual o se repitió hace poco) se descarta y se elige otro. La
+     * idea es que el próximo cambio no espere la conversión de un .milk.
+     */
+    function takeQueuedPresetId() {
+        const queued = queuedPresetId;
+        queuedPresetId = '';
+        if (!queued || queued === activePresetName) return '';
+        if (presetHistory.includes(queued)) return '';
+        if (presetLibrary && !presetLibrary.entry(queued)) return '';
+        return queued;
+    }
+
     async function switchPreset(nameOrId, transition) {
         if (!butterchurn || !nameOrId) return false;
         if (!presetCollection) presetCollection = Object.create(null);
@@ -597,18 +727,24 @@
             presetCollection[nameOrId] = preset;
         }
         try {
-            const blend = Number.isFinite(transition) ? transition : 2.6 + Math.random() * 1.6;
+            const blend = Number.isFinite(transition)
+                ? transition
+                : PRESET_BLEND_MIN + Math.random() * (PRESET_BLEND_MAX - PRESET_BLEND_MIN);
             butterchurn.loadPreset(preset, blend);
             activePresetName = nameOrId;
-            lastPresetChangeAt = performance.now();
+            markPresetStarted(nameOrId, blend);
             presetRetryGuard = 0;
             const info = presetLibrary ? presetLibrary.entry(nameOrId) : null;
             presetTitle(info ? `${info.name}${info.hlsl ? ' · MD2 (aprox.)' : ''}` : nameOrId);
             try { localStorage.setItem(VIZ_PRESET_KEY, nameOrId); } catch (_) {}
-            // Deja listo el siguiente preset para que el cambio no tenga pausas.
+            // Deja listo el siguiente preset (ya convertido) sin bloquear este cambio:
+            // así el próximo switch solo tiene que cargarlo en el shader.
             if (presetLibrary) {
-                const nextId = presetLibrary.pickRandom(nameOrId);
-                if (nextId) void presetLibrary.get(nextId);
+                const nextId = pickNextPresetId();
+                if (nextId) {
+                    queuedPresetId = nextId;
+                    schedulePrefetch(nextId);
+                }
             }
             return true;
         } catch (error) {
@@ -618,13 +754,16 @@
         }
     }
 
-    function chooseRandomPreset() {
+    function chooseRandomPreset(force) {
         if (milkdropEngine && typeof milkdropEngine.nextScene === 'function') {
             milkdropEngine.nextScene();
             return;
         }
         if (!butterchurn) return;
-        let target = presetLibrary ? presetLibrary.pickRandom(activePresetName) : '';
+        const now = performance.now();
+        if (!force && now < blendUntil) return;
+        let target = takeQueuedPresetId();
+        if (!target) target = pickNextPresetId();
         if (!target && presetNames.length) {
             const start = Math.floor(Math.random() * presetNames.length);
             for (let offset = 0; offset < presetNames.length; offset += 1) {
@@ -633,11 +772,10 @@
             }
         }
         if (!target) return;
-        if (loadUniquePreset(target, performance.now(), 0.52)) return;
         void switchPreset(target).then((ok) => {
             if (ok || presetRetryGuard >= 3) { presetRetryGuard = 0; return; }
             presetRetryGuard += 1;
-            setTimeout(chooseRandomPreset, 140);
+            setTimeout(() => chooseRandomPreset(force), 140);
         });
     }
 
@@ -708,7 +846,7 @@
         try {
             butterchurn.loadPreset(preset, transition);
             activePresetName = name;
-            lastPresetChangeAt = now;
+            markPresetStarted(name, transition);
             presetTitle(`✦ ${name} · variation ${musicDirector.variant}`);
             try { localStorage.setItem(VIZ_PRESET_KEY, name); } catch (_) {}
             return true;
@@ -726,17 +864,18 @@
         return total / Math.max(1, end - start) / 255;
     }
 
+    /*
+     * El beat ya no cambia de preset: solo "empuja" el cambio cuando el preset
+     * cumplió su tiempo mínimo. Así la imagen responde al ritmo (MilkDrop lee
+     * bass/mid/treb por su cuenta) sin que la escena dure tres segundos.
+     */
     function directPresetChange(now, intensity) {
         if (!butterchurn || presetNames.length < 2) return;
-        if (now - musicDirector.lastDecisionAt < 7600) return;
+        if (now < blendUntil) return;
+        if (now - lastPresetChangeAt < presetDwellMs) return;
+        if (now - musicDirector.lastDecisionAt < 12000) return;
         musicDirector.lastDecisionAt = now;
-        const jump = Math.max(1, Math.floor(intensity * presetNames.length * 0.22));
-        const current = Math.max(0, presetNames.indexOf(activePresetName));
-        const direction = musicDirector.high > musicDirector.low ? 1 : -1;
-        const target = presetNames[(current + direction * jump + presetNames.length * 2) % presetNames.length];
-        if (target && target !== activePresetName) {
-            if (!loadUniquePreset(target, now, intensity)) switchPreset(target);
-        }
+        chooseRandomPreset(true);
     }
 
     function updateMusicDirector(now) {
@@ -812,18 +951,26 @@
                 if (!core || typeof core.createVisualizer !== 'function') throw new Error('Butterchurn no disponible');
 
                 const rect = canvas.getBoundingClientRect();
-                const pixelRatio = Math.min(2, Math.max(1, Number(window.devicePixelRatio) || 1));
-                if (!renderWidth || !renderHeight) {
-                    renderWidth = Math.max(1, Math.round((rect.width || 640) * pixelRatio));
-                    renderHeight = Math.max(1, Math.round((rect.height || 360) * pixelRatio));
-                }
+                const cssWidth = Math.max(1, Math.round(rect.width || 640));
+                const cssHeight = Math.max(1, Math.round(rect.height || 360));
+                const pixelRatio = renderPixelRatio(cssWidth, cssHeight);
+                // Butterchurn renderiza a pantalla con viewport = width/height
+                // (sin multiplicar). Por eso se trabaja en píxeles reales y se
+                // deja pixelRatio en 1: cualquier otro valor duplicaba la escala.
+                const bufferWidth = Math.round(cssWidth * pixelRatio);
+                const bufferHeight = Math.round(cssHeight * pixelRatio);
 
                 butterchurn = core.createVisualizer(context, canvas, {
-                    width: renderWidth,
-                    height: renderHeight,
+                    width: bufferWidth,
+                    height: bufferHeight,
                     pixelRatio: 1,
                     textureRatio: 1
                 });
+                renderWidth = bufferWidth;
+                renderHeight = bufferHeight;
+                canvas.width = bufferWidth;
+                canvas.height = bufferHeight;
+                try { butterchurn.setRendererSize(bufferWidth, bufferHeight, { pixelRatio: 1 }); } catch (_) {}
                 setButterchurnMode();
                 presetTitle('MilkDrop · cargando presets…');
                 connectButterchurnInput();
@@ -834,7 +981,13 @@
                     try { stored = localStorage.getItem(VIZ_PRESET_KEY) || ''; } catch (_) {}
                     const startId = presetNames.includes(stored) ? stored : (library.pickRandom('', 'md1') || library.pickRandom());
                     if (startId) await switchPreset(startId, 0);
-                    void library.prefetch(4);
+                    // Si el primer preset elegido no convierte, se prueban otros.
+                    for (let attempt = 0; attempt < 3 && !activePresetName; attempt += 1) {
+                        const fallbackId = library.pickRandom('');
+                        if (fallbackId) await switchPreset(fallbackId, 0);
+                    }
+                    // El calentamiento de caché se deja para cuando no haya tráfico.
+                    window.setTimeout(() => { void library.prefetch(2); }, 9000);
                 } catch (error) {
                     console.warn('[YouToo] No se pudo cargar el pack real; se usan los presets incluidos:', error);
                     const bundled = window.butterchurnPresets && (window.butterchurnPresets.default || window.butterchurnPresets);
@@ -1339,7 +1492,12 @@
             updateSpectrum(now);
             drawFallback(now);
             if (now - lastUiSyncAt > 280) syncDeck(false);
-            if (butterchurn && presetNames.length > 1 && now - lastPresetChangeAt > 32000) chooseRandomPreset();
+            if (butterchurn && presetNames.length > 1
+                && now >= blendUntil
+                && now - lastPresetChangeAt > presetDwellMs) {
+                musicDirector.lastDecisionAt = now;
+                chooseRandomPreset(true);
+            }
         } catch (error) {
             console.warn('[YouToo] Falló un ciclo del visualizador:', error);
             try { setFallbackMode('Se activó el visualizador alternativo.'); } catch (_) {}
@@ -1391,19 +1549,11 @@
         });
         $('retroCaptureBtn')?.addEventListener('click', triggerCapture);
         syncCaptureButton();
-        $('retroPresetNext')?.addEventListener('click', chooseRandomPreset);
-        $('retroFullscreen')?.addEventListener('click', () => {
-            const target = $('retroVisualizerShell');
-            if (!target) return;
-            if (document.fullscreenElement) document.exitFullscreen?.().catch(() => {});
-            else target.requestFullscreen?.().catch(() => {});
-        });
+        $('retroPresetNext')?.addEventListener('click', () => chooseRandomPreset(true));
+        $('retroFullscreen')?.addEventListener('click', toggleFullscreen);
         $('retroVisualizerShell')?.addEventListener('dblclick', (event) => {
             if (event.target?.closest?.('button, input, a, select')) return;
-            const target = $('retroVisualizerShell');
-            if (!target) return;
-            if (document.fullscreenElement) document.exitFullscreen?.().catch(() => {});
-            else target.requestFullscreen?.().catch(() => {});
+            toggleFullscreen();
         });
         $('retroVolume')?.addEventListener('input', (event) => {
             const mainVolume = $('volumeSlider');
@@ -1440,11 +1590,24 @@
         document.addEventListener('visibilitychange', () => {
             if (!document.hidden && isRetro() && !renderFrameId) renderFrameId = requestAnimationFrame(renderLoop);
         });
-        window.addEventListener('resize', resizeVisualizer, { passive: true });
+        window.addEventListener('resize', scheduleResize, { passive: true });
+        window.addEventListener('orientationchange', scheduleResize, { passive: true });
+        // Al entrar o salir de pantalla completa el layout tarda un cuadro en
+        // estabilizarse: se recalcula ahora y un par de veces más.
+        ['fullscreenchange', 'webkitfullscreenchange'].forEach((name) => {
+            document.addEventListener(name, () => {
+                scheduleResize();
+                setTimeout(resizeVisualizer, 120);
+                setTimeout(resizeVisualizer, 420);
+            });
+        });
+        watchPixelRatio();
         if (window.ResizeObserver) {
-            const observer = new ResizeObserver(resizeVisualizer);
+            const observer = new ResizeObserver(scheduleResize);
             const shell = $('retroVisualizerShell');
             if (shell) observer.observe(shell);
+            const canvas = $('retroVisualizerCanvas');
+            if (canvas) observer.observe(canvas);
         }
 
         window.nowarfyAudioViz = {
@@ -1453,7 +1616,33 @@
             onMediaPlaying: connectCurrentMedia
         };
         window.toggleRetroMode = () => setRetroMode(!isRetro());
-        window.nextRetroPreset = chooseRandomPreset;
+        window.nextRetroPreset = () => chooseRandomPreset(true);
+        // Diagnóstico del visualizador (tamaño real del buffer, preset y tiempos).
+        window.nowarfyVisualizerDebug = () => {
+            const canvas = $('retroVisualizerCanvas');
+            const shell = $('retroVisualizerShell');
+            const canvasRect = canvas ? canvas.getBoundingClientRect() : null;
+            const shellRect = shell ? shell.getBoundingClientRect() : null;
+            return {
+                engine: butterchurn ? 'butterchurn' : (milkdropEngine ? 'generative' : 'none'),
+                preset: activePresetName,
+                presetTitle: $('retroPresetName') ? $('retroPresetName').textContent : '',
+                dwellMs: Math.round(presetDwellMs),
+                ageMs: Math.round(performance.now() - lastPresetChangeAt),
+                canvasWidth: canvas ? canvas.width : 0,
+                canvasHeight: canvas ? canvas.height : 0,
+                cssWidth: canvasRect ? Math.round(canvasRect.width) : 0,
+                cssHeight: canvasRect ? Math.round(canvasRect.height) : 0,
+                shellWidth: shellRect ? Math.round(shellRect.width) : 0,
+                shellHeight: shellRect ? Math.round(shellRect.height) : 0,
+                renderWidth,
+                renderHeight,
+                devicePixelRatio: window.devicePixelRatio || 1,
+                fullscreen: isFullscreen(),
+                presets: presetNames.length,
+                failedPresets: presetLibrary ? presetLibrary.stats().failed : 0
+            };
+        };
         window.previewRetroSeek = previewSeek;
         window.commitRetroSeek = commitRetroSeek;
         window.previewRetroVolume = (value) => {

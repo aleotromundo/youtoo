@@ -1,4 +1,4 @@
-const CACHE_NAME = 'nowarfy-shell-v58';
+const CACHE_NAME = 'nowarfy-shell-v59';
 const NAVIGATION_TIMEOUT_MS = 5000;
 // Recursos que se sirven desde caché al instante y se revalidan en segundo plano.
 const REVALIDATED_PATHS = new Set([
@@ -28,6 +28,7 @@ const APP_SHELL = [
   '/modules/lyrics-video.js',
   '/modules/player-pwa.js',
   '/modules/classic.js',
+  '/presets/converter-worker.js',
   '/manifest.webmanifest',
   '/favicon.ico',
   '/assets/favicon-32.png',

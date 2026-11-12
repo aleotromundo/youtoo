@@ -161,6 +161,27 @@ body.mode-classic .retro-studio { scroll-margin-top: 76px; }
     background: #020307;
     isolation: isolate;
 }
+/* Pantalla completa: el lienzo debe ocupar todo el viewport, sin bordes ni
+   márgenes heredados del panel, y con fondo negro puro (MilkDrop pinta encima). */
+.retro-visualizer-shell:fullscreen,
+.retro-visualizer-shell:-webkit-full-screen {
+    width: 100vw;
+    height: 100vh;
+    min-height: 0;
+    margin: 0;
+    border: 0;
+    background: #000;
+}
+.retro-visualizer-shell:fullscreen::before,
+.retro-visualizer-shell:-webkit-full-screen::before {
+    display: none;
+}
+.retro-visualizer-shell:fullscreen .retro-audio-state,
+.retro-visualizer-shell:-webkit-full-screen .retro-audio-state {
+    top: 14px;
+    left: 14px;
+    opacity: .92;
+}
 .retro-visualizer-shell::before {
     position: absolute;
     z-index: 4;

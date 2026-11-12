@@ -13,12 +13,18 @@
     const CONVERTER_URL = '/vendor/milkdrop-preset-converter-0.1.2.min.js';
     const IDB_NAME = 'nowarfy-milkdrop-presets';
     const IDB_STORE = 'converted';
-    const IDB_VERSION = 1;
+    const IDB_VERSION = 5;
 
     let manifest = null;
     let manifestPromise = null;
     let converterPromise = null;
     let dbPromise = null;
+
+    // Conversión fuera del hilo principal (ver presets/converter-worker.js).
+    let presetWorker = null;
+    let workerDisabled = false;
+    let workerSequence = 0;
+    const workerPending = new Map();
 
     const converted = new Map();   // id -> preset JSON listo para Butterchurn
     const inflight = new Map();    // id -> Promise en curso
@@ -53,7 +59,8 @@
             } catch (_) { resolve(null); return; }
             request.onupgradeneeded = () => {
                 const db = request.result;
-                if (!db.objectStoreNames.contains(IDB_STORE)) db.createObjectStore(IDB_STORE);
+                if (db.objectStoreNames.contains(IDB_STORE)) db.deleteObjectStore(IDB_STORE);
+                db.createObjectStore(IDB_STORE);
             };
             request.onsuccess = () => resolve(request.result);
             request.onerror = () => resolve(null);
@@ -105,6 +112,82 @@
         return converterPromise;
     }
 
+    function getPresetWorker() {
+        if (workerDisabled || typeof Worker === 'undefined') return null;
+        if (presetWorker) return presetWorker;
+        try {
+            presetWorker = new Worker('/presets/converter-worker.js');
+            presetWorker.onmessage = (event) => {
+                const data = event.data || {};
+                const pending = workerPending.get(data.id);
+                if (!pending) return;
+                workerPending.delete(data.id);
+                if (data.type === 'done') pending.resolve(data.preset);
+                else {
+                    const error = new Error(data.message || 'conversión fallida');
+                    if (data.fatal) error.workerFatal = true;
+                    pending.reject(error);
+                }
+            };
+            presetWorker.onerror = () => {
+                workerDisabled = true;
+                try { presetWorker.terminate(); } catch (_) {}
+                presetWorker = null;
+                workerPending.forEach((pending) => {
+                    const error = new Error('worker no disponible');
+                    error.workerFatal = true;
+                    pending.reject(error);
+                });
+                workerPending.clear();
+            };
+        } catch (_) {
+            workerDisabled = true;
+            presetWorker = null;
+        }
+        return presetWorker;
+    }
+
+    function convertInWorker(text) {
+        return new Promise((resolve, reject) => {
+            const worker = getPresetWorker();
+            if (!worker) {
+                const error = new Error('worker no disponible');
+                error.workerFatal = true;
+                reject(error);
+                return;
+            }
+            const id = ++workerSequence;
+            workerPending.set(id, { resolve, reject });
+            try {
+                worker.postMessage({ type: 'convert', id, text });
+            } catch (error) {
+                workerPending.delete(id);
+                error.workerFatal = true;
+                reject(error);
+            }
+        });
+    }
+
+    async function convertText(text) {
+        if (!workerDisabled) {
+            try {
+                return await convertInWorker(text);
+            } catch (error) {
+                // Si el worker no puede (no soportado, sin clonar el preset),
+                // se sigue en el hilo principal sin marcar el preset como roto.
+                if (!error || !error.workerFatal) throw error;
+                workerDisabled = true;
+            }
+        }
+        const api = await ensureConverter();
+        const fn = api.convertPreset || (api.default && api.default.convertPreset);
+        if (typeof fn !== 'function') throw new Error('convertPreset no disponible');
+        let preset = fn(text);
+        if (preset && typeof preset.then === 'function') preset = await preset;
+        if (!preset || typeof preset !== 'object') throw new Error('El conversor devolvió un preset inválido');
+        return preset;
+    }
+
     async function load() {
         if (manifest) return manifest;
         if (manifestPromise) return manifestPromise;
@@ -135,16 +218,128 @@
         return text;
     }
 
+    /*
+     * Normaliza el .milk antes de convertirlo. Dos patrones muy comunes en los
+     * presets originales rompen al compilador de EEL (filbert):
+     *
+     *  1. Ecuaciones partidas en varias líneas, donde la continuación empieza
+     *     con un operador:
+     *         wave_2_per_point4=xx = pow(sample,5)*t1 + ...
+     *         wave_2_per_point5=+ 10*sqr(sample)*... ;
+     *
+     *  2. Operadores unarios dentro de una llamada o paréntesis:
+     *         sin(+atan2(x4-x3,y4-y3) - asin(1)*2)
+     *     que se reescribe como sin(0+atan2(...) - ...).
+     *
+     * Ambas transformaciones son semánticamente neutras en EEL.
+     */
+    function normalizeSource(raw) {
+        const keyOf = (line) => {
+            const match = /^([A-Za-z0-9_]+)=(.*)$/.exec(line);
+            return match ? { key: match[1], value: match[2] } : null;
+        };
+        const family = (key) => key.replace(/_\d+$/, '');
+        // Solo se tocan ecuaciones EEL; el código HLSL de warp/comp se deja intacto.
+        // Además de per_frame/per_vertex/etc. también son EEL las ecuaciones de
+        // ondas (wave_N_init*, wave_N_per_point*) y formas (shape_N_*).
+        const isEquationKey = (key) => /(per_frame|per_vertex|per_pixel|per_point|wave_\d|shape_\d)/.test(key);
+
+        // 1) Une continuaciones con la ecuación anterior de la misma familia.
+        //    La ecuación se puede cortar después de un operador (termina en +)
+        //    o la continuación puede empezar con uno (=+ 10*...).
+        const merged = [];
+        for (const line of raw.split(/\r?\n/)) {
+            const current = keyOf(line);
+            if (current && merged.length) {
+                const previous = keyOf(merged[merged.length - 1]);
+                const sameFamily = previous && isEquationKey(previous.key) && isEquationKey(current.key)
+                    && family(previous.key) === family(current.key);
+                const openEnd = previous && /[+\-*\/,(]\s*$/.test(previous.value);
+                const startsWithOperator = /^[+\-*\/,]/.test(current.value.trim());
+                if (sameFamily && (openEnd || startsWithOperator)) {
+                    merged[merged.length - 1] = `${previous.key}=${previous.value} ${current.value.trim()}`;
+                    continue;
+                }
+            }
+            merged.push(line);
+        }
+
+        // 2) Signos consecutivos: "rad-+ang" → "rad-ang", "a--b" → "a+b".
+        let out = merged.join('\n').replace(/([+-])\s*([+-])/g,
+            (match, first, second) => (first === second ? '+' : '-'));
+
+        // 3) + / - unarios justo después de "(" o "," → 0+x / 0-x.
+        out = out.replace(/([(,])([ \t]*)([+-])(?=[A-Za-z0-9_.(])/g,
+            (match, prefix, space, sign) => `${prefix}${space}0${sign}`);
+
+        // 4) Asegura que cada ecuación termine en ";". Algunos presets dejan
+        //    expresiones sueltas (p. ej. "wave_1_init1=t") y el compilador de
+        //    Butterchurn concatena " return a;" justo después, lo que produce
+        //    "a['t'] return a;" (SyntaxError).
+        out = out.replace(/^([A-Za-z0-9_]+)=(.+)$/gm, (match, key, value) => {
+            if (!isEquationKey(key)) return match;
+            const trimmed = value.trimEnd();
+            if (!trimmed || trimmed.startsWith('//') || trimmed.endsWith(';')) return match;
+            return `${key}=${trimmed};`;
+        });
+
+        return out;
+    }
+    function ensureSemicolons(str) {
+        if (typeof str !== 'string') return str;
+        let out = str;
+        // Inserta ';' entre sentencias que quedaron pegadas (p. ej.
+        // "a['t'] a['p1']=..." -> "a['t']; a['p1']=...").
+        out = out.replace(/(\])(\s+)(a\[)/g, '$1;$2$3');
+        out = out.replace(/(\))(\s+)(a\[)/g, '$1;$2$3');
+        const t = out.trimEnd();
+        if (!t || t.endsWith(';')) return out;
+        return out + ';';
+    }
+
+    function fixPresetSemicolons(preset) {
+        if (!preset || typeof preset !== 'object') return preset;
+        for (const f of ['init_eqs_str', 'frame_eqs_str', 'pixel_eqs_str', 'vertex_eqs_str']) {
+            if (typeof preset[f] === 'string') preset[f] = ensureSemicolons(preset[f]);
+        }
+        if (Array.isArray(preset.shapes)) {
+            preset.shapes.forEach((sh) => {
+                for (const f of ['init_eqs_str', 'frame_eqs_str']) {
+                    if (typeof sh[f] === 'string') sh[f] = ensureSemicolons(sh[f]);
+                }
+            });
+        }
+        if (Array.isArray(preset.waves)) {
+            preset.waves.forEach((w) => {
+                for (const f of ['init_eqs_str', 'frame_eqs_str', 'point_eqs_str']) {
+                    if (typeof w[f] === 'string') w[f] = ensureSemicolons(w[f]);
+                }
+            });
+        }
+        return preset;
+    }
+
     async function convertEntry(entry) {
         const response = await fetch(entry.file, { cache: 'force-cache' });
         if (!response.ok) throw new Error(`HTTP ${response.status} al pedir ${entry.file}`);
-        const text = decodeLatin1(await response.arrayBuffer());
-        const api = await ensureConverter();
-        const fn = api.convertPreset || (api.default && api.default.convertPreset);
-        if (typeof fn !== 'function') throw new Error('convertPreset no disponible');
-        let preset = fn(text);
-        if (preset && typeof preset.then === 'function') preset = await preset;
-        if (!preset || typeof preset !== 'object') throw new Error('El conversor devolvió un preset inválido');
+        const raw = decodeLatin1(await response.arrayBuffer());
+
+        // Primero la versión normalizada; si el preset ya era válido, el texto
+        // original queda como red de seguridad.
+        const variants = [normalizeSource(raw), raw];
+        let preset = null;
+        let lastError = null;
+        for (let vi = 0; vi < variants.length; vi++) {
+            try {
+                preset = await convertText(variants[vi]);
+                break;
+            } catch (error) {
+                lastError = error;
+            }
+        }
+        if (!preset) throw lastError || new Error('El conversor devolvió un preset inválido');
+        fixPresetSemicolons(preset);
+        fixPresetSemicolons(preset);
         try {
             Object.defineProperty(preset, '__youtoo', {
                 value: {
