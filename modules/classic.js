@@ -1919,6 +1919,96 @@
             (x, y, s) => { for (let i = 0; i < 24 * s; i += 1) { const p = base(x, y, greenHue(), rnd(1.2, 2)); p.shape = 'plus'; p.vx = rnd(-160, 160); p.vy = rnd(-240, -80); p.g = 300; p.drag = 0.97; p.w = rnd(-6, 6); p.size = rnd(2, 3.5); add(p); } }
         ];
 
+        // Macaquito: cae desde el toque hasta el borde inferior y corre hacia un lado al azar.
+        const monkeys = [];
+        const spawnMonkey = (x, y) => {
+            monkeys.push({ x, y, vy: rnd(-60, 0), dir: 1, state: 'fall', life: 0, leg: 0, runFor: rnd(4, 6) });
+        };
+        const drawMonkey = (m) => {
+            const brown = '#8b5a2b';
+            const dark = '#5e3a1c';
+            const beige = '#f2cf98';
+            const legSwing = Math.sin(m.leg) * 6;
+            const armSwing = m.state === 'fall' ? Math.sin(m.life * 22) * 10 : -legSwing;
+            ctx.save();
+            ctx.translate(m.x, m.y);
+            ctx.scale(m.dir, 1);
+            ctx.lineCap = 'round';
+            ctx.strokeStyle = brown;
+            ctx.fillStyle = brown;
+            // Cola enroscada
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            ctx.moveTo(-8, -10);
+            ctx.quadraticCurveTo(-24, -6, -20, -20);
+            ctx.stroke();
+            // Piernas
+            ctx.lineWidth = 4;
+            ctx.beginPath();
+            ctx.moveTo(-3, -16); ctx.lineTo(-3 + legSwing, 0);
+            ctx.moveTo(3, -16); ctx.lineTo(3 - legSwing, 0);
+            ctx.stroke();
+            // Brazos
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            ctx.moveTo(-5, -32); ctx.lineTo(-10 - armSwing * 0.4, -22 + armSwing * 0.3);
+            ctx.moveTo(5, -32); ctx.lineTo(10 + armSwing * 0.4, -22 - armSwing * 0.3);
+            ctx.stroke();
+            // Cuerpo
+            ctx.beginPath();
+            ctx.ellipse(0, -24, 8, 11, 0, 0, Math.PI * 2);
+            ctx.fill();
+            // Cabeza y orejas
+            ctx.beginPath();
+            ctx.arc(1, -40, 10, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.fillStyle = dark;
+            ctx.beginPath();
+            ctx.arc(-8, -43, 3.6, 0, Math.PI * 2);
+            ctx.arc(9, -44, 3.6, 0, Math.PI * 2);
+            ctx.fill();
+            // Cara
+            ctx.fillStyle = beige;
+            ctx.beginPath();
+            ctx.ellipse(4, -37, 6.5, 5.5, 0, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.fillStyle = '#111';
+            ctx.beginPath();
+            ctx.arc(-1, -41, 1.5, 0, Math.PI * 2);
+            ctx.arc(5, -41, 1.5, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.strokeStyle = '#111';
+            ctx.lineWidth = 1.2;
+            ctx.beginPath();
+            ctx.arc(2, -34, 2, 0.2, Math.PI - 0.2);
+            ctx.stroke();
+            ctx.restore();
+        };
+        const updateMonkeys = (dt) => {
+            for (let i = monkeys.length - 1; i >= 0; i -= 1) {
+                const m = monkeys[i];
+                m.life += dt;
+                const ground = height - 6;
+                if (m.state === 'fall') {
+                    m.vy += 1100 * dt;
+                    m.y += m.vy * dt;
+                    if (m.y >= ground) {
+                        m.y = ground;
+                        m.state = 'run';
+                        m.dir = Math.random() < 0.5 ? -1 : 1;
+                        m.life = 0;
+                    }
+                } else {
+                    m.x += m.dir * 170 * dt;
+                    m.leg += dt * 16;
+                    if (m.life > m.runFor || m.x < -70 || m.x > width + 70) { monkeys.splice(i, 1); continue; }
+                }
+                // En el borde inferior siempre se ve entero.
+                m.y = Math.min(m.y, ground);
+                drawMonkey(m);
+            }
+        };
+
         const nextStyle = () => {
             if (!bag.length) {
                 bag = styles.map((_, index) => index);
@@ -2003,7 +2093,8 @@
             }
             ctx.globalAlpha = 1;
             ctx.globalCompositeOperation = 'source-over';
-            if (particles.length) frame = requestAnimationFrame(tick);
+            if (monkeys.length) updateMonkeys(dt);
+            if (particles.length || monkeys.length) frame = requestAnimationFrame(tick);
             else { frame = 0; ctx.clearRect(0, 0, width, height); }
         };
 
@@ -2023,6 +2114,8 @@
             down = true;
             const point = pointFrom(event);
             triggerStyle(point.x, point.y, 1);
+            // Algunos toques además dejan caer un macaquito.
+            if (Math.random() < 0.2) spawnMonkey(point.x, point.y);
             lastPoint = point;
             try { fx.setPointerCapture(event.pointerId); } catch (_) {}
             kick();
