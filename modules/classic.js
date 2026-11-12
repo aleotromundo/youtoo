@@ -1431,9 +1431,9 @@
             renderPlaylist();
             syncDeck(true);
             if (activeGraph) routeGraph(activeGraph);
-            // Retro Studio usa como renderer principal el motor WebGL2 propio:
-            // feedback persistente, escenas generativas y reacción multibanda.
-            void initGenerativeEngine();
+            // El modo retro usa Butterchurn para cargar la biblioteca real de
+            // presets MilkDrop, que contiene las 500+ visualizaciones.
+            void initButterchurn();
             const song = currentSong();
             if (song && song.url && String(song.type) !== 'yt') void prepareCurrentVisualizationTrack();
             if (!renderFrameId) renderFrameId = requestAnimationFrame(renderLoop);
@@ -1661,7 +1661,7 @@
                 setRetroMode(true, { initial: true });
                 const song = currentSong();
                 if (song && song.url && String(song.type) !== 'yt') void prepareCurrentVisualizationTrack();
-                void initGenerativeEngine();
+                void initButterchurn();
                 renderFrameId = requestAnimationFrame(renderLoop);
             }
         } catch (_) {}
