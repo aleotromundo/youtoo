@@ -62,6 +62,7 @@
     let vizLastPlayingAt = 0;
     let vizWatchdog = 0;
     let vizTrackKey = '';
+    let vizPlayingFlag = false;
     let vizTrackCardTimer = 0;
     let transitionTimer = 0;
     let transitionLocked = false;
@@ -1548,8 +1549,18 @@
 
     // Arranca el loop solo cuando hay reproducción; en pausa queda detenido.
     function ensureVisualizerLoop() {
+        // Detecta el paso de pausa a play (de cualquier duración) para mostrar la tarjeta.
+        const playing = vizIsPlaying();
+        if (playing && !vizPlayingFlag && isRetro()) {
+            const song = currentSong();
+            if (song) {
+                vizTrackKey = String(song.url || song.title || '');
+                showTrackCard(song);
+            }
+        }
+        vizPlayingFlag = playing;
         if (renderFrameId || !isRetro() || document.hidden) return;
-        if (!vizIsPlaying()) return;
+        if (!playing) return;
         vizLastFrameAt = performance.now();
         renderFrameId = requestAnimationFrame(renderLoop);
     }
@@ -1577,10 +1588,10 @@
             lastPresetChangeAt += gap - 16;
             blendUntil += gap - 16;
         }
-        // Título y artista al dar play, al reanudar o al cambiar de pista.
+        // Cambio de pista mientras suena (play y reanudar los maneja ensureVisualizerLoop).
         const song = currentSong();
         const trackKey = song ? String(song.url || song.title || '') : '';
-        if (song && (gap > 250 || trackKey !== vizTrackKey)) {
+        if (song && trackKey !== vizTrackKey) {
             vizTrackKey = trackKey;
             showTrackCard(song);
         }
