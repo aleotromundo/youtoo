@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>alltest-pending</title>
+<style>html,body{margin:0;background:#000}canvas{display:block}</style>
+</head>
+<body>
+<canvas id="c" width="320" height="180"></canvas>
+<script src="/vendor/butterchurn-2.6.7.min.js"></script>
+<script src="/vendor/milkdrop-preset-converter-0.1.2.min.js"></script>
+<script>
+(async function () {
+  const post = (line) => { try { fetch('/report', { method: 'POST', body: line }); } catch (_) {} };
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  post('ALLTEST start');
+  try {
+    const man = await (await fetch('/presets/manifest.json')).json();
+    const AC = window.AudioContext || window.webkitAudioContext;
+    const ctx = new AC();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    const analyser = ctx.createAnalyser();
+    analyser.fftSize = 1024;
+    osc.frequency.value = 130;
+    gain.gain.value = 0.05;
+    osc.connect(gain); gain.connect(analyser);
+    osc.start();
+    ctx.resume().catch(() => {});
+
+    const BC = window.butterchurn.createVisualizer ? window.butterchurn : window.butterchurn.default;
+    const canvas = document.getElementById('c');
+    const viz = BC.createVisualizer(ctx, canvas, { width: 320, height: 180, pixelRatio: 1 });
+    viz.connectAudio(analyser);
+    const conv = window.milkdropPresetConverter;
+
+    const failures = [];
+    let ok = 0;
+    const started = Date.now();
+    const from = Math.max(0, Number(new URLSearchParams(location.search).get('from')) || 0);
+    for (let index = from; index < man.presets.length; index += 1) {
+      const entry = man.presets[index];
+      const t0 = performance.now();
+      try {
+        const resp = await fetch(entry.file);
+        if (!resp.ok) throw new Error('HTTP ' + resp.status);
+        const bytes = new Uint8Array(await resp.arrayBuffer());
+        let text = '';
+        for (let i = 0; i < bytes.length; i += 8192) text += String.fromCharCode.apply(null, bytes.subarray(i, i + 8192));
+        let preset = conv.convertPreset(text);
+        if (preset && typeof preset.then === 'function') preset = await preset;
+        if (!preset || !Object.keys(preset).length) throw new Error('conversión vacía');
+        viz.loadPreset(preset, 0);
+        viz.render(); viz.render();
+        ok += 1;
+      } catch (error) {
+        const line = entry.id + ' :: ' + entry.name + ' :: ' + (error && error.message);
+        failures.push(line);
+        post('FAILED ' + line);
+      }
+      if ((index + 1) % 40 === 0) post('ALLTEST ' + (index + 1) + '/' + man.presets.length + ' ok=' + ok + ' fail=' + failures.length + ' (' + Math.round((Date.now() - started) / 1000) + 's)');
+      if (index % 12 === 0) await sleep(0);
+    }
+    post('ALLTEST DONE total=' + man.presets.length + ' ok=' + ok + ' fail=' + failures.length + ' seg=' + Math.round((Date.now() - started) / 1000));
+    failures.forEach((line) => post('FAILED ' + line));
+    document.title = 'DONE ok=' + ok + ' fail=' + failures.length;
+  } catch (error) {
+    post('ALLTEST FATAL ' + (error && error.message));
+  }
+})();
+</script>
+</body>
+</html>

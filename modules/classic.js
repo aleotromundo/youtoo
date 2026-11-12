@@ -21,6 +21,8 @@
     let presetLibrary = null;
     let presetLibraryPromise = null;
     let visualizerInitPromise = null;
+    let presetRetryGuard = 0;
+    let renderFailures = 0;
     let activePresetName = '';
     let activeButterchurnInput = null;
     let assetLoadPromise = null;
@@ -38,6 +40,12 @@
     let microphoneStream = null;
     let microphoneSource = null;
     let microphoneAnalyser = null;
+    // Captura del audio de la pestaña: única vía para analizar YouTube u otros iframes.
+    let captureStream = null;
+    let captureSource = null;
+    let captureAnalyser = null;
+    let captureFrequencies = null;
+    let externalGraph = null;
     const musicDirector = {
         low: 0,
         mid: 0,
@@ -217,6 +225,115 @@
             setAudioState('No se pudo activar el micrófono; revisá el permiso del navegador.', 'warning');
             return false;
         }
+    }
+
+    function stopTabAudioCapture(silent) {
+        const hadInput = Boolean(captureSource) && activeButterchurnInput === captureSource;
+        try { captureSource?.disconnect(); } catch (_) {}
+        try { captureAnalyser?.disconnect(); } catch (_) {}
+        try { captureStream?.getTracks().forEach((track) => track.stop()); } catch (_) {}
+        captureStream = null;
+        captureSource = null;
+        captureAnalyser = null;
+        captureFrequencies = null;
+        externalGraph = null;
+        if (hadInput) disconnectButterchurnInput();
+        try { milkdropEngine?.attachAnalyser(activeGraph ? activeGraph.analyser : null); } catch (_) {}
+        if (hadInput && butterchurn) connectButterchurnInput();
+        syncCaptureButton();
+        if (!silent) setAudioState('Captura detenida · modo ambiente', 'warning');
+    }
+
+    /**
+     * Captura el audio de la pestaña con getDisplayMedia. Es la única forma de
+     * analizar el sonido de un iframe de YouTube: el navegador entrega la mezcla
+     * de salida de la pestaña como un MediaStream que sí pasa por Web Audio.
+     */
+    async function startTabAudioCapture() {
+        if (captureAnalyser) {
+            setAudioState('Audio de la pestaña capturado · visualizador reactivo', 'live');
+            return true;
+        }
+        if (!navigator.mediaDevices?.getDisplayMedia) {
+            setAudioState('Este navegador no permite capturar el audio de la pestaña.', 'warning');
+            return false;
+        }
+        let stream = null;
+        try {
+            const context = ensureAudioContext();
+            if (!context) throw new Error('Web Audio no disponible');
+            stream = await navigator.mediaDevices.getDisplayMedia({
+                video: true,
+                audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false },
+                preferCurrentTab: true,
+                selfBrowserSurface: 'include',
+                surfaceSwitching: 'exclude',
+                systemAudio: 'include'
+            });
+            const audioTracks = stream.getAudioTracks();
+            if (!audioTracks.length) {
+                try { stream.getTracks().forEach((track) => track.stop()); } catch (_) {}
+                setAudioState('Falta activar "Compartir audio" al elegir la pestaña.', 'warning');
+                return false;
+            }
+            captureStream = stream;
+            captureSource = context.createMediaStreamSource(stream);
+            captureAnalyser = context.createAnalyser();
+            captureAnalyser.fftSize = 2048;
+            captureAnalyser.smoothingTimeConstant = 0.62;
+            captureFrequencies = new Uint8Array(captureAnalyser.frequencyBinCount);
+            captureSource.connect(captureAnalyser);
+            externalGraph = { analyser: captureAnalyser, frequencies: captureFrequencies, external: true };
+            if (butterchurn) {
+                try {
+                    butterchurn.connectAudio(captureSource);
+                    activeButterchurnInput = captureSource;
+                } catch (error) {
+                    console.warn('[YouToo] No se pudo enrutar la captura al visualizador:', error);
+                }
+            }
+            try { milkdropEngine?.attachAnalyser(captureAnalyser); } catch (_) {}
+            audioTracks.forEach((track) => {
+                track.addEventListener('ended', () => {
+                    stopTabAudioCapture(true);
+                    setAudioState('La captura terminó · modo ambiente', 'warning');
+                });
+            });
+            if (context.state === 'suspended') await context.resume().catch(() => {});
+            syncCaptureButton();
+            setAudioState('Audio de la pestaña capturado · visualizador reactivo', 'live');
+            return true;
+        } catch (error) {
+            try { stream?.getTracks().forEach((track) => track.stop()); } catch (_) {}
+            console.warn('[YouToo] No se pudo capturar el audio de la pestaña:', error);
+            const cancelled = error && (error.name === 'NotAllowedError' || error.name === 'AbortError');
+            setAudioState(cancelled
+                ? 'Captura cancelada · el visualizador sigue en modo ambiente'
+                : 'No se pudo capturar el audio de la pestaña.', 'warning');
+            return false;
+        }
+    }
+
+    async function captureBestSignal() {
+        if (captureAnalyser) { stopTabAudioCapture(); return; }
+        const ok = await startTabAudioCapture();
+        if (!ok && !navigator.mediaDevices?.getDisplayMedia) void startMicrophoneFallback();
+    }
+
+    function syncCaptureButton() {
+        const button = $('retroCaptureBtn');
+        if (!button) return;
+        const active = Boolean(captureAnalyser);
+        button.classList.toggle('is-active', active);
+        button.setAttribute('aria-pressed', String(active));
+        button.title = active ? 'Detener la captura de audio' : 'Capturar el audio de esta pestaña (YouTube, iframes)';
+    }
+
+    // Grafo de análisis efectivo: audio directo del reproductor o captura de pestaña.
+    function analysisGraph() {
+        const song = currentSong();
+        if (activeGraph && song && String(song.type) !== 'yt') return activeGraph;
+        return externalGraph;
     }
 
     async function prepareMediaLoad(media, url) {
@@ -480,15 +597,23 @@
             presetCollection[nameOrId] = preset;
         }
         try {
-            butterchurn.loadPreset(preset, Number.isFinite(transition) ? transition : 3.0);
+            const blend = Number.isFinite(transition) ? transition : 2.6 + Math.random() * 1.6;
+            butterchurn.loadPreset(preset, blend);
             activePresetName = nameOrId;
             lastPresetChangeAt = performance.now();
+            presetRetryGuard = 0;
             const info = presetLibrary ? presetLibrary.entry(nameOrId) : null;
             presetTitle(info ? `${info.name}${info.hlsl ? ' · MD2 (aprox.)' : ''}` : nameOrId);
             try { localStorage.setItem(VIZ_PRESET_KEY, nameOrId); } catch (_) {}
+            // Deja listo el siguiente preset para que el cambio no tenga pausas.
+            if (presetLibrary) {
+                const nextId = presetLibrary.pickRandom(nameOrId);
+                if (nextId) void presetLibrary.get(nextId);
+            }
             return true;
         } catch (error) {
             console.warn('[YouToo] Preset MilkDrop no compatible:', nameOrId, error);
+            if (presetLibrary) presetLibrary.markBroken(nameOrId, error && error.message);
             return false;
         }
     }
@@ -508,7 +633,12 @@
             }
         }
         if (!target) return;
-        if (!loadUniquePreset(target, performance.now(), 0.52)) void switchPreset(target);
+        if (loadUniquePreset(target, performance.now(), 0.52)) return;
+        void switchPreset(target).then((ok) => {
+            if (ok || presetRetryGuard >= 3) { presetRetryGuard = 0; return; }
+            presetRetryGuard += 1;
+            setTimeout(chooseRandomPreset, 140);
+        });
     }
 
     function copyPreset(preset) {
@@ -610,8 +740,7 @@
     }
 
     function updateMusicDirector(now) {
-        const song = currentSong();
-        const graph = activeGraph && song && String(song.type) !== 'yt' ? activeGraph : null;
+        const graph = analysisGraph();
         if (!graph || !graph.frequencies) return;
         const frequencies = graph.frequencies;
         const rawLow = readBand(frequencies, 0.005, 0.085);
@@ -656,10 +785,12 @@
     }
 
     function connectButterchurnInput() {
-        if (!butterchurn || !activeGraph) return;
+        if (!butterchurn) return;
+        const input = captureSource || (activeGraph && activeGraph.source);
+        if (!input) return;
         try {
-            butterchurn.connectAudio(activeGraph.source);
-            activeButterchurnInput = activeGraph.source;
+            butterchurn.connectAudio(input);
+            activeButterchurnInput = input;
         } catch (error) {
             console.warn('[YouToo] No se pudo conectar la señal de audio al visualizador:', error);
         }
@@ -794,7 +925,7 @@
     }
 
     function disableGraphAnalysis(graph, error) {
-        if (!graph) return;
+        if (!graph || graph.external) return;
         graph.analysisUnavailable = true;
         try { graph.source.disconnect(graph.analyser); } catch (_) {}
         try { graph.analyser.disconnect(); } catch (_) {}
@@ -810,9 +941,7 @@
         const bars = $('retroSpectrumBars');
         if (!bars) return;
         const children = bars.children;
-        const song = currentSong();
-        const useAmbient = !activeGraph || !song || String(song.type) === 'yt' || lastAmbientMode;
-        const graph = activeGraph && !useAmbient ? activeGraph : null;
+        const graph = analysisGraph();
         let frequency = graph ? graph.frequencies : null;
         if (frequency) {
             try { graph.analyser.getByteFrequencyData(frequency); }
@@ -861,7 +990,7 @@
             ctx.restore();
         }
         const song = currentSong();
-        let graph = activeGraph && song && String(song.type) !== 'yt' ? activeGraph : null;
+        let graph = analysisGraph();
         if (graph) {
             try { graph.analyser.getByteFrequencyData(graph.frequencies); }
             catch (error) {
@@ -979,8 +1108,13 @@
         const status = $('retroAudioState');
         if (status) {
             const youtube = song && String(song.type) === 'yt';
-            if (youtube) {
-                status.textContent = 'Modo ambiente · YouTube no expone su señal de audio al visualizador';
+            const capturing = Boolean(captureAnalyser);
+            if (capturing) {
+                status.textContent = 'Audio de la pestaña · visualizador reactivo';
+                status.dataset.state = 'live';
+                lastAmbientMode = false;
+            } else if (youtube) {
+                status.textContent = 'YouTube · tocá acá para capturar el audio de la pestaña';
                 status.dataset.state = 'warning';
                 lastAmbientMode = true;
                 disconnectButterchurnInput();
@@ -1180,11 +1314,18 @@
         try {
             updateMusicDirector(now);
             if (butterchurn) {
-                try { butterchurn.render(); }
+                try { butterchurn.render(); renderFailures = 0; }
                 catch (error) {
-                    console.warn('[YouToo] Falló el render MilkDrop:', error);
-                    butterchurn = null;
-                    void initGenerativeEngine();
+                    renderFailures += 1;
+                    console.warn('[YouToo] Falló el render MilkDrop (' + renderFailures + '):', error);
+                    if (presetLibrary) presetLibrary.markBroken(activePresetName, 'render');
+                    if (renderFailures <= 3 && presetNames.length) {
+                        const nextId = presetLibrary ? presetLibrary.pickRandom(activePresetName) : '';
+                        if (nextId) void switchPreset(nextId);
+                    } else {
+                        butterchurn = null;
+                        void initGenerativeEngine();
+                    }
                 }
             } else if (milkdropEngine) {
                 try { milkdropEngine.render(now); }
@@ -1241,12 +1382,15 @@
         }, { passive: true });
 
         $('retroModeToggle').addEventListener('click', () => setRetroMode(!isRetro()));
-        $('retroAudioState')?.addEventListener('click', () => { void startMicrophoneFallback(); });
+        const triggerCapture = () => { void captureBestSignal(); };
+        $('retroAudioState')?.addEventListener('click', triggerCapture);
         $('retroAudioState')?.setAttribute('role', 'button');
         $('retroAudioState')?.setAttribute('tabindex', '0');
         $('retroAudioState')?.addEventListener('keydown', (event) => {
-            if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); void startMicrophoneFallback(); }
+            if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); triggerCapture(); }
         });
+        $('retroCaptureBtn')?.addEventListener('click', triggerCapture);
+        syncCaptureButton();
         $('retroPresetNext')?.addEventListener('click', chooseRandomPreset);
         $('retroFullscreen')?.addEventListener('click', () => {
             const target = $('retroVisualizerShell');

@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="es">
+<head><meta charset="utf-8"><title>audio-test</title>
+<style>html,body{margin:0;background:#000}canvas{display:block}</style></head>
+<body>
+<canvas id="c" width="480" height="270"></canvas>
+<script src="/vendor/butterchurn-2.6.7.min.js"></script>
+<script src="/vendor/milkdrop-preset-converter-0.1.2.min.js"></script>
+<script>
+(async function () {
+  const post = (line) => { try { fetch('/report', { method: 'POST', body: line }); } catch (_) {} };
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  try {
+    const man = await (await fetch('/presets/manifest.json')).json();
+    const id = new URLSearchParams(location.search).get('id') || 'p0023';
+    const entry = man.presets.find((p) => p.id === id) || man.presets[0];
+    const bytes = new Uint8Array(await (await fetch(entry.file)).arrayBuffer());
+    let text = '';
+    for (let i = 0; i < bytes.length; i += 8192) text += String.fromCharCode.apply(null, bytes.subarray(i, i + 8192));
+    let preset = window.milkdropPresetConverter.convertPreset(text);
+    if (preset && typeof preset.then === 'function') preset = await preset;
+
+    const AC = window.AudioContext || window.webkitAudioContext;
+    const ctx = new AC();
+    const analyser = ctx.createAnalyser();
+    analyser.fftSize = 1024;
+    // Mezcla de graves + medios: sin destinos audibles, solo señal para el analizador.
+    const bus = ctx.createGain();
+    bus.gain.value = 0;
+    bus.connect(analyser);
+    [55, 110, 220, 440].forEach((freq, i) => {
+      const osc = ctx.createOscillator();
+      const g = ctx.createGain();
+      osc.frequency.value = freq;
+      g.gain.value = 0.35 / (i + 1);
+      osc.connect(g); g.connect(bus); osc.start();
+    });
+    ctx.resume().catch(() => {});
+
+    const BC = window.butterchurn.createVisualizer ? window.butterchurn : window.butterchurn.default;
+    const canvas = document.getElementById('c');
+    const viz = BC.createVisualizer(ctx, canvas, { width: 480, height: 270, pixelRatio: 1 });
+    viz.connectAudio(analyser);
+    viz.loadPreset(preset, 0);
+
+    const probe = document.createElement('canvas');
+    probe.width = 120; probe.height = 68;
+    const pctx = probe.getContext('2d');
+
+    function sample() {
+      pctx.clearRect(0, 0, probe.width, probe.height);
+      pctx.drawImage(canvas, 0, 0, probe.width, probe.height);
+      const px = pctx.getImageData(0, 0, probe.width, probe.height).data;
+      let sum = 0;
+      let hash = 0;
+      for (let i = 0; i < px.length; i += 4) {
+        sum += px[i] + px[i + 1] + px[i + 2];
+        hash = (hash * 31 + px[i] * 7 + px[i + 1] * 3 + px[i + 2]) >>> 0;
+      }
+      return { mean: sum / (px.length / 4) / 3, hash };
+    }
+
+    async function run(frames) {
+      let last = null;
+      for (let i = 0; i < frames; i += 1) { viz.render(); last = sample(); await sleep(16); }
+      return last;
+    }
+
+    const silA = await run(45);
+    bus.gain.value = 0.9;
+    const loudA = await run(45);
+    const diff = Math.abs(loudA.mean - silA.mean);
+    const moved = silA.hash !== loudA.hash;
+    post('AUDIOTEST ' + entry.id + ' ' + entry.name + ' | silencio_mean=' + silA.mean.toFixed(2) +
+         ' tono_mean=' + loudA.mean.toFixed(2) + ' delta=' + diff.toFixed(2) + ' cambio=' + moved +
+         ' | hlsl=' + entry.hlsl);
+    post('AUDIOTEST END');
+  } catch (error) {
+    post('AUDIOTEST FAIL ' + (error && error.message));
+  }
+})();
+</script>
+</body>
+</html>

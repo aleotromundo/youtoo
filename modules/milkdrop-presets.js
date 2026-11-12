@@ -194,6 +194,11 @@
         return converted.get(id) || null;
     }
 
+    // Marca un preset como no utilizable (conversión o render fallido) para saltarlo.
+    function markBroken(id, reason) {
+        if (id) failed.set(id, new Error(reason || 'preset descartado'));
+    }
+
     function entries() {
         return manifest && Array.isArray(manifest.presets) ? manifest.presets : [];
     }
@@ -257,6 +262,7 @@
         load,
         get,
         peek,
+        markBroken,
         ids,
         label,
         entry,
