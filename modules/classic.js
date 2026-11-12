@@ -1146,7 +1146,12 @@
         const children = bars.children;
         const graph = analysisGraph();
         let frequency = graph ? graph.frequencies : null;
-        if (frequency) {
+        // Sin análisis real (YouTube): las barras siguen al pulso simulado.
+        if (!frequency && synth && synth.analyser) {
+            frequency = synth.freq;
+            try { synth.analyser.getByteFrequencyData(frequency); } catch (_) { frequency = null; }
+        }
+        if (frequency && graph) {
             try { graph.analyser.getByteFrequencyData(frequency); }
             catch (error) {
                 disableGraphAnalysis(graph, error);
@@ -1535,6 +1540,7 @@
         try { if (butterchurn && activeButterchurnInput === current.bus) butterchurn.disconnectAudio(current.bus); } catch (_) {}
         if (activeButterchurnInput === current.bus) activeButterchurnInput = null;
         current.sources.forEach((node) => { try { node.stop?.(); } catch (_) {} try { node.disconnect(); } catch (_) {} });
+        try { current.analyser.disconnect(); } catch (_) {}
         try { current.bus.disconnect(); } catch (_) {}
     }
 
@@ -1548,6 +1554,11 @@
         const swing = Math.max(0, Math.min(0.3, Number(profile.swing) || 0));
         const bus = ctx.createGain();
         bus.gain.value = 1;
+        // Mismo análisis que el ecualizador real: el espectro sale de esta señal.
+        const analyser = ctx.createAnalyser();
+        analyser.fftSize = 512;
+        analyser.smoothingTimeConstant = 0.72;
+        bus.connect(analyser);
 
         const kick = ctx.createOscillator();
         kick.type = 'sine';
@@ -1614,7 +1625,7 @@
         };
         schedule();
         const timer = window.setInterval(schedule, 50);
-        synth = { bpm: profile.bpm, bus, timer, sources: [kick, noise] };
+        synth = { bpm: profile.bpm, bus, analyser, freq: new Uint8Array(analyser.frequencyBinCount), timer, sources: [kick, noise] };
         try {
             butterchurn.connectAudio(bus);
             activeButterchurnInput = bus;
