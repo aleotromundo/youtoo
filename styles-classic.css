@@ -176,8 +176,8 @@ body.mode-classic .retro-studio { scroll-margin-top: 76px; }
 .retro-visualizer-shell:-webkit-full-screen::before {
     display: none;
 }
-.retro-visualizer-shell:fullscreen > *:not(.retro-visualizer-canvas):not(.retro-fallback-canvas),
-.retro-visualizer-shell:-webkit-full-screen > *:not(.retro-visualizer-canvas):not(.retro-fallback-canvas) {
+.retro-visualizer-shell:fullscreen > *:not(.retro-visualizer-canvas):not(.retro-fallback-canvas):not(.retro-track-card),
+.retro-visualizer-shell:-webkit-full-screen > *:not(.retro-visualizer-canvas):not(.retro-fallback-canvas):not(.retro-track-card) {
     display: none !important;
 }
 .retro-visualizer-shell:fullscreen .retro-visualizer-canvas:not([hidden]),
