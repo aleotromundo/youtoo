@@ -11,6 +11,9 @@
         'player-pwa.js',
         'classic.js'
     ];
+    // Versionado explícito para que una PWA o un Service Worker no reutilice
+    // un módulo retro anterior después de un despliegue.
+    const ASSET_VERSION = '20261112-1137';
     const base = '/modules/';
     const loader = document.getElementById('loader');
     const message = document.getElementById('loaderMessage');
@@ -47,7 +50,7 @@
             };
         };
         const loadTimeout = window.setTimeout(fail, 20000);
-        script.src = `${base}${modules[index]}`;
+        script.src = `${base}${modules[index]}?v=${ASSET_VERSION}`;
         script.onload = () => {
             window.clearTimeout(loadTimeout);
             if (!failed) loadNext(index + 1);
