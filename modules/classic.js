@@ -1889,160 +1889,35 @@
         const rnd = (a, b) => a + Math.random() * (b - a);
         const greenHue = () => (Math.random() < 0.72 ? rnd(95, 155) : rnd(38, 56));
         const add = (p) => { if (particles.length < MAX_PARTICLES) particles.push(p); };
-        const base = (x, y, hue, life) => ({ x, y, vx: 0, vy: 0, g: 0, drag: 1, life: 0, max: life, size: 1.2 + Math.random() * 2, hue, shape: 'dot', spin: 0, w: 0, wobble: 0, wf: 0, orbit: null });
+        const base = (x, y, hue, life) => ({ x, y, vx: 0, vy: 0, g: 0, drag: 1, life: 0, max: life, size: 1.2 + Math.random() * 2, hue, shape: 'dot', spin: 0, w: 0, wobble: 0, wf: 0, wamp: 36, orbit: null, bounce: 0, hue2: null, grow: 0, fade: 1, twinkle: 0, points: null });
 
         // 12 estilos. Cada uno recibe el punto y la fuerza del toque.
         const styles = [
-            // 0 · Estallido radial clásico
+            // 0 · Pelotitas de colores que rebotan
+            (x, y, s) => { const n = Math.round(12 * s); for (let i = 0; i < n; i += 1) { const p = base(x, y, Math.floor(rnd(0, 360)), rnd(3.5, 5.5)); p.shape = 'ball'; p.size = rnd(6, 11); p.vx = rnd(-220, 220) * s; p.vy = rnd(-380, -160) * s; p.g = 700; p.drag = 0.995; p.bounce = 0.62; p.fade = 0.9; add(p); } },
+            // 1 · Fuego que sube
+            (x, y, s) => { for (let i = 0; i < 60 * s; i += 1) { const p = base(x + rnd(-14, 14), y, 52, rnd(0.8, 1.6)); p.hue2 = 4; p.vx = rnd(-50, 50); p.vy = rnd(-260, -120) * s; p.g = -90; p.drag = 0.97; p.grow = -2.2; p.size = rnd(3, 5); p.wobble = 1; p.wf = rnd(8, 14); p.wamp = 20; add(p); } },
+            // 2 · Agua que salpica y gotea
+            (x, y, s) => { for (let i = 0; i < 40 * s; i += 1) { const a = rnd(-Math.PI * 0.9, -Math.PI * 0.1), v = rnd(220, 480) * s; const p = base(x, y, rnd(186, 206), rnd(2.2, 3.2)); p.shape = 'drop'; p.size = rnd(2, 3.2); p.vx = Math.cos(a) * v; p.vy = Math.sin(a) * v; p.g = 900; p.drag = 0.995; p.bounce = 0.22; p.fade = 0.85; add(p); } },
+            // 3 · Humo que se expande
+            (x, y, s) => { for (let i = 0; i < 14 * s; i += 1) { const p = base(x + rnd(-10, 10), y, 0, rnd(3.2, 4.4)); p.shape = 'smoke'; p.sat = 0; p.size = rnd(6, 10); p.grow = rnd(22, 34); p.vx = rnd(-18, 18); p.vy = rnd(-70, -35); p.drag = 0.985; p.fade = 0.32; add(p); } },
+            // 4 · Nieve que cae despacio
+            (x, y, s) => { for (let i = 0; i < 40 * s; i += 1) { const p = base(x + rnd(-60, 60), y - rnd(0, 40), 205, rnd(3.8, 5.2)); p.hue = 205; p.size = rnd(1.4, 2.6); p.vy = rnd(55, 110); p.vx = rnd(-10, 10); p.wobble = 1; p.wf = rnd(1.4, 2.6); p.wamp = 40; p.fade = 0.95; add(p); } },
+            // 5 · Rayos eléctricos
+            (x, y, s) => { const bolts = Math.round(3 * s); for (let b = 0; b < bolts; b += 1) { const p = base(x, y, 200, rnd(0.22, 0.34)); p.shape = 'bolt'; p.points = [{ x, y }]; let cx = x; let cy = y; const dir = rnd(0.3, 2.8); for (let k = 0; k < 7; k += 1) { const a = dir + rnd(-0.5, 0.5); cx += Math.cos(a) * rnd(14, 24); cy += Math.sin(a) * rnd(14, 24); p.points.push({ x: cx, y: cy }); } add(p); } },
+            // 6 · Hojas que caen balanceándose
+            (x, y, s) => { for (let i = 0; i < 16 * s; i += 1) { const p = base(x + rnd(-20, 20), y, rnd(25, 120), rnd(4, 6)); p.shape = 'leaf'; p.size = rnd(4, 6.5); p.vy = rnd(-120, -40) * s; p.vx = rnd(-120, 120) * s; p.g = 120; p.drag = 0.97; p.w = rnd(-5, 5); p.wobble = 1; p.wf = rnd(2, 3.4); p.wamp = 60; p.fade = 0.9; add(p); } },
+            // 7 · Vidrio que se rompe en esquirlas
+            (x, y, s) => { for (let i = 0; i < 14 * s; i += 1) { const a = rnd(-Math.PI * 0.95, -Math.PI * 0.05), v = rnd(180, 420) * s; const p = base(x, y, rnd(178, 200), rnd(2.4, 3.4)); p.shape = 'shard'; p.size = rnd(4, 7); p.vx = Math.cos(a) * v; p.vy = Math.sin(a) * v; p.g = 800; p.drag = 0.995; p.w = rnd(-9, 9); p.bounce = 0.3; p.fade = 0.9; add(p); } },
+            // 8 · Chispas radiales
             (x, y, s) => { for (let i = 0; i < 40 * s; i += 1) { const a = rnd(0, 6.283), v = rnd(120, 340) * s; const p = base(x, y, greenHue(), rnd(0.9, 2)); p.vx = Math.cos(a) * v; p.vy = Math.sin(a) * v - rnd(120, 240); p.g = 420; p.drag = 0.98; add(p); } },
-            // 1 · Fuente hacia arriba
-            (x, y, s) => { for (let i = 0; i < 34 * s; i += 1) { const p = base(x, y, greenHue(), rnd(1.2, 2.2)); p.vx = rnd(-120, 120) * s; p.vy = rnd(-520, -300) * s; p.g = 520; p.drag = 0.99; add(p); } },
-            // 2 · Lluvia que cae en forma de rayas
-            (x, y, s) => { for (let i = 0; i < 26 * s; i += 1) { const p = base(x + rnd(-60, 60), y - rnd(0, 30), greenHue(), rnd(1, 1.8)); p.shape = 'streak'; p.vx = rnd(-14, 14); p.vy = rnd(160, 260); p.g = 60; add(p); } },
-            // 3 · Espiral que se abre
-            (x, y, s) => { for (let i = 0; i < 36 * s; i += 1) { const p = base(x, y, greenHue(), rnd(1.4, 2.2)); p.orbit = { origin: { x, y }, a: (i / 36) * 6.283, r: 4, w: rnd(3, 5) * (i % 2 ? 1 : -1), k: rnd(120, 200) }; add(p); } },
-            // 4 · Estrella de rayos rápidos
-            (x, y, s) => { const rays = 6 + Math.round(2 * s); for (let r = 0; r < rays; r += 1) { const a = (r / rays) * 6.283; for (let k = 0; k < 3; k += 1) { const p = base(x, y, 60, rnd(0.45, 0.7)); p.shape = 'streak'; p.hue = greenHue(); p.vx = Math.cos(a) * rnd(340, 480) * (1 - k * 0.15); p.vy = Math.sin(a) * rnd(340, 480) * (1 - k * 0.15); p.drag = 0.93; add(p); } } },
-            // 5 · Chispas doradas que parpadean
-            (x, y, s) => { for (let i = 0; i < 30 * s; i += 1) { const a = rnd(0, 6.283), v = rnd(60, 200); const p = base(x, y, rnd(38, 52), rnd(1.2, 2)); p.vx = Math.cos(a) * v; p.vy = Math.sin(a) * v; p.g = 90; p.drag = 0.97; p.wobble = 1; p.wf = rnd(14, 22); p.size = rnd(1, 2.2); add(p); } },
-            // 6 · Cometas con cola
-            (x, y, s) => { for (let i = 0; i < 9 * s; i += 1) { const p = base(x, y, greenHue(), rnd(0.8, 1.3)); p.shape = 'streak'; const a = rnd(-0.6, 0.6); p.vx = Math.cos(a) * rnd(420, 560); p.vy = Math.sin(a) * rnd(420, 560); p.drag = 0.975; add(p); } },
-            // 7 · Confeti que gira
-            (x, y, s) => { for (let i = 0; i < 26 * s; i += 1) { const p = base(x, y, greenHue(), rnd(1.8, 2.8)); p.shape = 'rect'; p.vx = rnd(-200, 200) * s; p.vy = rnd(-300, -120) * s; p.g = 260; p.drag = 0.96; p.w = rnd(-10, 10); p.size = rnd(2.5, 4.5); add(p); } },
-            // 8 · Brasas que suben con humo luminoso
-            (x, y, s) => { for (let i = 0; i < 22 * s; i += 1) { const p = base(x + rnd(-30, 30), y, rnd(20, 40), rnd(2.2, 3.2)); p.vx = rnd(-30, 30); p.vy = rnd(-120, -60); p.drag = 0.99; p.wobble = 1; p.wf = rnd(2, 4); p.size = rnd(3, 6); add(p); } },
-            // 9 · Estallido denso con destello
-            (x, y, s) => { for (let i = 0; i < 70 * s; i += 1) { const a = rnd(0, 6.283), v = rnd(200, 480) * s; const p = base(x, y, greenHue(), rnd(0.35, 0.7)); p.vx = Math.cos(a) * v; p.vy = Math.sin(a) * v; p.drag = 0.92; p.size = rnd(1, 1.8); add(p); } const flash = base(x, y, 90, 0.18); flash.size = 26 * s; add(flash); },
-            // 10 · Ola horizontal
-            (x, y, s) => { for (let i = 0; i < 40 * s; i += 1) { const p = base(x + rnd(-40, 40), y + rnd(-6, 6), greenHue(), rnd(1.1, 1.8)); p.vx = (i % 2 ? 1 : -1) * rnd(120, 220); p.vy = rnd(-40, 40); p.drag = 0.985; p.wobble = 1; p.wf = rnd(6, 9); p.size = rnd(1.4, 2.4); add(p); } },
-            // 11 · Cruces que titilan y caen
-            (x, y, s) => { for (let i = 0; i < 24 * s; i += 1) { const p = base(x, y, greenHue(), rnd(1.2, 2)); p.shape = 'plus'; p.vx = rnd(-160, 160); p.vy = rnd(-240, -80); p.g = 300; p.drag = 0.97; p.w = rnd(-6, 6); p.size = rnd(2, 3.5); add(p); } }
+            // 9 · Estrellas que titilan
+            (x, y, s) => { for (let i = 0; i < 8 * s; i += 1) { const p = base(x + rnd(-40, 40), y + rnd(-30, 30), 50, rnd(1.6, 2.4)); p.shape = 'star'; p.size = rnd(3, 5.5); p.vx = rnd(-14, 14); p.vy = rnd(-14, 14); p.w = rnd(-1.5, 1.5); p.twinkle = rnd(14, 24); p.fade = 1; add(p); } },
+            // 10 · Arena que cae en cascada
+            (x, y, s) => { for (let i = 0; i < 70 * s; i += 1) { const p = base(x + rnd(-6, 6), y, rnd(36, 46), rnd(1.2, 2)); p.size = 1.1; p.vx = rnd(-90, 90) * s; p.vy = rnd(-40, 60); p.g = 520; p.drag = 0.99; p.bounce = 0.1; p.fade = 1; add(p); } },
+            // 11 · Confeti
+            (x, y, s) => { for (let i = 0; i < 26 * s; i += 1) { const p = base(x, y, greenHue(), rnd(1.8, 2.8)); p.shape = 'rect'; p.vx = rnd(-200, 200) * s; p.vy = rnd(-300, -120) * s; p.g = 260; p.drag = 0.96; p.w = rnd(-10, 10); p.size = rnd(2.5, 4.5); add(p); } }
         ];
-
-        // Macaquito: cae desde el toque hasta el borde inferior y corre hacia un lado al azar.
-        const monkeys = [];
-        const spawnMonkey = (x, y) => {
-            monkeys.push({ x, y, vy: rnd(-60, 0), dir: 1, state: 'fall', life: 0, leg: 0, runFor: rnd(4, 6), pause: 0, greet: 0, cool: 0 });
-        };
-        const drawMonkey = (m) => {
-            const brown = '#8b5a2b';
-            const dark = '#5e3a1c';
-            const beige = '#f2cf98';
-            const legSwing = Math.sin(m.leg) * 6;
-            const armSwing = m.state === 'fall' ? Math.sin(m.life * 22) * 10 : -legSwing;
-            const greeting = m.greet > 0;
-            ctx.save();
-            ctx.translate(m.x, m.y);
-            ctx.scale(m.dir, 1);
-            ctx.lineCap = 'round';
-            ctx.strokeStyle = brown;
-            ctx.fillStyle = brown;
-            // Cola enroscada
-            ctx.lineWidth = 3;
-            ctx.beginPath();
-            ctx.moveTo(-8, -10);
-            ctx.quadraticCurveTo(-24, -6, -20, -20);
-            ctx.stroke();
-            // Piernas
-            ctx.lineWidth = 4;
-            ctx.beginPath();
-            ctx.moveTo(-3, -16); ctx.lineTo(-3 + legSwing, 0);
-            ctx.moveTo(3, -16); ctx.lineTo(3 - legSwing, 0);
-            ctx.stroke();
-            // Brazos
-            ctx.lineWidth = 3;
-            ctx.beginPath();
-            ctx.moveTo(-5, -32); ctx.lineTo(-10 - armSwing * 0.4, -22 + armSwing * 0.3);
-            if (greeting) ctx.lineTo(14, -46); // mano en alto para el choque
-            else ctx.moveTo(5, -32); ctx.lineTo(10 + armSwing * 0.4, -22 - armSwing * 0.3);
-            ctx.stroke();
-            // Cuerpo
-            ctx.beginPath();
-            ctx.ellipse(0, -24, 8, 11, 0, 0, Math.PI * 2);
-            ctx.fill();
-            // Cabeza y orejas
-            ctx.beginPath();
-            ctx.arc(1, -40, 10, 0, Math.PI * 2);
-            ctx.fill();
-            ctx.fillStyle = dark;
-            ctx.beginPath();
-            ctx.arc(-8, -43, 3.6, 0, Math.PI * 2);
-            ctx.arc(9, -44, 3.6, 0, Math.PI * 2);
-            ctx.fill();
-            // Cara
-            ctx.fillStyle = beige;
-            ctx.beginPath();
-            ctx.ellipse(4, -37, 6.5, 5.5, 0, 0, Math.PI * 2);
-            ctx.fill();
-            ctx.fillStyle = '#111';
-            ctx.beginPath();
-            ctx.arc(-1, -41, 1.5, 0, Math.PI * 2);
-            ctx.arc(5, -41, 1.5, 0, Math.PI * 2);
-            ctx.fill();
-            ctx.strokeStyle = '#111';
-            ctx.lineWidth = 1.2;
-            ctx.beginPath();
-            ctx.arc(2, -34, 2, 0.2, Math.PI - 0.2);
-            ctx.stroke();
-            ctx.restore();
-        };
-        // Dos macacos que se cruzan de frente se chocan la mano y se dan vuelta.
-        const checkHighFives = () => {
-            for (let i = 0; i < monkeys.length; i += 1) {
-                const a = monkeys[i];
-                if (a.state !== 'run' || a.pause > 0 || a.cool > 0) continue;
-                for (let j = i + 1; j < monkeys.length; j += 1) {
-                    const b = monkeys[j];
-                    if (b.state !== 'run' || b.pause > 0 || b.cool > 0) continue;
-                    const left = a.x <= b.x ? a : b;
-                    const right = left === a ? b : a;
-                    const meeting = left.dir === 1 && right.dir === -1 && right.x - left.x < 30;
-                    if (!meeting) continue;
-                    const midX = (a.x + b.x) / 2;
-                    const midY = height - 28;
-                    for (let k = 0; k < 14; k += 1) {
-                        const angle = rnd(-Math.PI, 0);
-                        const p = base(midX, midY, greenHue(), rnd(0.5, 0.9));
-                        p.vx = Math.cos(angle) * rnd(120, 240);
-                        p.vy = Math.sin(angle) * rnd(120, 240);
-                        p.g = 300;
-                        add(p);
-                    }
-                    for (const m of [a, b]) { m.pause = 0.35; m.greet = 0.6; m.cool = 1.2; m.dir *= -1; }
-                    kick();
-                }
-            }
-        };
-
-        const updateMonkeys = (dt) => {
-            checkHighFives();
-            for (let i = monkeys.length - 1; i >= 0; i -= 1) {
-                const m = monkeys[i];
-                m.life += dt;
-                m.cool = Math.max(0, m.cool - dt);
-                m.greet = Math.max(0, m.greet - dt);
-                const ground = height - 6;
-                if (m.state === 'fall') {
-                    m.vy += 1100 * dt;
-                    m.y += m.vy * dt;
-                    if (m.y >= ground) {
-                        m.y = ground;
-                        m.state = 'run';
-                        m.dir = Math.random() < 0.5 ? -1 : 1;
-                        m.life = 0;
-                    }
-                } else if (m.pause > 0) {
-                    m.pause = Math.max(0, m.pause - dt);
-                } else {
-                    m.x += m.dir * 170 * dt;
-                    m.leg += dt * 16;
-                    if (m.life > m.runFor || m.x < -70 || m.x > width + 70) { monkeys.splice(i, 1); continue; }
-                }
-                // En el borde inferior siempre se ve entero.
-                m.y = Math.min(m.y, ground);
-                drawMonkey(m);
-            }
-        };
 
         const nextStyle = () => {
             if (!bag.length) {
@@ -2080,25 +1955,48 @@
                 p.life += dt;
                 if (p.life >= p.max) { particles.splice(i, 1); continue; }
                 const t = p.life / p.max;
-                const alpha = 1 - t;
                 if (p.orbit) {
                     p.orbit.a += p.orbit.w * dt;
                     p.orbit.r += p.orbit.k * dt;
                     p.x = p.orbit.origin.x + Math.cos(p.orbit.a) * p.orbit.r;
                     p.y = p.orbit.origin.y + Math.sin(p.orbit.a) * p.orbit.r;
-                } else {
+                } else if (p.shape !== 'bolt') {
                     p.vy += p.g * dt;
                     p.vx *= Math.pow(p.drag, dt * 60);
                     p.vy *= Math.pow(p.drag, dt * 60);
-                    if (p.wobble) p.x += Math.sin(p.life * p.wf) * 36 * dt;
+                    if (p.wobble) p.x += Math.sin(p.life * p.wf) * (p.wamp || 36) * dt;
                     p.x += p.vx * dt;
                     p.y += p.vy * dt;
+                    if (p.bounce && p.y > height - 4 - p.size) {
+                        p.y = height - 4 - p.size;
+                        p.vy = -p.vy * p.bounce;
+                        p.vx *= 0.8;
+                    }
+                    if (p.bounce && (p.x < p.size || p.x > width - p.size)) {
+                        p.x = Math.max(p.size, Math.min(width - p.size, p.x));
+                        p.vx = -p.vx * 0.6;
+                    }
                 }
+                if (p.grow) p.size = Math.max(0.3, p.size + p.grow * dt);
                 p.spin += p.w * dt;
-                ctx.globalAlpha = Math.max(0, alpha) * (p.wobble ? 0.5 + 0.5 * Math.sin(p.life * 30) : 1);
-                ctx.fillStyle = `hsl(${p.hue}, 100%, 70%)`;
+                const alpha = (1 - t) * (p.fade ?? 1);
+                const hue = p.hue2 != null ? p.hue + (p.hue2 - p.hue) * t : p.hue;
+                const light = p.shape === 'smoke' ? 0 : 68;
+                ctx.globalAlpha = Math.max(0, alpha) * (p.twinkle ? 0.4 + 0.6 * Math.abs(Math.sin(p.life * p.twinkle)) : 1);
+                ctx.fillStyle = p.shape === 'smoke' ? 'hsl(0, 0%, 72%)' : `hsl(${hue}, 100%, ${light}%)`;
                 ctx.strokeStyle = ctx.fillStyle;
-                if (p.shape === 'streak') {
+                if (p.shape === 'bolt') {
+                    const flick = 0.6 + 0.4 * Math.sin(p.life * 60);
+                    ctx.globalAlpha = Math.max(0, 1 - t) * flick;
+                    ctx.beginPath();
+                    p.points.forEach((pt, k) => (k ? ctx.lineTo(pt.x, pt.y) : ctx.moveTo(pt.x, pt.y)));
+                    ctx.lineWidth = 6;
+                    ctx.strokeStyle = 'hsla(200, 100%, 70%, 0.35)';
+                    ctx.stroke();
+                    ctx.lineWidth = 2;
+                    ctx.strokeStyle = 'hsl(200, 100%, 88%)';
+                    ctx.stroke();
+                } else if (p.shape === 'streak') {
                     ctx.lineWidth = 1.6;
                     ctx.beginPath();
                     ctx.moveTo(p.x, p.y);
@@ -2110,6 +2008,42 @@
                     ctx.rotate(p.spin);
                     ctx.fillRect(-p.size, -p.size * 0.5, p.size * 2, p.size);
                     ctx.restore();
+                } else if (p.shape === 'shard') {
+                    ctx.save();
+                    ctx.translate(p.x, p.y);
+                    ctx.rotate(p.spin);
+                    ctx.beginPath();
+                    ctx.moveTo(-p.size, 0); ctx.lineTo(p.size * 0.6, -p.size * 0.6); ctx.lineTo(0, p.size);
+                    ctx.closePath();
+                    ctx.fill();
+                    ctx.restore();
+                } else if (p.shape === 'leaf') {
+                    ctx.save();
+                    ctx.translate(p.x, p.y);
+                    ctx.rotate(p.spin);
+                    ctx.beginPath();
+                    ctx.ellipse(0, 0, p.size * 1.5, p.size * 0.7, 0, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.restore();
+                } else if (p.shape === 'drop') {
+                    const angle = Math.atan2(p.vy, p.vx) + Math.PI / 2;
+                    ctx.save();
+                    ctx.translate(p.x, p.y);
+                    ctx.rotate(angle);
+                    ctx.beginPath();
+                    ctx.ellipse(0, 0, p.size * 0.6, p.size * 1.5, 0, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.restore();
+                } else if (p.shape === 'star') {
+                    ctx.save();
+                    ctx.translate(p.x, p.y);
+                    ctx.rotate(p.spin);
+                    ctx.lineWidth = 1.4;
+                    ctx.beginPath();
+                    ctx.moveTo(-p.size, 0); ctx.lineTo(p.size, 0);
+                    ctx.moveTo(0, -p.size); ctx.lineTo(0, p.size);
+                    ctx.stroke();
+                    ctx.restore();
                 } else if (p.shape === 'plus') {
                     ctx.save();
                     ctx.translate(p.x, p.y);
@@ -2120,9 +2054,20 @@
                     ctx.moveTo(0, -p.size); ctx.lineTo(0, p.size);
                     ctx.stroke();
                     ctx.restore();
-                } else {
+                } else if (p.shape === 'ball') {
+                    const r = Math.max(1, p.size);
                     ctx.beginPath();
-                    ctx.arc(p.x, p.y, Math.max(0.5, p.size * (0.6 + alpha * 0.6)), 0, Math.PI * 2);
+                    ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.globalAlpha = Math.max(0, alpha) * 0.7;
+                    ctx.fillStyle = 'hsl(0, 0%, 100%)';
+                    ctx.beginPath();
+                    ctx.arc(p.x - r * 0.35, p.y - r * 0.35, r * 0.28, 0, Math.PI * 2);
+                    ctx.fill();
+                } else {
+                    const r = Math.max(0.5, p.size * (0.6 + alpha * 0.6));
+                    ctx.beginPath();
+                    ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
                     ctx.fill();
                 }
             }
