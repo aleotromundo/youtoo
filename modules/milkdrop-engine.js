@@ -21,6 +21,8 @@
         uniform float uSeed;
         uniform vec4 uAudio;
         uniform vec4 uScene;
+        uniform vec4 uTouch;
+        uniform vec4 uPush;
         in vec2 vUv;
         out vec4 outColor;
 
@@ -64,6 +66,13 @@
             vec2 prevUv=0.5+(q*0.985)*vec2(1.0+0.017*sin(uTime*0.31+mode),1.0);
             prevUv += normalize(p+0.0001)*(-0.004-0.018*energy-0.028*beat);
             prevUv += 0.014*vec2(sin(q.y*5.0+uTime),cos(q.x*5.0-uTime))*intensity;
+            // Toque: empuja la imagen alrededor del dedo y lo arrastra en la dirección del movimiento.
+            vec2 tp=(uTouch.xy-0.5)*vec2(uResolution.x/uResolution.y,1.0);
+            vec2 tv=p-tp;
+            float tdist=length(tv);
+            float tfall=exp(-tdist*tdist/(uTouch.z*uTouch.z))*uTouch.w;
+            prevUv += uPush.xy*tfall*uPush.z;
+            prevUv += normalize(tv+0.0001)*tfall*0.035;
             vec3 prev=texture(uPrev,fract(prevUv)).rgb;
             float decay=0.91-0.022*beat-0.012*bass;
             prev*=decay;
@@ -73,6 +82,7 @@
             vec3 color=prev+ink*mask;
             color+=palette(spiral/TAU+clouds+phase,phase)*ring*(0.035+beat*0.24);
             color+=vec3(0.03,0.06,0.12)*pow(max(0.0,1.0-r),3.0)*(0.2+high*0.45);
+            color+=palette(clouds+uTime*0.1+phase+tdist,phase)*tfall*0.22;
             // El feedback se almacena en RGBA8: limitarlo evita que la imagen se queme a blanco.
             outColor=vec4(clamp(color,0.0,0.88),1.0);
         }
@@ -123,7 +133,7 @@
 
             this.simProgram = this.program(VERTEX, SIM_FRAGMENT);
             this.displayProgram = this.program(VERTEX, DISPLAY_FRAGMENT);
-            this.simUniforms = this.uniforms(this.simProgram, ['uPrev', 'uResolution', 'uTime', 'uSeed', 'uAudio', 'uScene']);
+            this.simUniforms = this.uniforms(this.simProgram, ['uPrev', 'uResolution', 'uTime', 'uSeed', 'uAudio', 'uScene', 'uTouch', 'uPush']);
             this.displayUniforms = this.uniforms(this.displayProgram, ['uSceneTex', 'uResolution', 'uAudio']);
             this.buffers = [];
             this.readIndex = 0;
@@ -151,6 +161,8 @@
             this.randomState = Math.floor(Math.random() * 4294967296) >>> 0;
             this.seed = this.randomState / 4294967296;
             this.scene = new Float32Array([0.5, 0.7, 0.0, 0.8]);
+            this.touchState = new Float32Array([0.5, 0.5, 0.16, 0]);
+            this.pushState = new Float32Array([0, 0, 0, 0]);
             this.targetScene = new Float32Array(this.scene);
             this.sceneIndex = 0;
             this.onSceneChange = null;
@@ -474,6 +486,9 @@
             this.lastFrameAt = time;
             this.updateAudio(time, deltaSeconds);
 
+            // El toque se desvanece solo: el empuje dura unos segundos y después vuelve a la normalidad.
+            this.touchState[3] *= Math.exp(-deltaSeconds / 0.55);
+            this.pushState[2] *= Math.exp(-deltaSeconds / 0.22);
             const sceneAlpha = 1.0 - Math.exp(-deltaSeconds / 1.2);
             for (let index = 0; index < 4; index += 1) {
                 this.scene[index] += (this.targetScene[index] - this.scene[index]) * sceneAlpha;
@@ -494,6 +509,8 @@
             gl.uniform1f(this.simUniforms.uSeed, this.seed);
             gl.uniform4fv(this.simUniforms.uAudio, this.audio);
             gl.uniform4fv(this.simUniforms.uScene, this.scene);
+            gl.uniform4fv(this.simUniforms.uTouch, this.touchState);
+            gl.uniform4fv(this.simUniforms.uPush, this.pushState);
             gl.drawArrays(gl.TRIANGLES, 0, 3);
 
             gl.bindFramebuffer(gl.FRAMEBUFFER, null);
@@ -506,6 +523,20 @@
             gl.uniform4fv(this.displayUniforms.uAudio, this.audio);
             gl.drawArrays(gl.TRIANGLES, 0, 3);
             this.readIndex = 1 - this.readIndex;
+        }
+
+        // x, y en píxeles del canvas; dx, dy: movimiento del dedo en píxeles.
+        touch(x, y, strength, dx = 0, dy = 0) {
+            const w = Math.max(1, this.width);
+            const h = Math.max(1, this.height);
+            this.touchState[0] = x / w;
+            this.touchState[1] = 1 - y / h;
+            this.touchState[3] = Math.max(this.touchState[3], Math.min(1, strength));
+            if (dx || dy) {
+                this.pushState[0] = (dx / w) * 1.6;
+                this.pushState[1] = (-dy / h) * 1.6;
+                this.pushState[2] = Math.max(this.pushState[2], Math.min(1, Math.hypot(dx, dy) / 40));
+            }
         }
 
         destroy() {

@@ -1682,13 +1682,38 @@
         };
         schedule();
         const timer = window.setInterval(schedule, 50);
-        synth = { bpm: profile.bpm, bus, analyser, freq: new Uint8Array(analyser.frequencyBinCount), timer, sources: [kick, noise] };
+        synth = { bpm: profile.bpm, bus, analyser, freq: new Uint8Array(analyser.frequencyBinCount), timer, sources: [kick, noise], kick, kickGain };
         try {
             butterchurn.connectAudio(bus);
             activeButterchurnInput = bus;
         } catch (error) {
             console.warn('[YouToo] No se pudo conectar el pulso simulado:', error);
             stopSyntheticPulse();
+        }
+    }
+
+    // Un golpe de bajo en el pulso simulado: los presets MilkDrop reaccionan al toque.
+    let vizLastHitAt = 0;
+    function pulseHit(strength) {
+        if (!synth || !audioContext) return;
+        const t = audioContext.currentTime;
+        const level = Math.min(1.2, 0.6 + strength * 0.5);
+        synth.kickGain.gain.setValueAtTime(level, t);
+        synth.kickGain.gain.exponentialRampToValueAtTime(0.001, t + 0.45);
+        synth.kick.frequency.setValueAtTime(110, t);
+        synth.kick.frequency.exponentialRampToValueAtTime(38, t + 0.35);
+    }
+
+    // Cada toque o arrastre llega acá: el motor generativo se deforma y, con el
+    // pulso simulado, MilkDrop recibe el golpe de audio.
+    function onVisualizerTouch(x, y, dx, dy, strength) {
+        if (!butterchurn && milkdropEngine && typeof milkdropEngine.touch === 'function') {
+            try { milkdropEngine.touch(x, y, strength, dx, dy); } catch (_) {}
+        }
+        const now = performance.now();
+        if (now - vizLastHitAt > 110) {
+            vizLastHitAt = now;
+            pulseHit(strength);
         }
     }
 
@@ -1872,6 +1897,7 @@
         let last = 0;
         let down = false;
         let lastPoint = null;
+        let dragDistance = 0;
         let bag = [];
         let lastStyle = -1;
 
@@ -2059,7 +2085,7 @@
         const trail = (from, to) => {
             const dx = to.x - from.x;
             const dy = to.y - from.y;
-            const steps = Math.min(4, Math.max(1, Math.round(Math.hypot(dx, dy) / 26)));
+            const steps = Math.min(7, Math.max(1, Math.round(Math.hypot(dx, dy) / 18)));
             for (let i = 1; i <= steps; i += 1) {
                 const p = base(from.x + (dx * i) / steps, from.y + (dy * i) / steps, greenHue(), rnd(0.5, 0.9));
                 p.vx = rnd(-30, 30);
@@ -2217,8 +2243,10 @@
         fx.addEventListener('pointerdown', (event) => {
             resize();
             down = true;
+            dragDistance = 0;
             const point = pointFrom(event);
             triggerStyle(point.x, point.y, 1);
+            onVisualizerTouch(point.x, point.y, 0, 0, 1);
             // Algunos toques además dejan caer un macaquito.
             if (Math.random() < 0.2) spawnMonkey(point.x, point.y);
             lastPoint = point;
@@ -2228,7 +2256,16 @@
         fx.addEventListener('pointermove', (event) => {
             if (!down) return;
             const point = pointFrom(event);
-            if (lastPoint) trail(lastPoint, point);
+            if (lastPoint) {
+                trail(lastPoint, point);
+                onVisualizerTouch(point.x, point.y, point.x - lastPoint.x, point.y - lastPoint.y, 0.55);
+                // Arrastrar mucho dispara un material nuevo cada tanto.
+                dragDistance += Math.hypot(point.x - lastPoint.x, point.y - lastPoint.y);
+                if (dragDistance > 110) {
+                    dragDistance = 0;
+                    triggerStyle(point.x, point.y, 0.6);
+                }
+            }
             lastPoint = point;
             kick();
         });
