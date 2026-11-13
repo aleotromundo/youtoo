@@ -1919,6 +1919,131 @@
             (x, y, s) => { for (let i = 0; i < 26 * s; i += 1) { const p = base(x, y, greenHue(), rnd(1.8, 2.8)); p.shape = 'rect'; p.vx = rnd(-200, 200) * s; p.vy = rnd(-300, -120) * s; p.g = 260; p.drag = 0.96; p.w = rnd(-10, 10); p.size = rnd(2.5, 4.5); add(p); } }
         ];
 
+        // Macaquito: cae desde el toque hasta el borde inferior y corre hacia un lado al azar.
+        const monkeys = [];
+        const spawnMonkey = (x, y) => {
+            monkeys.push({ x, y, vy: rnd(-60, 0), dir: 1, state: 'fall', life: 0, leg: 0, runFor: rnd(4, 6), pause: 0, greet: 0, cool: 0 });
+        };
+        const drawMonkey = (m) => {
+            const brown = '#8b5a2b';
+            const dark = '#5e3a1c';
+            const beige = '#f2cf98';
+            const legSwing = Math.sin(m.leg) * 6;
+            const armSwing = m.state === 'fall' ? Math.sin(m.life * 22) * 10 : -legSwing;
+            const greeting = m.greet > 0;
+            ctx.save();
+            ctx.translate(m.x, m.y);
+            ctx.scale(m.dir, 1);
+            ctx.lineCap = 'round';
+            ctx.strokeStyle = brown;
+            ctx.fillStyle = brown;
+            // Cola enroscada
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            ctx.moveTo(-8, -10);
+            ctx.quadraticCurveTo(-24, -6, -20, -20);
+            ctx.stroke();
+            // Piernas
+            ctx.lineWidth = 4;
+            ctx.beginPath();
+            ctx.moveTo(-3, -16); ctx.lineTo(-3 + legSwing, 0);
+            ctx.moveTo(3, -16); ctx.lineTo(3 - legSwing, 0);
+            ctx.stroke();
+            // Brazos
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            ctx.moveTo(-5, -32); ctx.lineTo(-10 - armSwing * 0.4, -22 + armSwing * 0.3);
+            if (greeting) ctx.lineTo(14, -46); // mano en alto para el choque
+            else ctx.moveTo(5, -32); ctx.lineTo(10 + armSwing * 0.4, -22 - armSwing * 0.3);
+            ctx.stroke();
+            // Cuerpo
+            ctx.beginPath();
+            ctx.ellipse(0, -24, 8, 11, 0, 0, Math.PI * 2);
+            ctx.fill();
+            // Cabeza y orejas
+            ctx.beginPath();
+            ctx.arc(1, -40, 10, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.fillStyle = dark;
+            ctx.beginPath();
+            ctx.arc(-8, -43, 3.6, 0, Math.PI * 2);
+            ctx.arc(9, -44, 3.6, 0, Math.PI * 2);
+            ctx.fill();
+            // Cara
+            ctx.fillStyle = beige;
+            ctx.beginPath();
+            ctx.ellipse(4, -37, 6.5, 5.5, 0, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.fillStyle = '#111';
+            ctx.beginPath();
+            ctx.arc(-1, -41, 1.5, 0, Math.PI * 2);
+            ctx.arc(5, -41, 1.5, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.strokeStyle = '#111';
+            ctx.lineWidth = 1.2;
+            ctx.beginPath();
+            ctx.arc(2, -34, 2, 0.2, Math.PI - 0.2);
+            ctx.stroke();
+            ctx.restore();
+        };
+        // Dos macacos que se cruzan de frente se chocan la mano y se dan vuelta.
+        const checkHighFives = () => {
+            for (let i = 0; i < monkeys.length; i += 1) {
+                const a = monkeys[i];
+                if (a.state !== 'run' || a.pause > 0 || a.cool > 0) continue;
+                for (let j = i + 1; j < monkeys.length; j += 1) {
+                    const b = monkeys[j];
+                    if (b.state !== 'run' || b.pause > 0 || b.cool > 0) continue;
+                    const left = a.x <= b.x ? a : b;
+                    const right = left === a ? b : a;
+                    const meeting = left.dir === 1 && right.dir === -1 && right.x - left.x < 30;
+                    if (!meeting) continue;
+                    const midX = (a.x + b.x) / 2;
+                    const midY = height - 28;
+                    for (let k = 0; k < 14; k += 1) {
+                        const angle = rnd(-Math.PI, 0);
+                        const p = base(midX, midY, greenHue(), rnd(0.5, 0.9));
+                        p.vx = Math.cos(angle) * rnd(120, 240);
+                        p.vy = Math.sin(angle) * rnd(120, 240);
+                        p.g = 300;
+                        add(p);
+                    }
+                    for (const m of [a, b]) { m.pause = 0.35; m.greet = 0.6; m.cool = 1.2; m.dir *= -1; }
+                    kick();
+                }
+            }
+        };
+
+        const updateMonkeys = (dt) => {
+            checkHighFives();
+            for (let i = monkeys.length - 1; i >= 0; i -= 1) {
+                const m = monkeys[i];
+                m.life += dt;
+                m.cool = Math.max(0, m.cool - dt);
+                m.greet = Math.max(0, m.greet - dt);
+                const ground = height - 6;
+                if (m.state === 'fall') {
+                    m.vy += 1100 * dt;
+                    m.y += m.vy * dt;
+                    if (m.y >= ground) {
+                        m.y = ground;
+                        m.state = 'run';
+                        m.dir = Math.random() < 0.5 ? -1 : 1;
+                        m.life = 0;
+                    }
+                } else if (m.pause > 0) {
+                    m.pause = Math.max(0, m.pause - dt);
+                } else {
+                    m.x += m.dir * 170 * dt;
+                    m.leg += dt * 16;
+                    if (m.life > m.runFor || m.x < -70 || m.x > width + 70) { monkeys.splice(i, 1); continue; }
+                }
+                // En el borde inferior siempre se ve entero.
+                m.y = Math.min(m.y, ground);
+                drawMonkey(m);
+            }
+        };
+
         const nextStyle = () => {
             if (!bag.length) {
                 bag = styles.map((_, index) => index);
