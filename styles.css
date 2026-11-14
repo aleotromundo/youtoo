@@ -783,6 +783,11 @@
         .nowarfy-device-dock.is-idle .nowarfy-device-dock-fab span { max-width: 0; opacity: 0; }
         .nowarfy-device-dock.is-idle .nowarfy-device-dock-fab:hover,
         .nowarfy-device-dock.is-idle .nowarfy-device-dock-fab:focus-visible { opacity: 1; }
+        /* Dentro de la barra de búsqueda, al lado del botón "Estilo de interfaz" */
+        body.mode-youtoo .search-toolbar .nowarfy-device-dock,
+        .search-toolbar .nowarfy-device-dock { position: relative; left: auto; right: auto; bottom: auto; flex: 0 0 auto; align-items: flex-end; max-width: none; }
+        body.mode-youtoo .search-toolbar .nowarfy-device-dock-panel,
+        .search-toolbar .nowarfy-device-dock-panel { position: absolute; top: calc(100% + 8px); right: 0; bottom: auto; margin: 0; z-index: 10004; }
         .nowarfy-device-dock-fab.is-player { border-color: rgba(94,234,212,.7); background: rgba(94,234,212,.16); }
         .nowarfy-device-dock-fab.is-mirror { border-color: rgba(167,139,250,.65); }
         .nowarfy-device-dock-fab.is-mirror i { color: #c4b5fd; }
