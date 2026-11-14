@@ -567,10 +567,15 @@ function renderNowarfyDeviceDock() {
     const dock = document.getElementById('nowarfyDeviceDock');
     if (!dock) return;
     const show = !!nowarfyAuthUser && !!nowarfyRemoteSession && (nowarfyDeviceDockPinned || nowarfyRemoteDevices.length > 1);
+    const appearing = dock.hidden && show;
     dock.hidden = !show;
     if (!show) { toggleNowarfyDeviceDock(false); return; }
+    if (appearing) flashNowarfyDeviceDock();
     const label = document.getElementById('nowarfyDeviceDockLabel');
-    if (label) label.textContent = nowarfyActiveDeviceLabel();
+    if (label) {
+        const text = nowarfyActiveDeviceLabel();
+        if (label.textContent !== text) { label.textContent = text; flashNowarfyDeviceDock(); }
+    }
     const button = document.getElementById('nowarfyDeviceDockButton');
     if (button) {
         button.classList.toggle('is-player', nowarfyRemoteIsPlayer);
@@ -607,7 +612,22 @@ function toggleNowarfyDeviceDock(force) {
     const open = typeof force === 'boolean' ? force : panel.hidden;
     panel.hidden = !open;
     if (button) button.setAttribute('aria-expanded', String(open));
-    if (open) { renderNowarfyDeviceDock(); void refreshNowarfyRemoteDevices(); }
+    if (open) { flashNowarfyDeviceDock(0); renderNowarfyDeviceDock(); void refreshNowarfyRemoteDevices(); }
+    else flashNowarfyDeviceDock(2000);
+}
+let nowarfyDeviceDockIdleTimer = null;
+// Muestra el botón completo un rato y después lo reduce a un ícono chico (sigue tocable).
+function flashNowarfyDeviceDock(ms = 4000) {
+    const dock = document.getElementById('nowarfyDeviceDock');
+    if (!dock) return;
+    clearTimeout(nowarfyDeviceDockIdleTimer);
+    dock.classList.remove('is-idle');
+    if (!ms) return;
+    nowarfyDeviceDockIdleTimer = setTimeout(() => {
+        const panel = document.getElementById('nowarfyDeviceDockPanel');
+        if (panel && !panel.hidden) return;
+        dock.classList.add('is-idle');
+    }, ms);
 }
 document.addEventListener('pointerdown', (event) => {
     const dock = document.getElementById('nowarfyDeviceDock');
