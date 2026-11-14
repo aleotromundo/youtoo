@@ -259,5 +259,5 @@ body.mode-youtoo.nowarfy-video-playing .song-row{
 /* responsive */
 @media (max-width:768px){
   body.mode-youtoo .player-bar{padding-bottom:calc(10px + var(--safe-area-bottom,0px))}
-  body.mode-youtoo .nowarfy-device-dock{right:12px;bottom:calc(var(--player-height,90px)+12px+var(--safe-area-bottom,0px))}
+  body.mode-youtoo .nowarfy-device-dock{left:12px;bottom:calc(var(--player-height,90px)+12px+var(--safe-area-bottom,0px))}
 }
