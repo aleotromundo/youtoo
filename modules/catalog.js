@@ -230,8 +230,9 @@ function applySourceFilter() {
     const container = document.getElementById('dynamicSections');
     if (!container) return;
     const filter = container.dataset.sourceFilter || '';
+    // Los resultados de YouTube son bloques <div> y los de música libre son <section>: se revisan todos.
     Array.from(container.children).forEach(section => {
-        if (section.tagName !== 'SECTION') return;
+        if (!(section instanceof HTMLElement)) return;
         const kind = section.classList.contains('source-openverse') ? 'openverse'
             : section.classList.contains('source-jamendo') ? 'jamendo' : 'youtube';
         section.style.display = (!filter || kind === filter) ? '' : 'none';
