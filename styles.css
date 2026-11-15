@@ -1188,7 +1188,7 @@
 body:not(.mode-classic) #visualSettingsBtn { display: none !important; }
 
 /* Cuenta: circulito arriba a la derecha (reemplaza el botón del menú lateral) */
-.nowarfy-account-circle { position: relative; display: inline-flex; align-items: center; justify-content: center; width: 36px; height: 36px; flex: 0 0 auto; margin-left: auto; border: 1px solid rgba(255,255,255,.18); border-radius: 999px; color: #cfd2e6; background: rgba(20,22,40,.9); cursor: pointer; font: inherit; font-weight: 700; transition: color .15s, border-color .15s, background .15s; }
+.nowarfy-account-circle { position: fixed; top: calc(env(safe-area-inset-top, 0px) + 10px); right: calc(env(safe-area-inset-right, 0px) + 14px); z-index: 10005; display: inline-flex; align-items: center; justify-content: center; width: 36px; height: 36px; flex: 0 0 auto; border: 1px solid rgba(255,255,255,.18); border-radius: 999px; color: #cfd2e6; background: rgba(20,22,40,.9); cursor: pointer; font: inherit; font-weight: 700; transition: color .15s, border-color .15s, background .15s; }
 .nowarfy-account-circle:hover { color: #eafffb; border-color: rgba(94,234,212,.45); background: rgba(94,234,212,.1); }
 .nowarfy-account-circle:focus-visible { outline: 2px solid #5eead4; outline-offset: 2px; }
 .nowarfy-account-circle i { font-size: .85rem; }
@@ -1197,3 +1197,9 @@ body:not(.mode-classic) #visualSettingsBtn { display: none !important; }
 .nowarfy-account-circle::after { content: ''; position: absolute; right: -1px; bottom: -1px; width: 10px; height: 10px; border-radius: 50%; border: 2px solid #12142a; background: transparent; }
 .nowarfy-account-circle[data-state="online"]::after { background: #5eead4; }
 .nowarfy-account-circle[data-state="player"]::after { background: #4ade80; }
+/* Siempre visible, en cualquier modo: fijo arriba a la derecha y la barra de búsqueda le deja lugar. */
+.search-toolbar { padding-right: 48px; box-sizing: border-box; }
+body.mode-classic .nowarfy-account-circle { color: #37fa27; border-color: rgba(49,244,27,.55); background: #12161a; }
+body.mode-classic .nowarfy-account-circle:hover { background: rgba(49,244,27,.12); }
+body.mode-classic .nowarfy-account-circle.is-signed-in { color: #10130f; background: #37fa27; border-color: #37fa27; }
+body.mode-classic .nowarfy-account-circle::after { border-color: #111318; }

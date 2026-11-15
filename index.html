@@ -99,6 +99,7 @@
     <script>try { if (localStorage.getItem('nowarfy_classic') === '1') { document.body.classList.remove('mode-youtoo'); document.body.classList.add('mode-classic'); } } catch (_) {}</script>
 
     <div class="ambient-artwork-background" id="ambientArtworkBackground" aria-hidden="true"></div>
+    <button type="button" id="nowarfyAuthButton" class="nowarfy-account-circle" data-state="offline" onclick="openNowarfyAuth()" aria-haspopup="dialog" aria-label="Cuenta" title="Cuenta"><i class="fas fa-user" aria-hidden="true"></i></button>
     <div class="main-container">
         <!-- SIDEBAR -->
         <aside class="sidebar" aria-label="Navegación principal de YouToo®">
@@ -183,7 +184,6 @@
                         </button>
                     </div>
                     <button type="button" class="local-music-btn" id="visualSettingsBtn" onclick="openVisualSettings()" title="Ajustes del visualizador" aria-label="Ajustes del visualizador"><i class="fas fa-sliders" aria-hidden="true"></i></button>
-                    <button type="button" id="nowarfyAuthButton" class="nowarfy-account-circle" data-state="offline" onclick="openNowarfyAuth()" aria-haspopup="dialog" aria-label="Cuenta" title="Cuenta"><i class="fas fa-user" aria-hidden="true"></i></button>
                 </div>
             </div>
             <nav class="taste-rail" aria-label="Categorías para descubrir">
