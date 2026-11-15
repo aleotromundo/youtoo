@@ -1365,6 +1365,13 @@ const QUEUE_VIRTUAL_STRIDE = QUEUE_VIRTUAL_ROW_HEIGHT + QUEUE_VIRTUAL_GAP;
 const QUEUE_VIRTUAL_OVERSCAN = 6;
 
 // `idx` es el índice real en `queue`; `position` es el lugar que ocupa en la lista visible.
+// Duración real de la pista (mm:ss). Si no se conoce, no muestra nada.
+function formatQueueDuration(seconds) {
+    const total = Number(seconds);
+    if (!Number.isFinite(total) || total <= 0) return '';
+    return `${Math.floor(total / 60)}:${String(Math.floor(total % 60)).padStart(2, '0')}`;
+}
+
 function createQueueRow(song, idx, virtual = false, position = idx) {
     const row = document.createElement('div');
     const isPlayingRow = song._qid === currentPlayingQid;
@@ -1380,6 +1387,7 @@ function createQueueRow(song, idx, virtual = false, position = idx) {
             <div class="queue-row-artist">${escapeHtml(song.artist)}</div>
         </div>
         ${isPlayingRow ? '<i class="fas fa-volume-up queue-playing-icon" title="Sonando ahora"></i>' : ''}
+        <span class="queue-row-time">${formatQueueDuration(song.duration)}</span>
         <button type="button" class="queue-row-remove" title="Quitar de Playlist" aria-label="Quitar de Playlist"><i class="fas fa-xmark"></i></button>`;
     row.addEventListener('click', (e) => {
         if (e.target.closest('.queue-row-remove') || e.target.closest('.queue-drag-handle')) return;

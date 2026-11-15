@@ -1543,7 +1543,7 @@
             copy.append(name, artist);
             const duration = document.createElement('span');
             duration.className = 'retro-track-duration';
-            duration.textContent = typeof song?.duration === 'string' && song.duration.includes(':') ? song.duration : formatTime(song?.duration);
+            duration.textContent = typeof song?.duration === 'string' && song.duration.includes(':') ? song.duration : (Number(song?.duration) > 0 ? formatTime(song.duration) : '—');
             play.append(number, copy, duration);
 
             const remove = document.createElement('button');

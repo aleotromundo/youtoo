@@ -486,6 +486,7 @@ html { scroll-behavior: smooth; }
         .queue-row-item.playing .queue-row-title { color: var(--accent); }
 
         .queue-row-artist { font-size: 0.72rem; color: var(--text-gray); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 2px; }
+        .queue-row-time { font-size: 0.72rem; color: var(--text-gray); font-variant-numeric: tabular-nums; margin-left: auto; padding: 0 6px; flex-shrink: 0; }
 
         .queue-playing-icon { color: var(--accent); font-size: 0.8rem; flex-shrink: 0; }
 
