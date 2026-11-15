@@ -192,3 +192,14 @@ async function syncNowarfyQueue() {
         }
     }
 }
+
+// Respaldo si Realtime se corta o la pestaña estuvo en segundo plano: revisa la cola del servidor
+// cada 15 segundos y al volver a la app.
+let nowarfyQueuePollStarted = false;
+function startNowarfyQueuePolling() {
+    if (nowarfyQueuePollStarted) return;
+    nowarfyQueuePollStarted = true;
+    setInterval(() => { if (!document.hidden) scheduleNowarfyQueueSync(0); }, 15000);
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) scheduleNowarfyQueueSync(0); });
+    window.addEventListener('focus', () => scheduleNowarfyQueueSync(0));
+}

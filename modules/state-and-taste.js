@@ -175,6 +175,7 @@ const initializeNowarfyHome = () => {
     restoreQueueFromStorage();
     void hydrateQueueFromIndexedDB().finally(() => {
         window.nowarfyQueueReady = true;
+        if (typeof startNowarfyQueuePolling === 'function') startNowarfyQueuePolling();
         if (typeof scheduleNowarfyQueueSync === 'function') scheduleNowarfyQueueSync(0);
     });
     setupQueueTrashDropzone();
