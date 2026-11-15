@@ -566,14 +566,15 @@ function nowarfyActiveDeviceLabel() {
 function renderNowarfyDeviceDock() {
     const dock = document.getElementById('nowarfyDeviceDock');
     if (!dock) return;
-    const show = !!nowarfyAuthUser && !!nowarfyRemoteSession && (nowarfyDeviceDockPinned || nowarfyRemoteDevices.length > 1);
+    // Siempre visible: sin sesión sirve de atajo para entrar y conectar dispositivos.
+    const show = true;
     const appearing = dock.hidden && show;
     dock.hidden = !show;
     if (!show) { toggleNowarfyDeviceDock(false); return; }
     if (appearing) flashNowarfyDeviceDock();
     const label = document.getElementById('nowarfyDeviceDockLabel');
     if (label) {
-        const text = nowarfyActiveDeviceLabel();
+        const text = nowarfyAuthUser ? nowarfyActiveDeviceLabel() : 'Entrar para cambiar de equipo';
         if (label.textContent !== text) { label.textContent = text; flashNowarfyDeviceDock(); }
     }
     const button = document.getElementById('nowarfyDeviceDockButton');
@@ -609,6 +610,8 @@ function toggleNowarfyDeviceDock(force) {
     const panel = document.getElementById('nowarfyDeviceDockPanel');
     const button = document.getElementById('nowarfyDeviceDockButton');
     if (!panel) return;
+    // Sin sesión, el botón lleva directamente a entrar: ahí se conectan los dispositivos.
+    if (!nowarfyAuthUser && typeof force !== 'boolean') { panel.hidden = true; openNowarfyAuth(); return; }
     const open = typeof force === 'boolean' ? force : panel.hidden;
     panel.hidden = !open;
     if (button) button.setAttribute('aria-expanded', String(open));
