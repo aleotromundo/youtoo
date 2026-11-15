@@ -28,9 +28,14 @@ function queueItemForSync(song) {
     return item;
 }
 
+// Huella de lo que importa sincronizar: si cambia la duración o la ruta, también cuenta como cambio.
+function queueSongFingerprint(song) {
+    return [songKey(song), song.duration ?? '', song.storagePath ?? '', song.url ?? ''].join('|');
+}
+
 function sameQueueSongs(a, b) {
     if (a.length !== b.length) return false;
-    return a.every((song, i) => songKey(song) === songKey(b[i]));
+    return a.every((song, i) => queueSongFingerprint(song) === queueSongFingerprint(b[i]));
 }
 
 // base: última versión acordada. local: esta cola. remote: la del servidor.
@@ -47,9 +52,12 @@ function mergeQueueSongs(base, local, remote) {
         seen.add(key);
         merged.push(song);
     };
+    const localByKey = new Map(local.map(song => [songKey(song), song]));
     remote.forEach(song => {
         const key = songKey(song);
-        if (!(baseKeys.has(key) && !localKeys.has(key))) add(song);
+        if (baseKeys.has(key) && !localKeys.has(key)) return;
+        // Para una canción que ya está en este dispositivo, manda la copia local (con su duración real).
+        add(localByKey.get(key) ?? song);
     });
     local.forEach(song => {
         if (!baseKeys.has(songKey(song))) add(song);
