@@ -453,6 +453,8 @@ body.mode-classic #dynamicSections { scroll-margin-top: 76px; }
 .retro-playlist-window { min-height: 0; }
 .retro-playlist-heading { display: flex; align-items: center; gap: 7px; min-width: 0; }
 .retro-playlist-heading span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.retro-refresh-btn { flex: 0 0 auto; background: none; border: 0; padding: 0 2px; color: #a1e98e; cursor: pointer; font-size: .62rem; line-height: 1; }
+.retro-refresh-btn:hover { color: #e1e6f1; }
 .retro-queue-count { flex: 0 0 auto; color: #a1e98e; font: 700 .56rem 'Courier New', monospace; letter-spacing: .02em; }
 .retro-playlist-actions { display: inline-flex; align-items: center; gap: 5px; }
 .retro-playlist-actions button {

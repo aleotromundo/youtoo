@@ -442,6 +442,10 @@ html { scroll-behavior: smooth; }
 
         .queue-close-btn:hover { background: var(--bg-hover); color: white; }
 
+        .queue-sub-row { display: flex; align-items: center; gap: 8px; padding-right: 18px; }
+        .queue-sub-row .queue-panel-sub { flex: 1; min-width: 0; padding-right: 0; }
+        .queue-refresh-btn { flex: 0 0 auto; width: 26px; height: 26px; margin-bottom: 12px; padding: 0; border: 1px solid var(--border-soft); border-radius: 6px; background: none; color: var(--text-gray); cursor: pointer; display: inline-flex; align-items: center; justify-content: center; font-size: 0.75rem; }
+        .queue-refresh-btn:hover { background: var(--accent); border-color: var(--accent); color: white; }
         .queue-panel-sub { padding: 0 18px 12px; color: var(--text-dim); font-size: 0.76rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em; }
 
 

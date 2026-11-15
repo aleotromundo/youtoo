@@ -257,13 +257,12 @@
                     </section>
                     <section class="retro-window retro-playlist-window" aria-label="Playlist actual">
                         <header class="retro-titlebar">
-                            <span class="retro-playlist-heading"><i class="fas fa-list" aria-hidden="true"></i><span>WINAMP PLAYLIST</span><span id="retroQueueCount" class="retro-queue-count">0 pistas</span></span>
+                            <span class="retro-playlist-heading"><i class="fas fa-list" aria-hidden="true"></i><span>WINAMP PLAYLIST</span><span id="retroQueueCount" class="retro-queue-count">0 pistas</span><button type="button" id="retroRefreshQueue" class="retro-refresh-btn" aria-label="Actualizar la lista" title="Actualizar la lista"><i class="fas fa-rotate-right" aria-hidden="true"></i></button></span>
                             <span class="retro-playlist-actions">
                                 <button type="button" id="retroShuffle" aria-label="Alternar reproducción aleatoria" title="Reproducción aleatoria" aria-pressed="false">MEZCLAR</button>
                                 <button type="button" id="retroContinuous" aria-label="Alternar reproducción continua" title="Reproducción continua">CONTINUA</button>
                                 <button type="button" id="retroClearQueue" aria-label="Vaciar Playlist" title="Vaciar Playlist">VACIAR</button>
                                 <button type="button" id="retroRestoreQueue" aria-label="Restaurar la última lista" title="Restaurar la última lista" hidden><i class="fas fa-rotate-left" aria-hidden="true"></i></button>
-                                <button type="button" id="retroRefreshQueue" aria-label="Actualizar la lista" title="Actualizar la lista"><i class="fas fa-rotate" aria-hidden="true"></i></button>
                             </span>
                         </header>
                         <div id="retroUploadStatus" class="retro-upload-status" aria-live="polite" hidden></div>
@@ -426,11 +425,13 @@
                 <button type="button" class="queue-clear-btn queue-continuous-btn" id="continuousQueueToggle" onclick="toggleContinuousPlayback()" title="Reproducción continua" aria-pressed="true"><i class="fas fa-infinity"></i> Continua</button>
                 <button type="button" class="queue-clear-btn" onclick="clearQueue()" title="Vaciar Playlist"><i class="fas fa-trash"></i> Vaciar</button>
                 <button type="button" class="queue-clear-btn queue-restore-btn" id="queueRestoreBtn" onclick="restoreQueueBackup()" title="Restaurar la última lista" aria-label="Restaurar la última lista" hidden><i class="fas fa-rotate-left"></i></button>
-                <button type="button" class="queue-clear-btn queue-restore-btn" id="queueRefreshBtn" onclick="refreshNowarfyQueue()" title="Actualizar la lista" aria-label="Actualizar la lista"><i class="fas fa-rotate"></i></button>
                 <button type="button" class="queue-close-btn" onclick="closeQueuePanel()" aria-label="Cerrar Playlist"><i class="fas fa-xmark"></i></button>
             </div>
         </div>
-        <div class="queue-panel-sub" id="queueSub">La Playlist está vacía</div>
+        <div class="queue-sub-row">
+            <div class="queue-panel-sub" id="queueSub">La Playlist está vacía</div>
+            <button type="button" class="queue-refresh-btn" id="queueRefreshBtn" onclick="refreshNowarfyQueue()" title="Actualizar la lista" aria-label="Actualizar la lista"><i class="fas fa-rotate-right"></i></button>
+        </div>
         <div class="queue-upload-status" id="queueUploadStatus" aria-live="polite" hidden></div>
         <div class="queue-list" id="queueList"></div>
         <div class="queue-loading-hint" id="queueLoadingHint"><div class="loader-spinner" style="width:16px;height:16px;border-width:2px;"></div> Sumando más canciones...</div>
