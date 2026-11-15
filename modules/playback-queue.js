@@ -879,12 +879,24 @@ function playQueueAt(idx, options = {}) {
         applyVolume(parseFloat(document.getElementById('volumeSlider').value));
         const shouldAutoplayAudio = !options.deferAutoplay && !externalAudioFocusInterrupted && resumeSession?.wasPlaying !== false;
         const startDirectAudio = (media) => {
-            if (currentQueueSong()?._qid !== song._qid) return;
+            if (currentQueueSong()?._qid !== song._qid) {
+                if (song.local) showToast('Diagnóstico: la pista cambió antes de empezar (cola reemplazada)', 'fa-circle-info');
+                return;
+            }
             activeAudioEl = media;
             media.src = song.url;
             media.dataset.queueId = String(song._qid);
             bindDirectAudioEvents(media);
             media.onloadedmetadata = () => applyResumeSessionToMedia(media, song, resumeSession);
+            if (song.local && shouldAutoplayAudio) {
+                const watchedQid = song._qid;
+                window.setTimeout(() => {
+                    if (currentPlayingQid !== watchedQid || !(media.paused || media.currentTime === 0)) return;
+                    const kind = String(media.src || '').startsWith('blob:') ? 'local' : 'nube';
+                    showToast(`Diagnóstico (${kind}): sin sonido tras 4 s · readyState ${media.readyState} · networkState ${media.networkState} · pausado ${media.paused} · t=${media.currentTime.toFixed(1)}`, 'fa-circle-info');
+                    console.warn('Diagnóstico de reproducción', { src: media.src, readyState: media.readyState, networkState: media.networkState, paused: media.paused, error: media.error, crossOrigin: media.crossOrigin, volume: media.volume, muted: media.muted });
+                }, 4000);
+            }
             if (shouldAutoplayAudio) media.play().catch(e => {
                 if (nowarfyHandleAutoplayBlocked?.(e)) return;
                 setTrackLoading(false);
