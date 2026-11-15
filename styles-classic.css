@@ -624,3 +624,25 @@ body.mode-transitioning .retro-studio { animation: retro-console-arrive 3s cubic
 .retro-mode-toggle:hover .retro-toggle-copy,
 .retro-mode-toggle:focus-visible .retro-toggle-copy,
 .retro-mode-toggle.is-retro .retro-toggle-copy { max-width: 220px; opacity: 1; }
+
+/* Soltar archivos de música sobre la Playlist (modo Winamp y panel moderno). */
+.retro-playlist-window.is-file-drop,
+.queue-panel.is-file-drop { outline: 2px dashed var(--retro-lime); outline-offset: -5px; }
+.retro-playlist-window.is-file-drop::after,
+.queue-panel.is-file-drop::after {
+    content: 'SOLTÁ LOS ARCHIVOS PARA AGREGARLOS';
+    position: absolute;
+    inset: 0;
+    z-index: 8;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 18px;
+    background: rgba(5, 6, 9, .86);
+    color: var(--retro-lime);
+    font: 800 .78rem 'Courier New', monospace;
+    letter-spacing: .12em;
+    text-align: center;
+    text-shadow: 0 0 10px rgba(49, 244, 27, .35);
+    pointer-events: none;
+}

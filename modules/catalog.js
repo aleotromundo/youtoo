@@ -290,6 +290,83 @@ function handleLocalMusicFiles(files) {
     if (idle) playQueueAt(firstNew, {});
     showToast(`Agregué ${tracks.length} pista(s) a la playlist`, 'fa-list');
 }
+// Arrastrar archivos o carpetas de música sobre la Playlist (modo Winamp y panel moderno).
+// Las carpetas se recorren completas; el audio se agrega con handleLocalMusicFiles.
+(function initPlaylistFileDrop() {
+    const hasFiles = (event) => Array.from(event.dataTransfer?.types || []).includes('Files');
+    const readEntry = (entry, path) => new Promise(resolve => {
+        if (entry.isFile) {
+            entry.file(file => {
+                if (path) { try { Object.defineProperty(file, 'webkitRelativePath', { value: `${path}${file.name}` }); } catch (_) {} }
+                resolve([file]);
+            }, () => resolve([]));
+        } else if (entry.isDirectory) {
+            const reader = entry.createReader();
+            const children = [];
+            const readBatch = () => reader.readEntries(async batch => {
+                if (!batch.length) {
+                    const nested = await Promise.all(children.map(child => readEntry(child, `${path}${entry.name}/`)));
+                    resolve(nested.flat());
+                    return;
+                }
+                children.push(...batch);
+                readBatch();
+            }, () => resolve([]));
+            readBatch();
+        } else resolve([]);
+    });
+    // El DataTransfer solo es válido durante el evento: las entradas se toman antes de esperar nada.
+    const collectFiles = (dataTransfer) => {
+        const plainFiles = Array.from(dataTransfer.files || []);
+        const entries = Array.from(dataTransfer.items || [])
+            .map(item => (item.kind === 'file' && typeof item.webkitGetAsEntry === 'function') ? item.webkitGetAsEntry() : null)
+            .filter(Boolean);
+        if (!entries.length) return Promise.resolve(plainFiles);
+        return Promise.all(entries.map(entry => readEntry(entry, ''))).then(groups => groups.flat());
+    };
+    const bindZone = (zone) => {
+        if (!zone || zone.dataset.fileDropBound) return;
+        zone.dataset.fileDropBound = '1';
+        let depth = 0;
+        const clear = () => { depth = 0; zone.classList.remove('is-file-drop'); };
+        zone.addEventListener('dragenter', (event) => {
+            if (!hasFiles(event)) return;
+            event.preventDefault();
+            depth += 1;
+            zone.classList.add('is-file-drop');
+        });
+        zone.addEventListener('dragover', (event) => {
+            if (!hasFiles(event)) return;
+            event.preventDefault();
+            event.dataTransfer.dropEffect = 'copy';
+        });
+        zone.addEventListener('dragleave', (event) => {
+            if (!hasFiles(event)) return;
+            depth = Math.max(0, depth - 1);
+            if (!depth) zone.classList.remove('is-file-drop');
+        });
+        zone.addEventListener('drop', (event) => {
+            if (!hasFiles(event)) return;
+            event.preventDefault();
+            clear();
+            collectFiles(event.dataTransfer).then(files => handleLocalMusicFiles(files));
+        });
+    };
+    const start = () => {
+        bindZone(document.querySelector('.retro-playlist-window'));
+        bindZone(document.getElementById('queuePanel'));
+        // Un archivo soltado fuera de la Playlist no debe abrirse en la pestaña.
+        const outside = (event) => {
+            if (!hasFiles(event) || event.target.closest?.('.retro-playlist-window, #queuePanel')) return;
+            event.preventDefault();
+            if (event.type === 'dragover') event.dataTransfer.dropEffect = 'none';
+        };
+        window.addEventListener('dragover', outside);
+        window.addEventListener('drop', outside);
+    };
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start);
+    else start();
+})();
 function scrollRetroResultsIntoView() {
     if (!retroSearchScrollPending || !document.body.classList.contains('mode-classic')) return;
     const target = document.getElementById('dynamicSections');
