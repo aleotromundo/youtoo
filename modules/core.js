@@ -377,10 +377,6 @@ async function signOutNowarfy() {
     updateNowarfyAuthUI();
     authStatus('Sesión cerrada. El modo anónimo local continúa disponible.');
 }
-async function switchNowarfyUser() {
-    await signOutNowarfy();
-    openNowarfyAuth();
-}
 
 function remoteStatus(message) { const el = document.getElementById('nowarfyRemoteStatus'); if (el) el.textContent = message; updateNowarfyConnectionStatus(); }
 function currentRemotePosition() {
