@@ -83,6 +83,8 @@
             float mask=(0.025+0.085*clouds+0.22*filament+0.12*tendrils+0.16*ring)*(0.42+energy*0.92);
             mask*=1.0-smoothstep(0.05,1.32,r);
             vec3 color=prev+ink*mask;
+            // El dedo solo agrega una luz local mientras está apoyado: la música sigue igual en todo el campo.
+            color+=mix(ink,vec3(0.45,0.85,1.0),0.5)*tfall*0.22;
             color+=palette(spiral/TAU+clouds+phase,phase)*ring*(0.035+beat*0.24);
             color+=vec3(0.03,0.06,0.12)*pow(max(0.0,1.0-r),3.0)*(0.2+high*0.45);
             color+=palette(clouds+uTime*0.1+phase+tdist,phase)*tfall*0.22;
