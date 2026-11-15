@@ -52,7 +52,25 @@
                 <div class="vs-label"><strong>Sensibilidad al sonido</strong><span class="vs-value" id="visSensitivityValue">${Number(visualSettings.sensitivity).toFixed(1)}×</span></div>
                 <input type="range" class="vs-range" id="visSensitivity" min="0.5" max="2" step="0.1" value="${visualSettings.sensitivity}">
             </div>
+            <div class="vs-row vs-block">
+                <!-- TEMPORAL: copiar el SQL de Supabase. Quitar cuando la migración esté aplicada. -->
+                <button type="button" class="vs-seg" id="visCopySql"><i class="fas fa-copy" aria-hidden="true"></i> Copiar SQL de Supabase</button>
+            </div>
         </div>`;
+        // TEMPORAL: copia el SQL de la migración de la cola para pegarlo en el editor de Supabase.
+        overlay.querySelector('#visCopySql').addEventListener('click', async (event) => {
+            const button = event.currentTarget;
+            try {
+                const response = await fetch('/supabase/migrations/20261114_nowarfy_user_queue.sql', { cache: 'no-store' });
+                if (!response.ok) throw new Error('sql_unavailable');
+                const sql = await response.text();
+                await navigator.clipboard.writeText(sql);
+                button.innerHTML = '<i class="fas fa-check" aria-hidden="true"></i> SQL copiado';
+            } catch (error) {
+                button.textContent = 'No se pudo copiar el SQL';
+                console.error('Error copiando el SQL:', error);
+            }
+        });
         const close = () => overlay.remove();
         overlay.addEventListener('click', (event) => {
             if (event.target === overlay || event.target.closest('[data-close]')) { close(); return; }
