@@ -307,6 +307,25 @@ function renderUploadStatus(flash = '') {
     });
 }
 
+// Convierte la respuesta de error de Supabase Storage en un motivo legible.
+function describeUploadError(status, responseText) {
+    let message = '';
+    try {
+        const body = JSON.parse(responseText || '{}');
+        message = String(body.message || body.error || '');
+    } catch (_) { message = String(responseText || '').slice(0, 160); }
+    const lower = message.toLowerCase();
+    let reason;
+    if (status === 404 || lower.includes('bucket not found')) reason = 'el bucket "nowarfy-music" no existe en Supabase (falta ejecutar la migración SQL)';
+    else if (status === 413 || lower.includes('exceeded the maximum') || lower.includes('too large')) reason = 'el archivo supera el tamaño máximo permitido por Supabase';
+    else if (status === 401 || lower.includes('jwt')) reason = 'la sesión expiró; volvé a iniciar sesión';
+    else if (status === 400 && lower.includes('mime')) reason = 'tipo de archivo no permitido por el bucket';
+    else if (status === 403 || lower.includes('row-level security') || lower.includes('policy')) reason = 'sin permiso en Supabase (faltan las políticas del bucket)';
+    else if (status === 409 || lower.includes('already exists')) reason = 'ya existe un archivo con ese nombre';
+    else reason = message || 'error del servidor';
+    return `${reason} [${status || 'sin respuesta'}]`;
+}
+
 // Sube un archivo local al bucket de la cuenta para que otros dispositivos puedan reproducirlo.
 function uploadLocalMusicFile(file, item) {
     if (!nowarfySupabase || !nowarfyAuthUser) return Promise.resolve();
@@ -316,7 +335,7 @@ function uploadLocalMusicFile(file, item) {
     const uploadId = `${item._qid}-${path}`;
     nowarfyUploads.set(uploadId, 0);
     renderUploadStatus();
-    const finish = (ok) => {
+    const finish = (ok, reason = '') => {
         nowarfyUploads.delete(uploadId);
         if (ok) {
             const stored = queue.find(song => song._qid === item._qid);
@@ -327,7 +346,7 @@ function uploadLocalMusicFile(file, item) {
             queue = queue.filter(song => song._qid !== item._qid);
             persistQueue();
             renderQueue();
-            showToast(`No se pudo subir "${item.title}"`, 'fa-triangle-exclamation');
+            showToast(`No se pudo subir "${item.title}"${reason ? ': ' + reason : ''}`, 'fa-triangle-exclamation');
             renderUploadStatus();
         } else if (nowarfyUploads.size) {
             renderUploadStatus();
@@ -337,6 +356,7 @@ function uploadLocalMusicFile(file, item) {
     };
     return nowarfySupabase.auth.getSession().then(({ data }) => new Promise(resolve => {
         const token = data?.session?.access_token;
+        if (!token) { finish(false, 'no hay sesión iniciada'); resolve(); return; }
         const endpoint = `${nowarfySupabase.supabaseUrl}/storage/v1/object/${NOWARFY_MUSIC_BUCKET}/${path.split('/').map(encodeURIComponent).join('/')}`;
         const xhr = new XMLHttpRequest();
         xhr.open('POST', endpoint, true);
@@ -349,10 +369,15 @@ function uploadLocalMusicFile(file, item) {
             nowarfyUploads.set(uploadId, event.loaded / event.total);
             renderUploadStatus();
         };
-        xhr.onload = () => { finish(xhr.status >= 200 && xhr.status < 300); resolve(); };
-        xhr.onerror = () => { finish(false); resolve(); };
+        xhr.onload = () => {
+            const ok = xhr.status >= 200 && xhr.status < 300;
+            if (!ok) console.error('Falló la subida a Supabase Storage:', xhr.status, xhr.responseText);
+            finish(ok, ok ? '' : describeUploadError(xhr.status, xhr.responseText));
+            resolve();
+        };
+        xhr.onerror = () => { console.error('Falló la subida: error de red'); finish(false, 'error de red o conexión interrumpida'); resolve(); };
         xhr.send(file);
-    })).catch(() => finish(false));
+    })).catch((err) => { console.error('Falló la subida:', err); finish(false, 'error inesperado'); });
 }
 
 // Lee la duración del archivo para mostrarla enseguida en la lista.
