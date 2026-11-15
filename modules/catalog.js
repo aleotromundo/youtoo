@@ -253,15 +253,40 @@ function formatContentDuration(seconds) {
     return hours ? `${hours}:${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}` : `${mins}:${String(secs).padStart(2, '0')}`;
 }
 
+// Separa "Artista - Canción" del título de un video de YouTube, como en Winamp.
+// Si el título no trae separador, usa el canal (sin "VEVO") como artista.
+function cleanChannelAsArtist(channelTitle) {
+    return String(channelTitle || '')
+        .replace(/vevo$/i, '')
+        .replace(/\s*-\s*topic$/i, '')
+        .trim();
+}
+function splitYouTubeArtistTitle(rawTitle, channelTitle) {
+    let text = normalizeSourceText(rawTitle).trim();
+    // Quita etiquetas de videoclip entre paréntesis o corchetes: (Official Video), [HD], (Lyrics), etc.
+    text = text.replace(/\s*[\(\[][^\)\]]*\b(official|video|audio|lyrics?|hd|hq|4k|remaster(?:ed)?|clip)\b[^\)\]]*[\)\]]/gi, '');
+    text = text.replace(/\s*\|\s*(official|video|audio|lyrics?).*$/i, '').trim();
+    const separator = text.match(/\s+[-–—]\s+/);
+    if (separator) {
+        const index = separator.index;
+        const artist = text.slice(0, index).trim();
+        const title = text.slice(index + separator[0].length).trim();
+        if (artist && title) return { artist, title };
+    }
+    return { artist: cleanChannelAsArtist(channelTitle) || normalizeSourceText(channelTitle), title: text };
+}
+
 function mapYouTubeItems(items) {
     return items
         .filter(item => item.id && (item.id.kind === 'youtube#video' || item.id.kind === 'youtube#playlist' || item.id.kind === 'youtube#channel'))
         .map(item => {
             const isChannel = item.id.kind === 'youtube#channel';
+            const isVideo = item.id.kind === 'youtube#video';
+            const parsed = isVideo ? splitYouTubeArtistTitle(item.snippet.title, item.snippet.channelTitle) : null;
             const thumb = item.snippet.thumbnails && (item.snippet.thumbnails.medium || item.snippet.thumbnails.default || item.snippet.thumbnails.high);
             return {
-                title: normalizeSourceText(item.snippet.title),
-                artist: normalizeSourceText(isChannel ? 'Canal de YouTube' : item.snippet.channelTitle),
+                title: parsed ? parsed.title : normalizeSourceText(item.snippet.title),
+                artist: parsed ? parsed.artist : normalizeSourceText(isChannel ? 'Canal de YouTube' : item.snippet.channelTitle),
                 description: normalizeSourceText(item.snippet.description),
                 img: thumb ? thumb.url : '',
                 url: item.id.videoId || item.id.playlistId || item.id.channelId,
@@ -526,9 +551,10 @@ async function fetchYouTubeLegacy(query, maxResults = 20) {
             .slice(0, maxResults)
             .map(item => {
                 const thumb = item.snippet.thumbnails && (item.snippet.thumbnails.medium || item.snippet.thumbnails.default || item.snippet.thumbnails.high);
+                const parsed = splitYouTubeArtistTitle(item.snippet.title, item.snippet.channelTitle);
                 return {
-                    title: normalizeSourceText(item.snippet.title),
-                    artist: normalizeSourceText(item.snippet.channelTitle),
+                    title: parsed.title,
+                    artist: parsed.artist,
                     description: normalizeSourceText(item.snippet.description),
                     img: thumb ? thumb.url : '',
                     url: item.id.videoId,
