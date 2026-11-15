@@ -1507,3 +1507,36 @@ let currentList = [];
 let favorites = JSON.parse(localStorage.getItem('nowarfy_favs')) || [];
 let currentIndex = -1;
 let isPlaying = false;
+
+// El círculo de Cuenta es fijo (se ve en todos los modos); acá se alinea con la barra de búsqueda:
+// misma altura que la barra y el borde derecho en el borde derecho de ella.
+(function alignNowarfyAccountCircle() {
+    let frame = 0;
+    const align = () => {
+        frame = 0;
+        const circle = document.getElementById('nowarfyAuthButton');
+        const toolbar = document.querySelector('.search-toolbar');
+        if (!circle || !toolbar) return;
+        const rect = toolbar.getBoundingClientRect();
+        if (!rect.height || !rect.width) return; // barra oculta: se queda la posición de respaldo del CSS
+        const size = circle.offsetHeight || 36;
+        const top = Math.max(4, rect.top + (rect.height - size) / 2);
+        const right = Math.max(4, document.documentElement.clientWidth - rect.right);
+        circle.style.top = top + 'px';
+        circle.style.right = right + 'px';
+    };
+    const schedule = () => { if (!frame) frame = window.requestAnimationFrame(align); };
+    const start = () => {
+        align();
+        window.addEventListener('resize', schedule, { passive: true });
+        window.addEventListener('scroll', schedule, { passive: true, capture: true });
+        window.addEventListener('load', schedule);
+        if ('ResizeObserver' in window) {
+            const toolbar = document.querySelector('.search-toolbar');
+            if (toolbar) new ResizeObserver(schedule).observe(toolbar);
+        }
+        new MutationObserver(schedule).observe(document.body, { attributes: true, attributeFilter: ['class'] });
+    };
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start);
+    else start();
+})();
