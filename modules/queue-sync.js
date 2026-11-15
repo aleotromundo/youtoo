@@ -98,6 +98,14 @@ function applyRemoteQueueSongs(songs) {
     });
     const playing = currentPlayingQid == null ? null : queue.find(song => song._qid === currentPlayingQid);
     if (playing && !next.some(song => song._qid === playing._qid)) next = [playing, ...next];
+    // Las pistas locales que todavía se están subiendo no están en la nube: se conservan en esta lista.
+    const nextKeys = new Set(next.map(songKey));
+    queue.forEach(song => {
+        if (song.local && !song.storagePath && !nextKeys.has(songKey(song))) {
+            nextKeys.add(songKey(song));
+            next.push(song);
+        }
+    });
     queue = next;
     queueSeenKeys = new Set(queue.map(songKey));
     const idx = currentPlayingQid == null ? -1 : queue.findIndex(song => song._qid === currentPlayingQid);
