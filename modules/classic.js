@@ -501,13 +501,13 @@
         const song = currentSong();
         if (!media || !song || !isActuallyPlaying()) return;
         if (String(song.type) === 'yt') {
-            setAudioState('Señal interna no disponible · tocá para usar el micrófono', 'warning');
+            setAudioState('YouTube · movimiento tranquilo · sin señal de audio', 'warning');
             return;
         }
         const url = song.url || media.currentSrc || media.src;
         const corsIsReady = corsPreparedMedia.has(media) || media.crossOrigin === 'anonymous' || isSameOrigin(url);
         if (!corsIsReady) {
-            setAudioState('Sin señal interna · tocá para usar el micrófono', 'warning');
+            setAudioState('Sin señal interna · movimiento tranquilo', 'warning');
             return;
         }
         const graph = makeAudioGraph(media);
@@ -1317,8 +1317,7 @@
         applyAmbientProfile(song);
         enrichAmbientProfile(song);
         if (force && song && String(song.type) === 'yt') {
-            const profile = detectAmbientProfile(song);
-            setAudioState(`YouTube · perfil ${profile.label} · pulso de ${profile.bpm} BPM estimado`, 'warning');
+            setAudioState('YouTube · movimiento tranquilo · sin señal de audio', 'warning');
         }
         const title = song?.title || 'Esperando una pista';
         const artist = song?.artist || song?.channelTitle || 'YouToo · Retro Studio';
@@ -1386,7 +1385,7 @@
                 status.dataset.state = 'live';
                 lastAmbientMode = false;
             } else if (youtube) {
-                status.textContent = 'YouTube · tocá acá para capturar el audio de la pestaña';
+                status.textContent = 'YouTube · movimiento tranquilo · sin señal de audio';
                 status.dataset.state = 'warning';
                 lastAmbientMode = true;
                 disconnectButterchurnInput();
@@ -1602,6 +1601,11 @@
     }
 
     function ensureSyntheticPulse(profile) {
+        // Desactivado: un ritmo inventado a BPM estimados no coincide con la canción.
+        // Sin audio real, el visualizador se queda con movimiento tranquilo.
+        if (synth) stopSyntheticPulse();
+        return;
+        // eslint-disable-next-line no-unreachable
         if (!audioContext || !butterchurn || !profile) return;
         if (synth && synth.bpm === profile.bpm) return;
         stopSyntheticPulse();

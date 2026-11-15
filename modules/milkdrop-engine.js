@@ -292,7 +292,10 @@
                 const barPosition = (time / 60000 * profile.bpm) % 4;
                 // Pulso con ataque corto y release suave: evita el “flash” aleatorio
                 // y conserva una sensación de compás aun sin acceso al iframe.
-                const beatPulse = Math.pow(Math.max(0, 1 - beatPosition) * (0.82 + 0.18 * Math.cos(barPosition * Math.PI)), 3.2);
+                // Sin audio real no marcamos golpes: inventar el ritmo confunde más de lo que ayuda.
+                // Queda un movimiento lento y tranquilo, sin pulsos.
+                void beatPosition; void barPosition;
+                const beatPulse = 0;
                 const slow = 0.5 + 0.5 * Math.sin(time * 0.001 * (0.35 + profile.swing));
                 const target = [
                     profile.bass * (0.34 + 0.56 * beatPulse),
