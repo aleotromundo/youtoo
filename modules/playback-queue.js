@@ -757,6 +757,11 @@ function playQueueAt(idx, options = {}) {
     }
     currentIndex = idx;
     const song = queue[idx];
+    if (song?.local && !song.url) {
+        // Pista subida desde otro dispositivo: falta descargarla acá.
+        showToast('Esta pista está en otro dispositivo', 'fa-cloud');
+        return;
+    }
     const reuseYouTubePlayer = previousSong?.type === 'yt' && song?.type === 'yt' && ytPlayer?.loadVideoById && !options.forceNewYouTubePlayer;
     const resumeSession = ['yt', 'mp3', 'freevideo'].includes(song.type) && options.resumeSession && String(options.resumeSession.resourceId) === String(song.url) && (!options.resumeSession.type || options.resumeSession.type === song.type)
         ? options.resumeSession

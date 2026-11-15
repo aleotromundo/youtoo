@@ -16,7 +16,14 @@ let nowarfyQueueSyncQueued = false;
 // Solo viajan los datos de la canción; la descripción y el _qid son locales.
 // La pista oculta tras "Vaciar" no se sincroniza: sigue sonando en este dispositivo.
 function queueItemForSync(song) {
-    if (!song?.url || song._qid === hiddenPlayingQid) return null;
+    if (song?._qid === hiddenPlayingQid) return null;
+    // Las pistas locales viajan solo si ya están subidas; la URL temporal (blob:) es de este dispositivo.
+    if (song?.local) {
+        if (!song.storagePath) return null;
+        const { _qid, description, ...item } = song;
+        return { ...item, url: '' };
+    }
+    if (!song?.url) return null;
     const { _qid, description, ...item } = song;
     return item;
 }
@@ -73,7 +80,14 @@ function applyRemoteQueueSongs(songs) {
         const key = songKey(song);
         if (!qidByKey.has(key)) qidByKey.set(key, song._qid);
     });
-    let next = songs.map(song => ({ ...song, _qid: qidByKey.get(songKey(song)) ?? ++queueIdCounter }));
+    const localByKey = new Map(queue.map(song => [songKey(song), song]));
+    let next = songs.map(song => {
+        const existing = localByKey.get(songKey(song));
+        const merged = { ...song, _qid: qidByKey.get(songKey(song)) ?? ++queueIdCounter };
+        // Si la pista ya está en este dispositivo, se conserva su URL local.
+        if (song.local && existing?.local && existing.url) merged.url = existing.url;
+        return merged;
+    });
     const playing = currentPlayingQid == null ? null : queue.find(song => song._qid === currentPlayingQid);
     if (playing && !next.some(song => song._qid === playing._qid)) next = [playing, ...next];
     queue = next;

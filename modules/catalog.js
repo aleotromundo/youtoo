@@ -262,6 +262,23 @@ function setSourceFilter(source) {
 })();
 // Archivos de música del propio dispositivo: se reproducen desde una URL local (blob),
 // así que el visualizador puede analizar su sonido sin restricciones de origen.
+const NOWARFY_MUSIC_BUCKET = 'nowarfy-music';
+
+// Sube un archivo local al bucket de la cuenta para que otros dispositivos puedan descargarlo.
+async function uploadLocalMusicFile(file, item) {
+    if (!nowarfySupabase || !nowarfyAuthUser) return;
+    const safeName = String(file.name || 'pista').replace(/[^a-zA-Z0-9._-]+/g, '_').slice(-120);
+    const path = `${nowarfyAuthUser.id}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}-${safeName}`;
+    const { error } = await nowarfySupabase.storage.from(NOWARFY_MUSIC_BUCKET).upload(path, file, { contentType: file.type || 'audio/mpeg', upsert: false });
+    if (error) {
+        console.error('Error subiendo la pista local:', error);
+        showToast(`No se pudo subir "${item.title}"`, 'fa-triangle-exclamation');
+        return;
+    }
+    const stored = queue.find(song => song._qid === item._qid);
+    if (stored) { stored.storagePath = path; persistQueue(); }
+}
+
 function handleLocalMusicFiles(files) {
     const isAudio = (file) => /^audio\//.test(file.type || '') || /\.(mp3|ogg|oga|wav|flac|m4a|aac|opus)$/i.test(file.name || '');
     const picked = Array.from(files || []).filter(isAudio);
@@ -283,7 +300,9 @@ function handleLocalMusicFiles(files) {
         sourceUrl: ''
     }));
     const firstNew = queue.length;
-    queue = [...queue, ...tracks.map(withQid)];
+    const added = tracks.map(withQid);
+    queue = [...queue, ...added];
+    added.forEach((item, i) => { void uploadLocalMusicFile(picked[i], item); });
     persistQueue();
     renderQueue();
     const idle = typeof isActuallyPlaying === 'function' ? !isActuallyPlaying() : true;
