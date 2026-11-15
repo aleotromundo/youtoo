@@ -57,7 +57,15 @@ function mergeQueueSongs(base, local, remote) {
         const key = songKey(song);
         if (baseKeys.has(key) && !localKeys.has(key)) return;
         // Para una canción que ya está en este dispositivo, manda la copia local (con su duración real).
-        add(localByKey.get(key) ?? song);
+        // Pero si el servidor ya tiene la ruta de la nube (otro dispositivo terminó de subirla) y la copia
+        // local todavía no, se toma esa ruta: si no, esta copia vieja pisaría el servidor con "subiendo…".
+        const mine = localByKey.get(key);
+        if (mine && song.storagePath && !mine.storagePath) {
+            const { uploading, ...ready } = mine;
+            add({ ...ready, storagePath: song.storagePath });
+        } else {
+            add(mine ?? song);
+        }
     });
     local.forEach(song => {
         if (!baseKeys.has(songKey(song))) add(song);
