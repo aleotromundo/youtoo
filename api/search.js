@@ -365,6 +365,8 @@ export default async function handler(req, res) {
       // Openverse permite consultas públicas sin token. Si Vercel tiene credenciales,
       // las usamos para aumentar el margen de cuota sin hacerlas obligatorias.
       if (clientId && clientSecret) {
+        // Si la credencial falla, seguimos sin token: no debe tumbar la búsqueda.
+        try {
         const tokenResp = await fetch('https://api.openverse.org/v1/auth_tokens/token/', {
           method: 'POST',
           headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -372,6 +374,7 @@ export default async function handler(req, res) {
         });
         const tokenData = await tokenResp.json();
         if (tokenResp.ok && tokenData.access_token) headers.Authorization = `Bearer ${tokenData.access_token}`;
+        } catch (tokenError) { /* sin token: búsqueda pública */ }
       }
       const searchResp = await fetch(searchUrl, { headers });
       const searchData = await searchResp.json();
