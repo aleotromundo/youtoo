@@ -1124,7 +1124,4 @@
 .source-chip:hover { opacity: 1; color: #cfd2e6; }
 .source-chip:focus-visible { outline: 2px solid #5eead4; outline-offset: 2px; }
 .source-chip.is-active { opacity: 1; color: #eafffb; border-color: rgba(94,234,212,.45); background: rgba(94,234,212,.1); }
-#dynamicSections[data-source-filter="youtube"] > section.source-openverse,
-#dynamicSections[data-source-filter="youtube"] > section.source-commons,
-#dynamicSections[data-source-filter="openverse"] > section:not(.source-openverse),
-#dynamicSections[data-source-filter="commons"] > section:not(.source-commons) { display: none; }
+

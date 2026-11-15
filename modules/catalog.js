@@ -224,7 +224,19 @@ function handleSearchKeydown(event) {
 }
 let retroSearchScrollPending = false;
 let retroReturnPending = false;
-// Filtro por fuente: muestra solo YouTube, Openverse o Wikimedia (o todas).
+// Filtro por fuente: muestra solo YouTube, Openverse o Jamendo (o todas).
+// Se aplica con JS sobre las secciones de resultados.
+function applySourceFilter() {
+    const container = document.getElementById('dynamicSections');
+    if (!container) return;
+    const filter = container.dataset.sourceFilter || '';
+    Array.from(container.children).forEach(section => {
+        if (section.tagName !== 'SECTION') return;
+        const kind = section.classList.contains('source-openverse') ? 'openverse'
+            : section.classList.contains('source-jamendo') ? 'jamendo' : 'youtube';
+        section.style.display = (!filter || kind === filter) ? '' : 'none';
+    });
+}
 function setSourceFilter(source) {
     const container = document.getElementById('dynamicSections');
     if (!container) return;
@@ -233,13 +245,14 @@ function setSourceFilter(source) {
         chip.classList.toggle('is-active', chip.dataset.source === source);
         chip.setAttribute('aria-pressed', String(chip.dataset.source === source));
     });
+    applySourceFilter();
 }
 (function initSourceFilterVisibility() {
     const start = () => {
         const container = document.getElementById('dynamicSections');
         const filter = document.getElementById('sourceFilter');
         if (!container || !filter) return;
-        const sync = () => { filter.hidden = !container.children.length; };
+        const sync = () => { filter.hidden = !container.children.length; applySourceFilter(); };
         new MutationObserver(sync).observe(container, { childList: true });
         sync();
     };
@@ -801,18 +814,18 @@ async function performSmartSearch(query, options = {}) {
             return all.findIndex(other => songKey(other) === key) === index;
         });
         const openverseQuery = channelFilter ? query : `${query} music`;
-        const [youtubeResult, openverseResult, commonsResult] = await Promise.allSettled([
+        const [youtubeResult, openverseResult, jamendoResult] = await Promise.allSettled([
             channelFilter
                 ? fetchYouTubeSearch(query, 'video,playlist', { channelId: channelFilter.id, maxResults: 50, signal: activeSearchController.signal })
                 : fetchYouTubeSearch(query, 'video,playlist,channel', { maxResults: 50, signal: activeSearchController.signal }),
             fetchOpenverseTracks(openverseQuery, 20, { page: 1, reserveContext: 'manual', seed: { artist: query, title: query }, signal: activeSearchController.signal }),
-            channelFilter ? Promise.resolve([]) : fetchCommonsAudioTracks(query, 15, { signal: activeSearchController.signal })
+            channelFilter ? Promise.resolve([]) : fetchJamendoTracks(query, 15, { signal: activeSearchController.signal })
         ]);
         if (requestId !== activeSearchRequestId) return;
         const fresh = youtubeResult.status === 'fulfilled' ? youtubeResult.value || [] : [];
         const openverseTracks = mergeSearchResults([
             ...(openverseResult.status === 'fulfilled' ? openverseResult.value || [] : []),
-            ...(commonsResult.status === 'fulfilled' ? commonsResult.value || [] : [])
+            ...(jamendoResult.status === 'fulfilled' ? jamendoResult.value || [] : [])
         ]);
         const merged = mergeSearchResults([...localSongs, ...fresh]);
         activeSearchPagination.youtubeResults = merged;
@@ -859,6 +872,32 @@ function clearChannelFilter() {
     if (q) performSmartSearch(q); else resetView();
 }
 
+// Jamendo: música libre (CC) desde nuestro servidor, que guarda la clave JAMENDO_CLIENT_ID.
+async function fetchJamendoTracks(query, limit = 15, options = {}) {
+    const text = String(query || '').trim();
+    if (!text) return [];
+    try {
+        const response = await fetch(`/api/search?type=jamendo&query=${encodeURIComponent(text)}&maxResults=${Math.min(Math.max(limit, 1), 20)}`, options.signal ? { signal: options.signal } : undefined);
+        if (!response.ok) return [];
+        const data = await response.json();
+        return (data.results || []).filter(item => item && item.url).map(item => ({
+            title: normalizeSourceText(item.title || 'Sin título'),
+            artist: normalizeSourceText(item.artist || 'Jamendo'),
+            img: item.thumbnail || 'assets/nowarfy-icon-512.png',
+            url: item.url,
+            type: 'mp3',
+            duration: item.duration ?? null,
+            genre: item.genre || 'unknown',
+            license: item.license || '',
+            licenseVersion: item.licenseVersion || '',
+            filetype: 'audio/mpeg',
+            source: 'jamendo',
+            sourceUrl: item.sourceUrl || ''
+        }));
+    } catch (error) {
+        return [];
+    }
+}
 // Wikimedia Commons: audio libre con acceso desde el navegador (origin=*),
 // así el visualizador puede analizar el sonido de estas pistas.
 async function fetchCommonsAudioTracks(query, limit = 15, options = {}) {
@@ -986,17 +1025,17 @@ async function fetchFreeMusicCollection(collection) {
 function renderOpenverseSearchResults(tracks, query) {
     if (!Array.isArray(tracks) || !tracks.length) return;
     // Openverse y Wikimedia llegan mezclados: se separan en dos bloques para poder filtrarlos.
-    const commons = tracks.filter(track => track.source === 'commons');
-    const openverse = tracks.filter(track => track.source !== 'commons');
+    const jamendo = tracks.filter(track => track.source === 'jamendo');
+    const openverse = tracks.filter(track => track.source !== 'jamendo');
     if (openverse.length) renderLibraryRail(openverse.slice(0, 20), `Openverse · música de "${query}"`, "<i class='fas fa-headphones'></i>", false, {
         hint: 'Fuente abierta · resultados visibles siempre',
         showControls: true,
         className: 'free-music-rail openverse-search-rail source-openverse'
     });
-    if (commons.length) renderLibraryRail(commons.slice(0, 20), `Wikimedia Commons · audio de "${query}"`, "<i class='fas fa-compact-disc'></i>", false, {
-        hint: 'Audio libre · Wikimedia Commons',
+    if (jamendo.length) renderLibraryRail(jamendo.slice(0, 20), `Jamendo · música de "${query}"`, "<i class='fas fa-music'></i>", false, {
+        hint: 'Música libre · Jamendo',
         showControls: true,
-        className: 'free-music-rail source-commons'
+        className: 'free-music-rail source-jamendo'
     });
 }
 async function searchOpenverse(query) {
