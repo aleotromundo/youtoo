@@ -7,13 +7,14 @@
         'catalog.js',
         'reserve.js',
         'playback-queue.js',
+        'queue-sync.js',
         'lyrics-video.js',
         'player-pwa.js',
         'classic.js'
     ];
     // Versionado explícito para que una PWA o un Service Worker no reutilice
     // un módulo retro anterior después de un despliegue.
-    const ASSET_VERSION = '20261114-2240';
+    const ASSET_VERSION = '20261114-2320';
     const base = '/modules/';
     const loader = document.getElementById('loader');
     const message = document.getElementById('loaderMessage');

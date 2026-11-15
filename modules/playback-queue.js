@@ -362,11 +362,6 @@ async function addToQueue(song) {
     const onlyHiddenCopy = hiddenPlayingQid != null && queue.every(s => songKey(s) !== k || s._qid === hiddenPlayingQid);
     if (queueSeenKeys.has(k) && !onlyHiddenCopy) { showToast('Ya está en la Playlist', 'fa-circle-info'); return; }
 
-    // Si estamos en modo control remoto, enviar al reproductor
-    if (nowarfyAuthUser && nowarfyRemoteSession && !nowarfyRemoteIsPlayer) {
-        await sendRemoteAddToQueueCommand(song);
-        return;
-    }
     
     const q = withQid(song);
     queueSeenKeys.add(k);
@@ -375,7 +370,9 @@ async function addToQueue(song) {
     persistQueue();
     renderQueue();
     showToast('Añadido a la cola', 'fa-list');
-    if (currentPlayingQid == null) playQueueAt(queue.length - 1);
+    // Un control no reproduce localmente: solo deja la canción en la cola compartida.
+    const controllingRemotely = !!(nowarfyAuthUser && nowarfyRemoteSession && !nowarfyRemoteIsPlayer);
+    if (currentPlayingQid == null && !controllingRemotely) playQueueAt(queue.length - 1);
 }
 
 async function sendRemoteAddToQueueCommand(song) {
@@ -1154,6 +1151,7 @@ function persistQueue() {
     nowarfyQueuePersistTimer = window.setTimeout(() => {
         nowarfyQueuePersistTimer = null;
         persistQueueNow();
+        if (typeof scheduleNowarfyQueueSync === 'function') scheduleNowarfyQueueSync(400);
     }, 350);
 }
 function flushNowarfyPersistence() {

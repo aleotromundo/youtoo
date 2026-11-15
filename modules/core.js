@@ -258,10 +258,12 @@ async function initNowarfyAuth() {
 
                 updateNowarfyAuthUI();
                 if (document.getElementById('knowledgeCatalogGrid')) void renderKnowledgeBase();
+                if (typeof scheduleNowarfyQueueSync === 'function') scheduleNowarfyQueueSync(0);
                 void setupNowarfyRemoteControl();
             });
             updateNowarfyAuthUI();
             authStatus('');
+            if (typeof scheduleNowarfyQueueSync === 'function') scheduleNowarfyQueueSync(0);
             void setupNowarfyRemoteControl();
             return nowarfySupabase;
         } catch (error) {
@@ -385,7 +387,7 @@ function remoteSongSnapshot(song) {
 function remoteStateSnapshot() {
     const { song, position, duration } = currentRemotePosition();
     const positionAt = Date.now();
-    return { resourceId: song?.url || null, title: song?.title || '', artist: song?.artist || '', type: song?.type || null, img: song?.img || '', channelId: song?.channelId || '', isPlaying: !!isPlaying, volume: Math.round(lastVolume * 100), position: Math.round(position * 10) / 10, positionAt, duration: Math.round(duration * 10) / 10, currentQid: currentPlayingQid || song?._qid || null, queueRound, playlist: Array.isArray(queue) ? queue.slice(0, 100).map(remoteSongSnapshot).filter(Boolean) : [], updatedAt: new Date(positionAt).toISOString() };
+    return { resourceId: song?.url || null, title: song?.title || '', artist: song?.artist || '', type: song?.type || null, img: song?.img || '', channelId: song?.channelId || '', isPlaying: !!isPlaying, volume: Math.round(lastVolume * 100), position: Math.round(position * 10) / 10, positionAt, duration: Math.round(duration * 10) / 10, currentQid: currentPlayingQid || song?._qid || null, queueRound, playlist: [], updatedAt: new Date(positionAt).toISOString() };
 }
 function detectNowarfyDeviceName() {
     const ua = navigator.userAgent || '';
@@ -494,6 +496,7 @@ async function setupNowarfyRemoteControl() {
             })
             .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'youtoo_remote_commands', filter: `user_id=eq.${nowarfyAuthUser.id}` }, payload => { const command = payload.new.command || {}; if (command.commandId && nowarfyRemoteSeenCommandIds.has(command.commandId)) return; if (command.commandId) nowarfyRemoteSeenCommandIds.set(command.commandId, Date.now()); if (payload.new.device_id !== nowarfyRemoteDeviceId && (!command.targetDeviceId || command.targetDeviceId === nowarfyRemoteDeviceId)) void nowarfyHandleIncomingCommand(command); })
             .on('postgres_changes', { event: '*', schema: 'public', table: NOWARFY_TASTE_TABLE, filter: `user_id=eq.${nowarfyAuthUser.id}` }, payload => { if (!nowarfyTasteSyncInFlight) void loadNowarfyTaste(); })
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'nowarfy_user_queue', filter: `user_id=eq.${nowarfyAuthUser.id}` }, () => { if (typeof scheduleNowarfyQueueSync === 'function') scheduleNowarfyQueueSync(150); })
             .subscribe(status => { nowarfyRemoteBroadcastReady = status === 'SUBSCRIBED'; if (status === 'SUBSCRIBED') { updateNowarfyAuthUI(); remoteStatus(nowarfyRemoteIsPlayer ? 'Este dispositivo es el reproductor activo.' : 'Control remoto conectado; elegí otro dispositivo como reproductor.'); } });
         if (!nowarfyRemoteIsPlayer && nowarfyRemoteSession?.state) updateRemoteControlsFromState(nowarfyRemoteSession.state);
         await refreshNowarfyRemoteDevices();
@@ -857,18 +860,6 @@ function updateRemoteControlsFromState(state, forceQueue = false) {
     if (!state) return;
     if (!nowarfyRemoteIsPlayer) nowarfyRemoteLastStateAt = Date.now();
     if (!nowarfyRemoteIsPlayer) nowarfyRemoteShadowState = { ...state };
-    if ((!nowarfyRemoteIsPlayer || forceQueue) && Array.isArray(state.playlist) && state.playlist.length) {
-        const remoteQueue = state.playlist.map(item => ({ ...item, _qid: item._qid || queueIdCounter++ })).filter(item => item.url);
-        if (remoteQueue.length) {
-            queue = remoteQueue;
-            queueSeenKeys = new Set(queue.map(songKey));
-            currentPlayingQid = state.currentQid || state.resourceId || queue[0]?._qid || null;
-            currentIndex = queue.findIndex(item => item._qid === state.currentQid || String(item.url) === String(state.resourceId));
-            if (currentIndex < 0) currentIndex = 0;
-            persistQueue();
-            renderQueue();
-        }
-    }
     if (!nowarfyRemoteIsPlayer && state.resourceId) {
         const currentQueueItem = Array.isArray(queue) && currentIndex >= 0 ? queue[currentIndex] : null;
         const nextShadow = { _qid: currentQueueItem?._qid || state.currentQid || null, type: state.type || 'yt', url: state.resourceId, title: state.title || 'Reproduciendo en otro dispositivo', artist: state.artist || '', img: state.img || '', channelId: state.channelId || '' };
@@ -1136,7 +1127,6 @@ async function executeNowarfyRemoteCommand(command) {
         // porque el polling y el comando de handoff llegaron casi juntos), no
         // la reiniciamos.
         if (shouldPlay && state.resourceId && nowarfyRemoteIsActuallyPlaying() && nowarfyMirrorLoadedUrl(currentQueueSong()) === String(state.resourceId)) return;
-        if (Array.isArray(state.playlist) && state.playlist.length) updateRemoteControlsFromState(state, true);
         const targetUrl = state.resourceId || state.title;
         let idx = queue.findIndex(song => (state.currentQid && song._qid === state.currentQid) || (targetUrl && String(song.url) === String(targetUrl)));
         if (idx < 0 && state.resourceId) {

@@ -173,7 +173,10 @@ const initializeNowarfyHome = () => {
     setupBackgroundPlaybackSupport();
     setupKeyboardShortcuts();
     restoreQueueFromStorage();
-    void hydrateQueueFromIndexedDB();
+    void hydrateQueueFromIndexedDB().finally(() => {
+        window.nowarfyQueueReady = true;
+        if (typeof scheduleNowarfyQueueSync === 'function') scheduleNowarfyQueueSync(0);
+    });
     setupQueueTrashDropzone();
     setupVideoStageObserver();
     setupVideoStageVisibilityAwareness();
