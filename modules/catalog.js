@@ -285,7 +285,8 @@ async function uploadLocalMusicFile(file, item) {
     if (!nowarfySupabase || !nowarfyAuthUser) return;
     const safeName = String(file.name || 'pista').replace(/[^a-zA-Z0-9._-]+/g, '_').slice(-120);
     const path = `${nowarfyAuthUser.id}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}-${safeName}`;
-    const { error } = await nowarfySupabase.storage.from(NOWARFY_MUSIC_BUCKET).upload(path, file, { contentType: file.type || 'audio/mpeg', upsert: false });
+    const fallbackType = localMediaKind(file) === 'video' ? 'video/mp4' : 'audio/mpeg';
+    const { error } = await nowarfySupabase.storage.from(NOWARFY_MUSIC_BUCKET).upload(path, file, { contentType: file.type || fallbackType, upsert: false });
     if (error) {
         console.error('Error subiendo la pista local:', error);
         showToast(`No se pudo subir "${item.title}"`, 'fa-triangle-exclamation');
@@ -295,10 +296,22 @@ async function uploadLocalMusicFile(file, item) {
     if (stored) { stored.storagePath = path; persistQueue(); }
 }
 
+const LOCAL_AUDIO_EXT = /\.(mp3|ogg|oga|opus|wav|flac|m4a|aac|wma|aiff?|weba)$/i;
+const LOCAL_VIDEO_EXT = /\.(mp4|m4v|mov|webm|mkv|avi|ogv|3gp|mpe?g)$/i;
+
+// Audio o video, de cualquier formato común. El MIME del navegador manda; si falta, la extensión.
+function localMediaKind(file) {
+    const name = file?.name || '';
+    if (/^audio\//.test(file?.type || '')) return 'audio';
+    if (/^video\//.test(file?.type || '')) return 'video';
+    if (LOCAL_AUDIO_EXT.test(name)) return 'audio';
+    if (LOCAL_VIDEO_EXT.test(name)) return 'video';
+    return null;
+}
+
 function handleLocalMusicFiles(files) {
-    const isAudio = (file) => /^audio\//.test(file.type || '') || /\.(mp3|ogg|oga|wav|flac|m4a|aac|opus)$/i.test(file.name || '');
-    const picked = Array.from(files || []).filter(isAudio);
-    if (!picked.length) { showToast('No encontré audio en esos archivos', 'fa-circle-exclamation'); return; }
+    const picked = Array.from(files || []).filter(file => localMediaKind(file));
+    if (!picked.length) { showToast('No encontré audio ni video en esos archivos', 'fa-circle-exclamation'); return; }
     // Carpetas: se ordenan por ruta (carpeta y nombre), como Winamp.
     picked.sort((x, y) => String(x.webkitRelativePath || x.name).localeCompare(String(y.webkitRelativePath || y.name), undefined, { numeric: true, sensitivity: 'base' }));
     const tracks = picked.map(file => ({
@@ -306,7 +319,7 @@ function handleLocalMusicFiles(files) {
         artist: 'Mi música',
         img: 'assets/nowarfy-icon-512.png',
         url: (() => { const url = URL.createObjectURL(file); nowarfyLiveLocalUrls.add(url); return url; })(),
-        type: 'mp3',
+        type: localMediaKind(file) === 'video' ? 'freevideo' : 'mp3',
         local: true,
         duration: null,
         genre: 'unknown',
