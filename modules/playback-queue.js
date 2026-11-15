@@ -1150,6 +1150,15 @@ function readVideoResumeSession() {
 }
 
 let nowarfyQueuePersistTimer = null;
+const QUEUE_HIDDEN_KEY = 'nowarfy_queue_hidden_v1';
+
+function restoreHiddenPlayingEntry() {
+    try {
+        const saved = localStorage.getItem(QUEUE_HIDDEN_KEY);
+        if (saved && currentPlayingQid != null && Number(saved) === Number(currentPlayingQid)) hiddenPlayingQid = currentPlayingQid;
+    } catch (_) {}
+}
+
 function persistQueueNow() {
     const queueSnapshot = queue.slice();
     const qidSnapshot = currentPlayingQid == null ? '' : String(currentPlayingQid);
@@ -1158,6 +1167,8 @@ function persistQueueNow() {
         localStorage.setItem('nowarfy_queue', JSON.stringify(queueSnapshot));
         localStorage.setItem('nowarfy_queue_qid', qidSnapshot);
         localStorage.setItem('nowarfy_queue_round', roundSnapshot);
+        // Guardar qué pista quedó oculta tras "Vaciar": si no, al recargar vuelve a verse y se sube como nueva.
+        localStorage.setItem(QUEUE_HIDDEN_KEY, hiddenPlayingQid == null ? '' : String(hiddenPlayingQid));
         persistQueueMode();
     } catch (e) {}
     if (window.nowarfyStorage) {
@@ -1207,6 +1218,7 @@ function restoreQueueFromStorage() {
         if (idx === -1) return;
         currentIndex = idx;
         currentPlayingQid = qid;
+        restoreHiddenPlayingEntry();
         const song = queue[idx];
         updateNowPlaying(song);
 
@@ -1244,6 +1256,7 @@ async function hydrateQueueFromIndexedDB() {
     if (idx < 0) return;
     currentIndex = idx;
     currentPlayingQid = qid;
+    restoreHiddenPlayingEntry();
     updateNowPlaying(queue[idx]);
     renderQueue();
 }
