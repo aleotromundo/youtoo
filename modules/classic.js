@@ -2413,6 +2413,9 @@
         $('retroRestoreQueue')?.addEventListener('click', () => {
             if (typeof restoreQueueBackup === 'function') restoreQueueBackup();
         });
+        $('retroRefreshQueue')?.addEventListener('click', () => {
+            if (typeof refreshNowarfyQueue === 'function') refreshNowarfyQueue();
+        });
         ['retroCurrentTime', 'retroClockTime'].forEach(id => {
             const el = $(id);
             if (!el) return;

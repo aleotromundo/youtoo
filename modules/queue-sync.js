@@ -193,6 +193,16 @@ async function syncNowarfyQueue() {
     }
 }
 
+// Botón "Actualizar": vuelve a leer la cola del servidor y la combina ahora mismo.
+function refreshNowarfyQueue() {
+    if (!nowarfyAuthUser || !nowarfySupabase) {
+        if (typeof showToast === 'function') showToast('Iniciá sesión para sincronizar la lista', 'fa-circle-info');
+        return;
+    }
+    scheduleNowarfyQueueSync(0);
+    if (typeof showToast === 'function') showToast('Lista actualizada', 'fa-rotate');
+}
+
 // Respaldo si Realtime se corta o la pestaña estuvo en segundo plano: revisa la cola del servidor
 // cada 15 segundos y al volver a la app.
 let nowarfyQueuePollStarted = false;

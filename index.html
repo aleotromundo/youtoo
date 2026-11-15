@@ -263,6 +263,7 @@
                                 <button type="button" id="retroContinuous" aria-label="Alternar reproducción continua" title="Reproducción continua">CONTINUA</button>
                                 <button type="button" id="retroClearQueue" aria-label="Vaciar Playlist" title="Vaciar Playlist">VACIAR</button>
                                 <button type="button" id="retroRestoreQueue" aria-label="Restaurar la última lista" title="Restaurar la última lista" hidden><i class="fas fa-rotate-left" aria-hidden="true"></i></button>
+                                <button type="button" id="retroRefreshQueue" aria-label="Actualizar la lista" title="Actualizar la lista"><i class="fas fa-rotate" aria-hidden="true"></i></button>
                             </span>
                         </header>
                         <div id="retroUploadStatus" class="retro-upload-status" aria-live="polite" hidden></div>
@@ -425,6 +426,7 @@
                 <button type="button" class="queue-clear-btn queue-continuous-btn" id="continuousQueueToggle" onclick="toggleContinuousPlayback()" title="Reproducción continua" aria-pressed="true"><i class="fas fa-infinity"></i> Continua</button>
                 <button type="button" class="queue-clear-btn" onclick="clearQueue()" title="Vaciar Playlist"><i class="fas fa-trash"></i> Vaciar</button>
                 <button type="button" class="queue-clear-btn queue-restore-btn" id="queueRestoreBtn" onclick="restoreQueueBackup()" title="Restaurar la última lista" aria-label="Restaurar la última lista" hidden><i class="fas fa-rotate-left"></i></button>
+                <button type="button" class="queue-clear-btn queue-restore-btn" id="queueRefreshBtn" onclick="refreshNowarfyQueue()" title="Actualizar la lista" aria-label="Actualizar la lista"><i class="fas fa-rotate"></i></button>
                 <button type="button" class="queue-close-btn" onclick="closeQueuePanel()" aria-label="Cerrar Playlist"><i class="fas fa-xmark"></i></button>
             </div>
         </div>
