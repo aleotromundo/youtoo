@@ -1274,8 +1274,11 @@ function backupVisibleQueue() {
 }
 
 function updateQueueRestoreButton() {
-    const button = document.getElementById('queueRestoreBtn');
-    if (button) button.hidden = !readQueueBackup();
+    const hasBackup = !!readQueueBackup();
+    ['queueRestoreBtn', 'retroRestoreQueue'].forEach(id => {
+        const button = document.getElementById(id);
+        if (button) button.hidden = !hasBackup;
+    });
 }
 
 function restoreQueueBackup() {

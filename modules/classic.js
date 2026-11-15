@@ -2403,6 +2403,9 @@
         $('retroClearQueue')?.addEventListener('click', () => {
             if (typeof clearQueue === 'function') clearQueue();
         });
+        $('retroRestoreQueue')?.addEventListener('click', () => {
+            if (typeof restoreQueueBackup === 'function') restoreQueueBackup();
+        });
         $('retroContinuous')?.addEventListener('click', () => {
             if (typeof toggleContinuousPlayback === 'function') toggleContinuousPlayback();
             syncDeck(true);
