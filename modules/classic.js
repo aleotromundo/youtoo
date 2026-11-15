@@ -23,27 +23,53 @@
     function openVisualSettings() {
         const existing = document.getElementById('visualSettingsOverlay');
         if (existing) { existing.remove(); return; }
+        const dwellChoices = [[15000, '15 s'], [30000, '30 s'], [60000, '1 min'], [120000, '2 min']];
+        const blendChoices = [[0.6, 'Rápidas'], [1, 'Normales'], [1.6, 'Lentas']];
+        const segment = (choices, active, name) => choices.map(([value, label]) =>
+            `<button type="button" class="vs-seg${Math.abs(active - value) < 0.01 ? ' is-active' : ''}" data-setting="${name}" data-value="${value}">${label}</button>`).join('');
         const overlay = document.createElement('div');
         overlay.id = 'visualSettingsOverlay';
-        overlay.className = 'play-mode-overlay';
-        const dwellOptions = [[15000, '15 s'], [30000, '30 s'], [60000, '1 min'], [120000, '2 min']]
-            .map(([value, label]) => `<option value="${value}"${visualSettings.dwellMs === value ? ' selected' : ''}>${label}</option>`).join('');
-        const blendOptions = [[0.6, 'Rápidas'], [1, 'Normales'], [1.6, 'Lentas']]
-            .map(([value, label]) => `<option value="${value}"${Math.abs(visualSettings.blendScale - value) < 0.01 ? ' selected' : ''}>${label}</option>`).join('');
-        overlay.innerHTML = `<div class="play-mode-dialog" role="dialog" aria-modal="true" aria-label="Ajustes del visualizador">
-            <p class="play-mode-title">Visualizador</p>
-            <label class="visual-setting"><input type="checkbox" id="visAutoPresets"${visualSettings.autoPresets ? ' checked' : ''}> Cambiar de preset solo</label>
-            <label class="visual-setting">Tiempo entre presets <select id="visDwell">${dwellOptions}</select></label>
-            <label class="visual-setting">Transiciones <select id="visBlend">${blendOptions}</select></label>
-            <label class="visual-setting">Sensibilidad al sonido <input type="range" id="visSensitivity" min="0.5" max="2" step="0.1" value="${visualSettings.sensitivity}"></label>
-            <div class="play-mode-actions"><button type="button" data-close="1" class="primary">Listo</button></div>
+        overlay.className = 'vs-overlay';
+        overlay.innerHTML = `<div class="vs-card" role="dialog" aria-modal="true" aria-label="Ajustes del visualizador">
+            <header class="vs-head">
+                <span class="vs-icon"><i class="fas fa-wand-magic-sparkles" aria-hidden="true"></i></span>
+                <div><strong>Visualizador</strong><small>Ajustes de movimiento</small></div>
+                <button type="button" class="vs-close" data-close="1" aria-label="Cerrar"><i class="fas fa-xmark" aria-hidden="true"></i></button>
+            </header>
+            <div class="vs-row">
+                <div class="vs-label"><strong>Cambiar de preset solo</strong><small>Rota entre los visuales sin tocar nada</small></div>
+                <label class="vs-switch"><input type="checkbox" id="visAutoPresets"${visualSettings.autoPresets ? ' checked' : ''}><span></span></label>
+            </div>
+            <div class="vs-row vs-block">
+                <div class="vs-label"><strong>Tiempo entre presets</strong></div>
+                <div class="vs-segments" data-group="dwell">${segment(dwellChoices, visualSettings.dwellMs, 'dwell')}</div>
+            </div>
+            <div class="vs-row vs-block">
+                <div class="vs-label"><strong>Transiciones</strong></div>
+                <div class="vs-segments" data-group="blend">${segment(blendChoices, visualSettings.blendScale, 'blend')}</div>
+            </div>
+            <div class="vs-row vs-block">
+                <div class="vs-label"><strong>Sensibilidad al sonido</strong><span class="vs-value" id="visSensitivityValue">${Number(visualSettings.sensitivity).toFixed(1)}×</span></div>
+                <input type="range" class="vs-range" id="visSensitivity" min="0.5" max="2" step="0.1" value="${visualSettings.sensitivity}">
+            </div>
         </div>`;
         const close = () => overlay.remove();
-        overlay.addEventListener('click', (event) => { if (event.target === overlay || event.target.closest('[data-close]')) close(); });
+        overlay.addEventListener('click', (event) => {
+            if (event.target === overlay || event.target.closest('[data-close]')) { close(); return; }
+            const seg = event.target.closest('.vs-seg');
+            if (!seg) return;
+            const value = Number(seg.dataset.value);
+            if (seg.dataset.setting === 'dwell') visualSettings.dwellMs = value;
+            if (seg.dataset.setting === 'blend') visualSettings.blendScale = value;
+            seg.parentElement.querySelectorAll('.vs-seg').forEach(b => b.classList.toggle('is-active', b === seg));
+            saveVisualSettings();
+        });
         overlay.querySelector('#visAutoPresets').addEventListener('change', (e) => { visualSettings.autoPresets = e.target.checked; saveVisualSettings(); });
-        overlay.querySelector('#visDwell').addEventListener('change', (e) => { visualSettings.dwellMs = Number(e.target.value); saveVisualSettings(); });
-        overlay.querySelector('#visBlend').addEventListener('change', (e) => { visualSettings.blendScale = Number(e.target.value); saveVisualSettings(); });
-        overlay.querySelector('#visSensitivity').addEventListener('input', (e) => { visualSettings.sensitivity = Number(e.target.value); saveVisualSettings(); });
+        overlay.querySelector('#visSensitivity').addEventListener('input', (e) => {
+            visualSettings.sensitivity = Number(e.target.value);
+            overlay.querySelector('#visSensitivityValue').textContent = `${visualSettings.sensitivity.toFixed(1)}×`;
+            saveVisualSettings();
+        });
         document.body.appendChild(overlay);
     }
     window.openVisualSettings = openVisualSettings;

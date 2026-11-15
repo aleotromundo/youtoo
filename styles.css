@@ -1151,3 +1151,35 @@
 .nowarfy-device-dock:hover .nowarfy-device-dock-fab span,
 .nowarfy-device-dock:focus-within .nowarfy-device-dock-fab span,
 .nowarfy-device-dock-fab:focus-visible span { max-width: 200px; opacity: 1; padding: 0; }
+
+/* Ajustes del visualizador: panel moderno */
+.vs-overlay { position: fixed; inset: 0; z-index: 10010; display: grid; place-items: center; padding: 20px; background: rgba(4,5,10,.55); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); animation: vs-fade .18s ease; }
+@keyframes vs-fade { from { opacity: 0; } to { opacity: 1; } }
+.vs-card { width: min(92vw, 380px); padding: 16px; border-radius: 22px; border: 1px solid rgba(255,255,255,.08); background: linear-gradient(180deg, rgba(30,32,56,.96), rgba(16,17,30,.97)); color: #f2f3fb; box-shadow: 0 30px 80px rgba(0,0,0,.6), inset 0 1px 0 rgba(255,255,255,.05); font-family: 'Manrope', sans-serif; animation: vs-rise .22s cubic-bezier(.2,.8,.2,1); }
+@keyframes vs-rise { from { transform: translateY(8px) scale(.98); opacity: 0; } to { transform: none; opacity: 1; } }
+.vs-head { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
+.vs-head > div { flex: 1; display: grid; gap: 2px; }
+.vs-head strong { font-size: .95rem; letter-spacing: .01em; }
+.vs-head small, .vs-label small { color: #8c92ad; font-size: .68rem; }
+.vs-icon { display: inline-grid; place-items: center; width: 38px; height: 38px; border-radius: 12px; color: #0d1117; background: linear-gradient(135deg, #5eead4, #a78bfa); box-shadow: 0 6px 18px rgba(94,234,212,.25); }
+.vs-close { display: inline-grid; place-items: center; width: 30px; height: 30px; border: 0; border-radius: 10px; color: #aeb3c8; background: rgba(255,255,255,.06); cursor: pointer; }
+.vs-close:hover { background: rgba(255,255,255,.12); color: #fff; }
+.vs-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 4px; border-top: 1px solid rgba(255,255,255,.06); }
+.vs-block { flex-direction: column; align-items: stretch; gap: 10px; }
+.vs-label { display: grid; gap: 2px; }
+.vs-label strong { font-size: .8rem; font-weight: 800; }
+.vs-value { font-size: .72rem; color: #5eead4; font-weight: 800; }
+.vs-switch { position: relative; width: 44px; height: 26px; flex: 0 0 auto; }
+.vs-switch input { position: absolute; opacity: 0; inset: 0; margin: 0; cursor: pointer; }
+.vs-switch span { position: absolute; inset: 0; border-radius: 999px; background: rgba(255,255,255,.14); transition: background .2s; pointer-events: none; }
+.vs-switch span::after { content: ''; position: absolute; top: 3px; left: 3px; width: 20px; height: 20px; border-radius: 50%; background: #fff; box-shadow: 0 2px 6px rgba(0,0,0,.35); transition: transform .22s cubic-bezier(.2,.8,.2,1); }
+.vs-switch input:checked + span { background: linear-gradient(90deg, #5eead4, #a78bfa); }
+.vs-switch input:checked + span::after { transform: translateX(18px); }
+.vs-switch input:focus-visible + span { outline: 2px solid #5eead4; outline-offset: 2px; }
+.vs-segments { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 4px; padding: 4px; border-radius: 12px; background: rgba(255,255,255,.05); }
+.vs-seg { padding: 8px 6px; border: 0; border-radius: 9px; color: #aeb3c8; background: transparent; font: 800 .7rem 'Manrope', sans-serif; cursor: pointer; transition: background .18s, color .18s; }
+.vs-seg:hover { color: #fff; }
+.vs-seg.is-active { color: #0d1117; background: linear-gradient(135deg, #5eead4, #a78bfa); box-shadow: 0 4px 12px rgba(94,234,212,.2); }
+.vs-range { width: 100%; height: 6px; appearance: none; -webkit-appearance: none; border-radius: 999px; background: linear-gradient(90deg, #5eead4 var(--p, 50%), rgba(255,255,255,.12) var(--p, 50%)); outline: none; }
+.vs-range::-webkit-slider-thumb { -webkit-appearance: none; width: 20px; height: 20px; border-radius: 50%; background: #fff; box-shadow: 0 2px 8px rgba(0,0,0,.4); cursor: pointer; }
+.vs-range::-moz-range-thumb { width: 20px; height: 20px; border: 0; border-radius: 50%; background: #fff; cursor: pointer; }
