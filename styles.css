@@ -1116,3 +1116,15 @@
             .nowarfy-device-dock-fab { transition: none; }
             .nowarfy-device-dock-fab:hover { transform: none; }
         }
+
+/* Filtro por fuente de los resultados (YouTube · Openverse · Wikimedia) */
+.source-filter { display: flex; flex-wrap: wrap; gap: 6px; margin: 2px 0 10px; }
+.source-filter[hidden] { display: none !important; }
+.source-chip { border: 1px solid rgba(255,255,255,.1); background: transparent; color: #8c92ad; font: 700 .62rem 'Manrope', sans-serif; letter-spacing: .04em; padding: 4px 10px; border-radius: 999px; cursor: pointer; opacity: .72; transition: opacity .15s, color .15s, border-color .15s; }
+.source-chip:hover { opacity: 1; color: #cfd2e6; }
+.source-chip:focus-visible { outline: 2px solid #5eead4; outline-offset: 2px; }
+.source-chip.is-active { opacity: 1; color: #eafffb; border-color: rgba(94,234,212,.45); background: rgba(94,234,212,.1); }
+#dynamicSections[data-source-filter="youtube"] > section.source-openverse,
+#dynamicSections[data-source-filter="youtube"] > section.source-commons,
+#dynamicSections[data-source-filter="openverse"] > section:not(.source-openverse),
+#dynamicSections[data-source-filter="commons"] > section:not(.source-commons) { display: none; }
