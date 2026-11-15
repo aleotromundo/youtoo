@@ -4,6 +4,9 @@ let queue = [];
 let queueSeenKeys = new Set();
 let queueIdCounter = 0;
 let currentPlayingQid = null;
+// Tras "Vaciar", la pista que suena sigue dentro de `queue` (la lógica de reproducción
+// depende de ella) pero se oculta de la lista hasta que la reproducción pase a otra pista.
+let hiddenPlayingQid = null;
 let currentSourceIdx = null;
 let queueRound = 0;
 let queueFetching = false;

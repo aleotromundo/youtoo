@@ -304,18 +304,29 @@ function setContinuousMode(on) {
     renderContinuousPlaybackControls();
 }
 
-// Vacía la playlist por completo (queda en cero) y detiene lo que suena.
-function emptyPlaylistFully() {
-    if (!queue.length) return;
-    try { stopAll(); isPlaying = false; updateIcon(); } catch (_) {}
-    queue = [];
-    queueSeenKeys = new Set();
-    queueRound = 0;
-    currentIndex = 0;
-    currentPlayingQid = null;
-    persistQueue();
-    renderQueue();
-    showToast('Playlist vacía', 'fa-trash');
+// Entradas de `queue` que se muestran en la lista (con su índice real), sin la pista
+// que sigue sonando después de vaciar la Playlist.
+function queueVisibleEntries() {
+    const entries = [];
+    queue.forEach((song, index) => {
+        if (hiddenPlayingQid != null && song._qid === hiddenPlayingQid) return;
+        entries.push({ song, index });
+    });
+    return entries;
+}
+
+// Quita de `queue` la pista oculta cuando ya no es la que suena.
+function dropHiddenPlayingEntry() {
+    if (hiddenPlayingQid == null) return;
+    const qid = hiddenPlayingQid;
+    hiddenPlayingQid = null;
+    if (!queue.some(s => s._qid === qid)) return;
+    queue = queue.filter(s => s._qid !== qid);
+    queueSeenKeys = new Set(queue.map(songKey));
+}
+
+function normalizeHiddenPlayingEntry() {
+    if (hiddenPlayingQid != null && hiddenPlayingQid !== currentPlayingQid) dropHiddenPlayingEntry();
 }
 
 async function resumeSongFromWelcome(song, sourceIdx = 0) {
@@ -347,8 +358,10 @@ async function resumeSongFromWelcome(song, sourceIdx = 0) {
 
 async function addToQueue(song) {
     const k = songKey(song);
-    if (queueSeenKeys.has(k)) { showToast('Ya está en la Playlist', 'fa-circle-info'); return; }
-    
+    // La pista oculta tras "Vaciar" no figura en la lista, así que no cuenta como repetida.
+    const onlyHiddenCopy = hiddenPlayingQid != null && queue.every(s => songKey(s) !== k || s._qid === hiddenPlayingQid);
+    if (queueSeenKeys.has(k) && !onlyHiddenCopy) { showToast('Ya está en la Playlist', 'fa-circle-info'); return; }
+
     // Si estamos en modo control remoto, enviar al reproductor
     if (nowarfyAuthUser && nowarfyRemoteSession && !nowarfyRemoteIsPlayer) {
         await sendRemoteAddToQueueCommand(song);
@@ -739,6 +752,12 @@ function playQueueAt(idx, options = {}) {
     clearAutomaticAdvance();
     playbackStoppedByUser = false;
     const previousSong = currentQueueSong();
+    if (hiddenPlayingQid != null && queue[idx]._qid !== hiddenPlayingQid) {
+        // La pista que quedó oculta tras "Vaciar" ya no suena: se descarta del todo.
+        const target = queue[idx];
+        dropHiddenPlayingEntry();
+        idx = queue.indexOf(target);
+    }
     currentIndex = idx;
     const song = queue[idx];
     const reuseYouTubePlayer = previousSong?.type === 'yt' && song?.type === 'yt' && ytPlayer?.loadVideoById && !options.forceNewYouTubePlayer;
@@ -1221,12 +1240,25 @@ function closeQueuePanel() {
     document.getElementById('queueToggleBtn').classList.remove('active');
 }
 
+// Vacía la lista de la Playlist. Si hay una pista sonando, no se corta: sigue reproduciéndose
+// aunque ya no figure en la lista (queda oculta en `queue` hasta que termine o se elija otra).
 function clearQueue() {
     if (queue.length === 0) return;
     const current = currentQueueSong() || queue[currentIndex];
-    if (!current) return;
+    if (!current) {
+        queue = [];
+        queueSeenKeys = new Set();
+        hiddenPlayingQid = null;
+        queueRound = 0;
+        currentIndex = -1;
+        persistQueue();
+        renderQueue();
+        showToast('Playlist vacía', 'fa-trash');
+        return;
+    }
     queue = [current];
     queueSeenKeys = new Set([songKey(current)]);
+    hiddenPlayingQid = current._qid;
     currentIndex = 0;
     currentPlayingQid = current._qid;
     currentSourceIdx = null;
@@ -1234,9 +1266,7 @@ function clearQueue() {
     if (queuePlaybackMode === 'prebuilt_playlist' && queuePlaylistContext) queuePlaylistContext.nextPageToken = '';
     persistQueue();
     renderQueue();
-    showToast(queuePlaybackMode === 'prebuilt_playlist'
-        ? 'Se quitaron los videos siguientes; continúa la playlist actual'
-        : 'Se quitaron las canciones siguientes; continúa la actual', 'fa-trash');
+    showToast('Playlist vacía; sigue sonando la pista actual', 'fa-trash');
 }
 
 function removeFromQueue(qid) {
@@ -1277,13 +1307,14 @@ const QUEUE_VIRTUAL_GAP = 6;
 const QUEUE_VIRTUAL_STRIDE = QUEUE_VIRTUAL_ROW_HEIGHT + QUEUE_VIRTUAL_GAP;
 const QUEUE_VIRTUAL_OVERSCAN = 6;
 
-function createQueueRow(song, idx, virtual = false) {
+// `idx` es el índice real en `queue`; `position` es el lugar que ocupa en la lista visible.
+function createQueueRow(song, idx, virtual = false, position = idx) {
     const row = document.createElement('div');
     const isPlayingRow = song._qid === currentPlayingQid;
     row.className = `queue-row-item${isPlayingRow ? ' playing' : ''}${virtual ? ' queue-virtual-row' : ''}`;
     row.draggable = true;
     row.dataset.qid = String(song._qid);
-    if (virtual) row.style.top = `${idx * QUEUE_VIRTUAL_STRIDE}px`;
+    if (virtual) row.style.top = `${position * QUEUE_VIRTUAL_STRIDE}px`;
     row.innerHTML = `
         <i class="fas fa-grip-lines queue-drag-handle" title="Arrastrar para reordenar o quitar"></i>
         <img src="${escapeHtml(song.img || '')}" class="queue-row-img" loading="lazy" alt="" onerror="this.closest('.queue-row-item')?.remove();">
@@ -1334,21 +1365,21 @@ function createQueueRow(song, idx, virtual = false) {
     return row;
 }
 
-function renderVirtualQueue(list) {
+function renderVirtualQueue(list, entries = queueVisibleEntries()) {
     const previousRender = list._nowarfyVirtualRender;
     if (previousRender) list.removeEventListener('scroll', previousRender);
     list.innerHTML = '';
     list.classList.add('queue-list-virtual');
     const spacer = document.createElement('div');
     spacer.className = 'queue-virtual-spacer';
-    spacer.style.height = `${Math.max(0, queue.length * QUEUE_VIRTUAL_STRIDE - QUEUE_VIRTUAL_GAP)}px`;
+    spacer.style.height = `${Math.max(0, entries.length * QUEUE_VIRTUAL_STRIDE - QUEUE_VIRTUAL_GAP)}px`;
     list.appendChild(spacer);
     const renderVisible = () => {
         const scrollTop = list.scrollTop;
         const viewportHeight = list.clientHeight || 560;
         const start = Math.max(0, Math.floor(scrollTop / QUEUE_VIRTUAL_STRIDE) - QUEUE_VIRTUAL_OVERSCAN);
-        const end = Math.min(queue.length, Math.ceil((scrollTop + viewportHeight) / QUEUE_VIRTUAL_STRIDE) + QUEUE_VIRTUAL_OVERSCAN);
-        spacer.replaceChildren(...queue.slice(start, end).map((song, offset) => createQueueRow(song, start + offset, true)));
+        const end = Math.min(entries.length, Math.ceil((scrollTop + viewportHeight) / QUEUE_VIRTUAL_STRIDE) + QUEUE_VIRTUAL_OVERSCAN);
+        spacer.replaceChildren(...entries.slice(start, end).map(({ song, index }, offset) => createQueueRow(song, index, true, start + offset)));
     };
     list._nowarfyVirtualRender = renderVisible;
     list.addEventListener('scroll', renderVisible, { passive: true });
@@ -1357,6 +1388,7 @@ function renderVirtualQueue(list) {
 
 function renderQueue() {
     renderContinuousPlaybackControls();
+    normalizeHiddenPlayingEntry();
     currentIndex = queue.findIndex(s => s._qid === currentPlayingQid);
     window.dispatchEvent(new Event('nowarfy:queue-updated'));
     const list = document.getElementById('queueList');
@@ -1364,12 +1396,13 @@ function renderQueue() {
     const badge = document.getElementById('queueCountBadge');
     if (!list) return;
 
-    if (badge) { badge.textContent = String(queue.length); badge.classList.toggle('show', queue.length > 0); }
+    const entries = queueVisibleEntries();
+    if (badge) { badge.textContent = String(entries.length); badge.classList.toggle('show', entries.length > 0); }
     const queueModeLabel = queuePlaybackMode === 'prebuilt_playlist'
         ? `playlist de YouTube${queuePlaylistContext?.title ? ` · ${queuePlaylistContext.title}` : ''}`
         : 'radio automática';
-    if (sub) sub.textContent = queue.length
-        ? `${queue.length} ${queue.length === 1 ? 'canción' : 'canciones'} · ${queueModeLabel} · ${continuousPlayback ? 'reproducción continua' : 'se detiene al terminar'}`
+    if (sub) sub.textContent = entries.length
+        ? `${entries.length} ${entries.length === 1 ? 'canción' : 'canciones'} · ${queueModeLabel} · ${continuousPlayback ? 'reproducción continua' : 'se detiene al terminar'}`
         : `La Playlist está vacía · ${continuousPlayback ? 'continua lista' : 'una pista por vez'}`;
 
     const previousRender = list._nowarfyVirtualRender;
@@ -1377,14 +1410,14 @@ function renderQueue() {
     list._nowarfyVirtualRender = null;
     list.classList.remove('queue-list-virtual');
     list.innerHTML = '';
-    if (queue.length === 0) {
+    if (entries.length === 0) {
         list.innerHTML = `<div class="queue-empty"><i class="fas fa-compact-disc"></i><p>Elegí una canción para armar tu Playlist automática: 20 del mismo artista y después más de artistas similares.</p></div>`;
         document.getElementById('queueTrash').classList.remove('show');
         return;
     }
 
-    if (queue.length >= QUEUE_VIRTUAL_THRESHOLD) renderVirtualQueue(list);
-    else queue.forEach((song, idx) => list.appendChild(createQueueRow(song, idx)));
+    if (entries.length >= QUEUE_VIRTUAL_THRESHOLD) renderVirtualQueue(list, entries);
+    else entries.forEach(({ song, index }, position) => list.appendChild(createQueueRow(song, index, false, position)));
 }
 
 function getVideoSuggestions(song) {

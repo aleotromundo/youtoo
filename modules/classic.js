@@ -1430,8 +1430,10 @@
         const trackNumber = $('retroTrackNumber');
         if (trackNumber) {
             const index = typeof currentIndex !== 'undefined' ? Number(currentIndex) : -1;
-            const total = typeof queue !== 'undefined' && Array.isArray(queue) ? queue.length : 0;
-            trackNumber.textContent = index >= 0 ? `PISTA ${String(index + 1).padStart(2, '0')} / ${String(total).padStart(2, '0')}` : 'SIN PISTA';
+            const entries = visibleQueueEntries();
+            const total = entries.length;
+            const position = entries.findIndex((entry) => entry.index === index);
+            trackNumber.textContent = index >= 0 ? `PISTA ${String(position + 1).padStart(2, '0')} / ${String(total).padStart(2, '0')}` : 'SIN PISTA';
         }
 
         const source = $('retroSourceBadge');
@@ -1490,13 +1492,20 @@
             connectCurrentMedia(playingMedia);
         }
         const queueCount = $('retroQueueCount');
-        if (queueCount) queueCount.textContent = `${typeof queue !== 'undefined' && Array.isArray(queue) ? queue.length : 0} pistas`;
+        if (queueCount) queueCount.textContent = `${visibleQueueEntries().length} pistas`;
+    }
+
+    // Pistas de la cola que se muestran, con su índice real (tras "Vaciar" la que suena queda oculta).
+    function visibleQueueEntries() {
+        if (typeof queueVisibleEntries === 'function') return queueVisibleEntries();
+        const items = typeof queue !== 'undefined' && Array.isArray(queue) ? queue : [];
+        return items.map((song, index) => ({ song, index }));
     }
 
     function renderPlaylist() {
         const list = $('retroPlaylist');
         if (!list) return;
-        const items = typeof queue !== 'undefined' && Array.isArray(queue) ? queue : [];
+        const items = visibleQueueEntries();
         const current = typeof currentIndex !== 'undefined' ? Number(currentIndex) : -1;
         const visible = items.slice(0, MAX_VISIBLE_TRACKS);
         list.replaceChildren();
@@ -1509,7 +1518,7 @@
             return;
         }
 
-        visible.forEach((song, index) => {
+        visible.forEach(({ song, index }, position) => {
             const item = document.createElement('li');
             item.className = `retro-track${index === current ? ' is-current' : ''}`;
             item.dataset.qid = String(song?._qid || '');
@@ -1522,7 +1531,7 @@
 
             const number = document.createElement('span');
             number.className = 'retro-track-index';
-            number.textContent = String(index + 1).padStart(2, '0');
+            number.textContent = String(position + 1).padStart(2, '0');
             const copy = document.createElement('span');
             copy.className = 'retro-track-copy';
             const name = document.createElement('span');
@@ -1567,7 +1576,7 @@
                 currentRow.scrollIntoView({ block: 'nearest' });
             }
         }
-        queueSignature = `${items.length}:${current}:${items.map((item) => item?._qid || '').join(',')}`;
+        queueSignature = `${items.length}:${current}:${items.map(({ song }) => song?._qid || '').join(',')}`;
     }
 
     function updateModeToggle() {
@@ -2392,7 +2401,7 @@
             if (typeof setVolume === 'function') setVolume(event.target.value);
         });
         $('retroClearQueue')?.addEventListener('click', () => {
-            if (typeof emptyPlaylistFully === 'function') emptyPlaylistFully();
+            if (typeof clearQueue === 'function') clearQueue();
         });
         $('retroContinuous')?.addEventListener('click', () => {
             if (typeof toggleContinuousPlayback === 'function') toggleContinuousPlayback();
