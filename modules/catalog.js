@@ -263,9 +263,12 @@ function setSourceFilter(source) {
 // Archivos de música del propio dispositivo: se reproducen desde una URL local (blob),
 // así que el visualizador puede analizar su sonido sin restricciones de origen.
 function handleLocalMusicFiles(files) {
-    const list = Array.from(files || []).filter(file => /^audio\//.test(file.type || '') || /\.(mp3|ogg|oga|wav|flac|m4a|aac|opus)$/i.test(file.name || ''));
-    if (!list.length) { showToast('No encontré audio en esos archivos', 'fa-circle-exclamation'); return; }
-    const tracks = list.map(file => ({
+    const isAudio = (file) => /^audio\//.test(file.type || '') || /\.(mp3|ogg|oga|wav|flac|m4a|aac|opus)$/i.test(file.name || '');
+    const picked = Array.from(files || []).filter(isAudio);
+    if (!picked.length) { showToast('No encontré audio en esos archivos', 'fa-circle-exclamation'); return; }
+    // Carpetas: se ordenan por ruta (carpeta y nombre), como Winamp.
+    picked.sort((x, y) => String(x.webkitRelativePath || x.name).localeCompare(String(y.webkitRelativePath || y.name), undefined, { numeric: true, sensitivity: 'base' }));
+    const tracks = picked.map(file => ({
         title: file.name.replace(/\.[^.]+$/, '').replace(/_/g, ' '),
         artist: 'Mi música',
         img: 'assets/nowarfy-icon-512.png',
@@ -279,13 +282,13 @@ function handleLocalMusicFiles(files) {
         filetype: file.type || '',
         sourceUrl: ''
     }));
-    queue = tracks.map(withQid);
-    queueSeenKeys = new Set();
-    queueRound = 0;
+    const firstNew = queue.length;
+    queue = [...queue, ...tracks.map(withQid)];
     persistQueue();
     renderQueue();
-    playQueueAt(0, {});
-    showToast(`Reproduciendo ${tracks.length} archivo(s) de tu música`, 'fa-folder-open');
+    const idle = typeof isActuallyPlaying === 'function' ? !isActuallyPlaying() : true;
+    if (idle) playQueueAt(firstNew, {});
+    showToast(`Agregué ${tracks.length} pista(s) a la playlist`, 'fa-list');
 }
 function scrollRetroResultsIntoView() {
     if (!retroSearchScrollPending || !document.body.classList.contains('mode-classic')) return;

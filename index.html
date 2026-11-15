@@ -184,8 +184,6 @@
                             <span id="nowarfyDeviceDockLabel">Dispositivos</span>
                         </button>
                     </div>
-                    <button type="button" class="local-music-btn" id="localMusicBtn" onclick="document.getElementById('localMusicInput').click()" title="Subir tu música" aria-label="Subir tu música"><i class="fas fa-folder-open" aria-hidden="true"></i></button>
-                    <input type="file" id="localMusicInput" accept="audio/*" multiple hidden onchange="handleLocalMusicFiles(this.files); this.value = ''">
                 </div>
             </div>
             <nav class="taste-rail" aria-label="Categorías para descubrir">
@@ -243,6 +241,10 @@
                                 <button type="button" onclick="prevSong()" title="Anterior" aria-label="Pista anterior"><i class="fas fa-backward-step" aria-hidden="true"></i></button>
                                 <button type="button" onclick="togglePlay()" id="retroPlayToggle" class="retro-play-button" aria-label="Reproducir"><i class="fas fa-play" aria-hidden="true"></i></button>
                                 <button type="button" onclick="nextSong(true)" title="Siguiente" aria-label="Pista siguiente"><i class="fas fa-forward-step" aria-hidden="true"></i></button>
+                                <button type="button" class="retro-add-btn" onclick="document.getElementById('localMusicInput').click()" title="Agregar archivos de música" aria-label="Agregar archivos de música"><i class="fas fa-plus" aria-hidden="true"></i></button>
+                                <button type="button" class="retro-add-btn" onclick="document.getElementById('localFolderInput').click()" title="Agregar carpeta de música" aria-label="Agregar carpeta de música"><i class="fas fa-folder-plus" aria-hidden="true"></i></button>
+                                <input type="file" id="localMusicInput" accept="audio/*" multiple hidden onchange="handleLocalMusicFiles(this.files, 'add'); this.value = ''">
+                                <input type="file" id="localFolderInput" webkitdirectory directory multiple hidden onchange="handleLocalMusicFiles(this.files, 'add'); this.value = ''">
                             </div>
                             <div class="retro-volume-row">
                                 <i class="fas fa-volume-low retro-volume-icon" aria-hidden="true"></i>
