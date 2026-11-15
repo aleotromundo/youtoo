@@ -147,6 +147,10 @@ async function syncNowarfyQueue() {
             const row = read.data;
             const remoteSongs = Array.isArray(row?.items) ? row.items : [];
             const remoteVersion = Number(row?.version) || 0;
+            // Pistas de este equipo cuya subida se perdió al recargar: no sirven, se quitan.
+            const before = queue.length;
+            queue = queue.filter(song => !(song.local && !song.storagePath && song.url && !nowarfyLiveLocalUrls.has(song.url)));
+            if (queue.length !== before) persistQueueNow();
             const localSongs = queue.map(queueItemForSync).filter(Boolean);
             const merged = mergeQueueSongs(readQueueSyncBase(uid), localSongs, remoteSongs);
 

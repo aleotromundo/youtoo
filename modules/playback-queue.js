@@ -758,6 +758,14 @@ function playQueueAt(idx, options = {}) {
     currentIndex = idx;
     const song = queue[idx];
     // Pista que todavía se sube: queda en espera y suena cuando llega a la nube.
+    if (song?.local && !song.storagePath && song.url && !nowarfyLiveLocalUrls.has(song.url)) {
+        // La página se recargó durante la subida: el archivo ya no está y la subida se perdió.
+        queue = queue.filter(s => s._qid !== song._qid);
+        persistQueue();
+        renderQueue();
+        showToast('La subida se interrumpió; volvé a cargar el archivo', 'fa-triangle-exclamation');
+        return;
+    }
     if (song?.local && !song.storagePath && !nowarfyLiveLocalUrls.has(song.url)) {
         nowarfyAwaitingUploadKey = songKey(song);
         setTrackLoading(true);
