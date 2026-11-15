@@ -1240,8 +1240,52 @@ function closeQueuePanel() {
 
 // Vacía la lista de la Playlist. Si hay una pista sonando, no se corta: sigue reproduciéndose
 // aunque ya no figure en la lista (queda oculta en `queue` hasta que termine o se elija otra).
+// Respaldo de la última lista vaciada. Vive en este dispositivo y sobrevive a recargas.
+const QUEUE_BACKUP_KEY = 'nowarfy_queue_backup_v1';
+
+function readQueueBackup() {
+    try {
+        const saved = JSON.parse(localStorage.getItem(QUEUE_BACKUP_KEY) || 'null');
+        return Array.isArray(saved) && saved.length ? saved : null;
+    } catch (_) {
+        return null;
+    }
+}
+
+function writeQueueBackup(songs) {
+    try {
+        if (songs.length) localStorage.setItem(QUEUE_BACKUP_KEY, JSON.stringify(songs));
+        else localStorage.removeItem(QUEUE_BACKUP_KEY);
+    } catch (_) {}
+}
+
+function updateQueueRestoreButton() {
+    const button = document.getElementById('queueRestoreBtn');
+    if (button) button.hidden = !readQueueBackup();
+}
+
+function restoreQueueBackup() {
+    const backup = readQueueBackup();
+    if (!backup) { updateQueueRestoreButton(); return; }
+    const visibleKeys = new Set(queue.filter(song => song._qid !== hiddenPlayingQid).map(songKey));
+    // Si la pista que suena estaba oculta y vuelve en el respaldo, se muestra de nuevo en vez de duplicarla.
+    const playingHidden = hiddenPlayingQid == null ? null : queue.find(song => song._qid === hiddenPlayingQid);
+    if (playingHidden && backup.some(song => songKey(song) === songKey(playingHidden))) hiddenPlayingQid = null;
+    const toAdd = backup.filter(song => !visibleKeys.has(songKey(song)) && !(playingHidden && songKey(song) === songKey(playingHidden) && hiddenPlayingQid == null));
+    queue.push(...toAdd.map(withQid));
+    queueSeenKeys = new Set(queue.map(songKey));
+    writeQueueBackup([]);
+    persistQueue();
+    renderQueue();
+    updateQueueRestoreButton();
+    showToast(toAdd.length ? `Lista restaurada · ${toAdd.length} ${toAdd.length === 1 ? 'pista' : 'pistas'}` : 'La lista ya estaba completa', 'fa-rotate-left');
+}
+
 function clearQueue() {
     if (queue.length === 0) return;
+    // Guardar lo que se ve en la lista (sin la pista que suena oculta) antes de vaciar.
+    const visibleSongs = queue.filter(song => song._qid !== hiddenPlayingQid).map(({ _qid, ...song }) => song);
+    if (visibleSongs.length) writeQueueBackup(visibleSongs);
     const current = currentQueueSong() || queue[currentIndex];
     if (!current) {
         queue = [];
@@ -1385,6 +1429,7 @@ function renderVirtualQueue(list, entries = queueVisibleEntries()) {
 }
 
 function renderQueue() {
+    updateQueueRestoreButton();
     renderContinuousPlaybackControls();
     normalizeHiddenPlayingEntry();
     currentIndex = queue.findIndex(s => s._qid === currentPlayingQid);

@@ -422,6 +422,7 @@
             <div class="queue-panel-actions">
                 <button type="button" class="queue-clear-btn queue-continuous-btn" id="continuousQueueToggle" onclick="toggleContinuousPlayback()" title="Reproducción continua" aria-pressed="true"><i class="fas fa-infinity"></i> Continua</button>
                 <button type="button" class="queue-clear-btn" onclick="clearQueue()" title="Vaciar Playlist"><i class="fas fa-trash"></i> Vaciar</button>
+                <button type="button" class="queue-clear-btn queue-restore-btn" id="queueRestoreBtn" onclick="restoreQueueBackup()" title="Restaurar la última lista" aria-label="Restaurar la última lista" hidden><i class="fas fa-rotate-left"></i></button>
                 <button type="button" class="queue-close-btn" onclick="closeQueuePanel()" aria-label="Cerrar Playlist"><i class="fas fa-xmark"></i></button>
             </div>
         </div>

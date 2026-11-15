@@ -428,6 +428,11 @@ html { scroll-behavior: smooth; }
 
         .queue-clear-btn:hover { background: #e74c3c; border-color: #e74c3c; color: white; }
 
+        /* Cuadrado con icono. El display del botón base pisaría el atributo hidden, por eso va aparte. */
+        .queue-restore-btn { width: 30px; height: 30px; padding: 0; border-radius: 6px; justify-content: center; gap: 0; }
+        .queue-restore-btn:hover { background: var(--accent); border-color: var(--accent); color: white; }
+        .queue-restore-btn[hidden] { display: none; }
+
         .queue-close-btn { background: none; border: none; color: var(--text-gray); font-size: 1rem; cursor: pointer; width: 30px; height: 30px; border-radius: 50%; }
 
         .queue-close-btn:hover { background: var(--bg-hover); color: white; }
