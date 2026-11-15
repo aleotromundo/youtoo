@@ -280,33 +280,84 @@ async function resolveStoredSongUrl(song) {
     return true;
 }
 
-// Sube un archivo local al bucket de la cuenta para que otros dispositivos puedan descargarlo.
-async function uploadLocalMusicFile(file, item) {
-    if (!nowarfySupabase || !nowarfyAuthUser) return;
+// Subidas en curso: id -> avance (0 a 1). Se muestran en un aviso discreto de la Playlist.
+const nowarfyUploads = new Map();
+let nowarfyUploadFlashTimer = null;
+
+function renderUploadStatus(flash = '') {
+    const el = document.getElementById('queueUploadStatus');
+    if (!el) return;
+    clearTimeout(nowarfyUploadFlashTimer);
+    if (flash) {
+        el.textContent = flash;
+        el.classList.add('is-done');
+        el.hidden = false;
+        nowarfyUploadFlashTimer = setTimeout(() => renderUploadStatus(), 3500);
+        return;
+    }
+    el.classList.remove('is-done');
+    if (!nowarfyUploads.size) { el.hidden = true; el.textContent = ''; return; }
+    const values = [...nowarfyUploads.values()];
+    const avg = Math.round(values.reduce((sum, value) => sum + value, 0) / values.length * 100);
+    el.textContent = `Subiendo ${values.length === 1 ? 'una pista' : `${values.length} pistas`} a la nube · ${avg}%`;
+    el.hidden = false;
+}
+
+// Sube un archivo local al bucket de la cuenta para que otros dispositivos puedan reproducirlo.
+function uploadLocalMusicFile(file, item) {
+    if (!nowarfySupabase || !nowarfyAuthUser) return Promise.resolve();
     const safeName = String(file.name || 'pista').replace(/[^a-zA-Z0-9._-]+/g, '_').slice(-120);
     const path = `${nowarfyAuthUser.id}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}-${safeName}`;
     const fallbackType = localMediaKind(file) === 'video' ? 'video/mp4' : 'audio/mpeg';
-    const { error } = await nowarfySupabase.storage.from(NOWARFY_MUSIC_BUCKET).upload(path, file, { contentType: file.type || fallbackType, upsert: false });
-    if (error) {
-        console.error('Error subiendo la pista local:', error);
-        showToast(`No se pudo subir "${item.title}"`, 'fa-triangle-exclamation');
-        return;
-    }
-    const stored = queue.find(song => song._qid === item._qid);
-    if (stored) { stored.storagePath = path; persistQueue(); }
+    const uploadId = `${item._qid}-${path}`;
+    nowarfyUploads.set(uploadId, 0);
+    renderUploadStatus();
+    const finish = (ok) => {
+        nowarfyUploads.delete(uploadId);
+        if (ok) {
+            const stored = queue.find(song => song._qid === item._qid);
+            if (stored) { stored.storagePath = path; persistQueue(); }
+        }
+        if (!ok) {
+            showToast(`No se pudo subir "${item.title}"`, 'fa-triangle-exclamation');
+            renderUploadStatus();
+        } else if (nowarfyUploads.size) {
+            renderUploadStatus();
+        } else {
+            renderUploadStatus(`"${item.title}" ya está en la nube`);
+        }
+    };
+    return nowarfySupabase.auth.getSession().then(({ data }) => new Promise(resolve => {
+        const token = data?.session?.access_token;
+        const endpoint = `${nowarfySupabase.supabaseUrl}/storage/v1/object/${NOWARFY_MUSIC_BUCKET}/${path.split('/').map(encodeURIComponent).join('/')}`;
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', endpoint, true);
+        xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+        xhr.setRequestHeader('apikey', nowarfySupabase.supabaseKey);
+        xhr.setRequestHeader('x-upsert', 'false');
+        xhr.setRequestHeader('Content-Type', file.type || fallbackType);
+        xhr.upload.onprogress = (event) => {
+            if (!event.lengthComputable) return;
+            nowarfyUploads.set(uploadId, event.loaded / event.total);
+            renderUploadStatus();
+        };
+        xhr.onload = () => { finish(xhr.status >= 200 && xhr.status < 300); resolve(); };
+        xhr.onerror = () => { finish(false); resolve(); };
+        xhr.send(file);
+    })).catch(() => finish(false));
 }
 
-const LOCAL_AUDIO_EXT = /\.(mp3|ogg|oga|opus|wav|flac|m4a|aac|wma|aiff?|weba)$/i;
-const LOCAL_VIDEO_EXT = /\.(mp4|m4v|mov|webm|mkv|avi|ogv|3gp|mpe?g)$/i;
-
-// Audio o video, de cualquier formato común. El MIME del navegador manda; si falta, la extensión.
-function localMediaKind(file) {
-    const name = file?.name || '';
-    if (/^audio\//.test(file?.type || '')) return 'audio';
-    if (/^video\//.test(file?.type || '')) return 'video';
-    if (LOCAL_AUDIO_EXT.test(name)) return 'audio';
-    if (LOCAL_VIDEO_EXT.test(name)) return 'video';
-    return null;
+// Lee la duración del archivo para mostrarla enseguida en la lista.
+function readLocalMediaDuration(file) {
+    return new Promise(resolve => {
+        const media = document.createElement(localMediaKind(file) === 'video' ? 'video' : 'audio');
+        const url = URL.createObjectURL(file);
+        const done = (value) => { URL.revokeObjectURL(url); resolve(value); };
+        media.preload = 'metadata';
+        media.onloadedmetadata = () => done(Number.isFinite(media.duration) ? media.duration : null);
+        media.onerror = () => done(null);
+        media.src = url;
+    });
 }
 
 function handleLocalMusicFiles(files) {
@@ -332,7 +383,13 @@ function handleLocalMusicFiles(files) {
     queue = [...queue, ...added];
     // Las pistas nuevas quedan esperando en la cola: nunca arrancan solas.
     // La subida a la nube corre en paralelo; es solo para los otros dispositivos.
-    added.forEach((item, i) => { void uploadLocalMusicFile(picked[i], item); });
+    added.forEach((item, i) => {
+        void uploadLocalMusicFile(picked[i], item);
+        void readLocalMediaDuration(picked[i]).then(duration => {
+            const stored = queue.find(song => song._qid === item._qid);
+            if (stored && duration) { stored.duration = duration; persistQueue(); renderQueue(); }
+        });
+    });
     persistQueue();
     renderQueue();
     showToast(`Agregué ${tracks.length} pista(s) a la playlist`, 'fa-list');

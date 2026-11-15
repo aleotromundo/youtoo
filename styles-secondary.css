@@ -433,6 +433,11 @@ html { scroll-behavior: smooth; }
         .queue-restore-btn:hover { background: var(--accent); border-color: var(--accent); color: white; }
         .queue-restore-btn[hidden] { display: none; }
 
+        /* Aviso discreto de subida a la nube dentro de la Playlist. */
+        .queue-upload-status { font-size: 0.72rem; color: var(--text-gray); padding: 4px 16px 0; }
+        .queue-upload-status[hidden] { display: none; }
+        .queue-upload-status.is-done { color: var(--accent); }
+
         .queue-close-btn { background: none; border: none; color: var(--text-gray); font-size: 1rem; cursor: pointer; width: 30px; height: 30px; border-radius: 50%; }
 
         .queue-close-btn:hover { background: var(--bg-hover); color: white; }
