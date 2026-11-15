@@ -673,7 +673,11 @@ function bindDirectAudioEvents(audio) {
     audio.onerror = () => {
         if (audio !== activeAudioEl) return;
         setTrackLoading(false);
-        showToast('No se pudo reproducir esta pista; seguimos con la siguiente', 'fa-triangle-exclamation');
+        const mediaCodes = { 1: 'carga cancelada', 2: 'error de red o enlace vencido', 3: 'el archivo no se pudo decodificar', 4: 'formato o enlace no válido' };
+        const code = audio.error?.code;
+        const kind = String(audio.src || '').startsWith('blob:') ? 'archivo local' : 'enlace de la nube';
+        console.error('Error de reproducción:', kind, audio.error);
+        showToast(`No se pudo reproducir (${kind}): ${mediaCodes[code] || audio.error?.message || 'error desconocido'}${code ? ' [' + code + ']' : ''}`, 'fa-triangle-exclamation');
         queueAutomaticAdvance('direct-error');
     };
 }
@@ -884,7 +888,8 @@ function playQueueAt(idx, options = {}) {
             if (shouldAutoplayAudio) media.play().catch(e => {
                 if (nowarfyHandleAutoplayBlocked?.(e)) return;
                 setTrackLoading(false);
-                showToast('No se pudo reproducir esta pista', 'fa-triangle-exclamation');
+                console.error('play() rechazado:', e);
+                showToast(`No se pudo reproducir esta pista: ${e?.name || 'error'}${e?.message ? ' · ' + e.message : ''}`, 'fa-triangle-exclamation');
             });
             else setTrackLoading(false);
         };

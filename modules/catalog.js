@@ -272,7 +272,7 @@ async function resolveStoredSongUrl(song) {
     const { data, error } = await nowarfySupabase.storage.from(NOWARFY_MUSIC_BUCKET).createSignedUrl(song.storagePath, 6 * 60 * 60);
     if (error || !data?.signedUrl) {
         console.error('No se pudo abrir la pista subida:', error);
-        showToast(`No se pudo abrir "${song.title}"`, 'fa-triangle-exclamation');
+        showToast(`No se pudo abrir "${song.title}": ${error?.message || 'Supabase no devolvió el enlace'}`, 'fa-triangle-exclamation');
         return false;
     }
     song.url = data.signedUrl;
