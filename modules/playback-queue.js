@@ -757,6 +757,13 @@ function playQueueAt(idx, options = {}) {
     }
     currentIndex = idx;
     const song = queue[idx];
+    // Pista que todavía se sube: queda en espera y suena cuando llega a la nube.
+    if (song?.local && !song.storagePath && !nowarfyLiveLocalUrls.has(song.url)) {
+        nowarfyAwaitingUploadKey = songKey(song);
+        setTrackLoading(true);
+        showToast('Se está subiendo a la nube; suena cuando termine', 'fa-cloud-arrow-up');
+        return;
+    }
     // Pista subida que no es de este dispositivo: se reproduce desde la nube con un enlace temporal.
     if (song?.local && song.storagePath && !nowarfyLiveLocalUrls.has(song.url) && !(song.urlExpiresAt > Date.now())) {
         setTrackLoading(true);
@@ -1387,7 +1394,7 @@ function createQueueRow(song, idx, virtual = false, position = idx) {
             <div class="queue-row-artist">${escapeHtml(song.artist)}</div>
         </div>
         ${isPlayingRow ? '<i class="fas fa-volume-up queue-playing-icon" title="Sonando ahora"></i>' : ''}
-        <span class="queue-row-time">${formatQueueDuration(song.duration)}</span>
+        <span class="queue-row-time">${song.uploading ? 'subiendo…' : formatQueueDuration(song.duration)}</span>
         <button type="button" class="queue-row-remove" title="Quitar de Playlist" aria-label="Quitar de Playlist"><i class="fas fa-xmark"></i></button>`;
     row.addEventListener('click', (e) => {
         if (e.target.closest('.queue-row-remove') || e.target.closest('.queue-drag-handle')) return;

@@ -646,3 +646,8 @@ body.mode-transitioning .retro-studio { animation: retro-console-arrive 3s cubic
     text-shadow: 0 0 10px rgba(49, 244, 27, .35);
     pointer-events: none;
 }
+
+/* Aviso de subida a la nube dentro de la Playlist retro. */
+.retro-upload-status { font-size: .52rem; letter-spacing: .04em; color: var(--retro-lime); padding: 3px 8px; background: #050608; }
+.retro-upload-status[hidden] { display: none; }
+.retro-upload-status.is-done { color: #fff; }

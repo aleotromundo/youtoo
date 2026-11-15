@@ -19,9 +19,9 @@ function queueItemForSync(song) {
     if (song?._qid === hiddenPlayingQid) return null;
     // Las pistas locales viajan solo si ya están subidas; la URL temporal (blob:) es de este dispositivo.
     if (song?.local) {
-        if (!song.storagePath) return null;
-        const { _qid, description, ...item } = song;
-        return { ...item, url: '' };
+        // Mientras se sube, la pista viaja marcada como "subiendo" para que los otros equipos la muestren.
+        const { _qid, description, uploading, ...item } = song;
+        return song.storagePath ? { ...item, url: '' } : { ...item, url: '', uploading: true };
     }
     if (!song?.url) return null;
     const { _qid, description, ...item } = song;
@@ -101,7 +101,7 @@ function applyRemoteQueueSongs(songs) {
     // Las pistas locales que todavía se están subiendo no están en la nube: se conservan en esta lista.
     const nextKeys = new Set(next.map(songKey));
     queue.forEach(song => {
-        if (song.local && !song.storagePath && !nextKeys.has(songKey(song))) {
+        if (nowarfyLiveLocalUrls.has(song.url) && !song.storagePath && !nextKeys.has(songKey(song))) {
             nextKeys.add(songKey(song));
             next.push(song);
         }
@@ -112,6 +112,14 @@ function applyRemoteQueueSongs(songs) {
     if (idx >= 0) currentIndex = idx;
     persistQueueNow();
     renderQueue();
+    // Si el usuario pidió una pista que todavía se subía, suena apenas llega a la nube.
+    if (nowarfyAwaitingUploadKey) {
+        const ready = queue.find(song => songKey(song) === nowarfyAwaitingUploadKey && song.storagePath);
+        if (ready) {
+            nowarfyAwaitingUploadKey = null;
+            playQueueAt(queue.indexOf(ready), {});
+        }
+    }
 }
 
 function scheduleNowarfyQueueSync(delay = 400) {

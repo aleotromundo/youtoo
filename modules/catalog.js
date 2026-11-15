@@ -283,24 +283,28 @@ async function resolveStoredSongUrl(song) {
 // Subidas en curso: id -> avance (0 a 1). Se muestran en un aviso discreto de la Playlist.
 const nowarfyUploads = new Map();
 let nowarfyUploadFlashTimer = null;
+// Pista que el usuario pidió mientras se subía: suena al llegar a la nube.
+let nowarfyAwaitingUploadKey = null;
+const NOWARFY_UPLOAD_STATUS_IDS = ['queueUploadStatus', 'retroUploadStatus'];
 
 function renderUploadStatus(flash = '') {
-    const el = document.getElementById('queueUploadStatus');
-    if (!el) return;
     clearTimeout(nowarfyUploadFlashTimer);
+    let text = '';
     if (flash) {
-        el.textContent = flash;
-        el.classList.add('is-done');
-        el.hidden = false;
+        text = flash;
         nowarfyUploadFlashTimer = setTimeout(() => renderUploadStatus(), 3500);
-        return;
+    } else if (nowarfyUploads.size) {
+        const values = [...nowarfyUploads.values()];
+        const avg = Math.round(values.reduce((sum, value) => sum + value, 0) / values.length * 100);
+        text = `Subiendo ${values.length === 1 ? 'una pista' : `${values.length} pistas`} a la nube · ${avg}%`;
     }
-    el.classList.remove('is-done');
-    if (!nowarfyUploads.size) { el.hidden = true; el.textContent = ''; return; }
-    const values = [...nowarfyUploads.values()];
-    const avg = Math.round(values.reduce((sum, value) => sum + value, 0) / values.length * 100);
-    el.textContent = `Subiendo ${values.length === 1 ? 'una pista' : `${values.length} pistas`} a la nube · ${avg}%`;
-    el.hidden = false;
+    NOWARFY_UPLOAD_STATUS_IDS.forEach(id => {
+        const el = document.getElementById(id);
+        if (!el) return;
+        el.textContent = text;
+        el.hidden = !text;
+        el.classList.toggle('is-done', !!flash);
+    });
 }
 
 // Sube un archivo local al bucket de la cuenta para que otros dispositivos puedan reproducirlo.
@@ -316,9 +320,13 @@ function uploadLocalMusicFile(file, item) {
         nowarfyUploads.delete(uploadId);
         if (ok) {
             const stored = queue.find(song => song._qid === item._qid);
-            if (stored) { stored.storagePath = path; persistQueue(); }
+            if (stored) { stored.storagePath = path; delete stored.uploading; persistQueue(); renderQueue(); }
         }
         if (!ok) {
+            // La pista no llegó a la nube: se quita de la lista (y de los otros equipos al sincronizar).
+            queue = queue.filter(song => song._qid !== item._qid);
+            persistQueue();
+            renderQueue();
             showToast(`No se pudo subir "${item.title}"`, 'fa-triangle-exclamation');
             renderUploadStatus();
         } else if (nowarfyUploads.size) {
