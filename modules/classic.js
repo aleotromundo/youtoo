@@ -233,6 +233,12 @@
         try { return typeof isPlaying !== 'undefined' && Boolean(isPlaying); } catch (_) { return false; }
     }
 
+    // Como Winamp: un clic en el reloj alterna entre tiempo transcurrido y tiempo que falta (-m:ss).
+    let retroShowRemaining = false;
+    let retroLastTime = { position: 0, duration: 0 };
+    function renderRetroElapsed(position, duration) {
+        return retroShowRemaining && duration > 0 ? `-${formatTime(Math.max(0, duration - position))}` : formatTime(position);
+    }
     function formatTime(value) {
         const seconds = Number(value);
         if (!Number.isFinite(seconds) || seconds < 0) return '0:00';
@@ -1417,8 +1423,9 @@
         const screenTime = $('retroClockTime');
         const totalTime = $('retroTotalTime');
         const isSeeking = document.activeElement === progress;
-        if (currentTime && !isSeeking) currentTime.textContent = formatTime(position);
-        if (screenTime && !isSeeking) screenTime.textContent = formatTime(position);
+        retroLastTime = { position, duration };
+        if (currentTime && !isSeeking) currentTime.textContent = renderRetroElapsed(position, duration);
+        if (screenTime && !isSeeking) screenTime.textContent = renderRetroElapsed(position, duration);
         if (totalTime) totalTime.textContent = formatTime(duration);
 
         const playButton = $('retroPlayToggle');
@@ -2405,6 +2412,17 @@
         });
         $('retroRestoreQueue')?.addEventListener('click', () => {
             if (typeof restoreQueueBackup === 'function') restoreQueueBackup();
+        });
+        ['retroCurrentTime', 'retroClockTime'].forEach(id => {
+            const el = $(id);
+            if (!el) return;
+            el.style.cursor = 'pointer';
+            el.title = 'Clic para ver el tiempo que falta';
+            el.addEventListener('click', () => {
+                retroShowRemaining = !retroShowRemaining;
+                const { position, duration } = retroLastTime;
+                el.textContent = renderRetroElapsed(position, duration);
+            });
         });
         $('retroContinuous')?.addEventListener('click', () => {
             if (typeof toggleContinuousPlayback === 'function') toggleContinuousPlayback();
