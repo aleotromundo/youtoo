@@ -573,3 +573,9 @@ body.mode-transitioning .retro-studio { animation: retro-console-arrive 3s cubic
 }
 
 
+
+/* Botón de estilo de interfaz: queda como disco chico y se agranda solo al pasar o interactuar */
+.retro-mode-toggle .retro-toggle-copy { overflow: hidden; white-space: nowrap; max-width: 0; opacity: 0; transition: max-width .25s ease, opacity .2s ease; }
+.retro-mode-toggle:hover .retro-toggle-copy,
+.retro-mode-toggle:focus-visible .retro-toggle-copy,
+.retro-mode-toggle.is-retro .retro-toggle-copy { max-width: 220px; opacity: 1; }

@@ -1141,3 +1141,13 @@
 .play-mode-actions button { padding: 10px 8px; border: 1px solid rgba(255,255,255,.14); border-radius: 10px; color: #e6e8f5; background: rgba(255,255,255,.05); font: 800 .72rem 'Manrope', sans-serif; cursor: pointer; }
 .play-mode-actions button.primary { border-color: rgba(94,234,212,.5); background: rgba(94,234,212,.14); color: #eafffb; }
 .play-mode-actions button:focus-visible { outline: 2px solid #5eead4; outline-offset: 2px; }
+
+/* Botón de dispositivos: queda como ícono chico y se agranda solo al pasar o interactuar */
+.nowarfy-device-dock-fab { padding: 9px 10px; gap: 0; opacity: .85; transition: transform .18s var(--ease), border-color .18s var(--ease), background .18s var(--ease), padding .2s var(--ease), gap .2s var(--ease), opacity .2s var(--ease); }
+.nowarfy-device-dock-fab span { max-width: 0; opacity: 0; padding: 0; }
+.nowarfy-device-dock:hover .nowarfy-device-dock-fab,
+.nowarfy-device-dock:focus-within .nowarfy-device-dock-fab,
+.nowarfy-device-dock-fab:focus-visible { padding: 10px 15px; gap: 8px; opacity: 1; }
+.nowarfy-device-dock:hover .nowarfy-device-dock-fab span,
+.nowarfy-device-dock:focus-within .nowarfy-device-dock-fab span,
+.nowarfy-device-dock-fab:focus-visible span { max-width: 200px; opacity: 1; padding: 0; }
