@@ -1131,3 +1131,13 @@
 .local-music-btn:hover { color: #eafffb; border-color: rgba(94,234,212,.45); background: rgba(94,234,212,.1); }
 .local-music-btn:focus-visible { outline: 2px solid #5eead4; outline-offset: 2px; }
 .local-music-btn i { font-size: .8rem; }
+
+/* Pregunta al elegir una pista: solo esta o reproducción infinita */
+.play-mode-overlay { position: fixed; inset: 0; z-index: 10010; display: grid; place-items: center; padding: 20px; background: rgba(5,6,12,.62); backdrop-filter: blur(3px); }
+.play-mode-dialog { width: min(92vw, 360px); padding: 18px; border: 1px solid rgba(190,188,255,.18); border-radius: 16px; background: rgba(21,22,40,.98); color: #f4f4ff; box-shadow: 0 22px 54px rgba(0,0,0,.52); }
+.play-mode-title { margin: 0 0 6px; font: 800 .86rem 'Manrope', sans-serif; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.play-mode-question { margin: 0 0 14px; color: #9da5b7; font: 600 .74rem 'Manrope', sans-serif; line-height: 1.4; }
+.play-mode-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.play-mode-actions button { padding: 10px 8px; border: 1px solid rgba(255,255,255,.14); border-radius: 10px; color: #e6e8f5; background: rgba(255,255,255,.05); font: 800 .72rem 'Manrope', sans-serif; cursor: pointer; }
+.play-mode-actions button.primary { border-color: rgba(94,234,212,.5); background: rgba(94,234,212,.14); color: #eafffb; }
+.play-mode-actions button:focus-visible { outline: 2px solid #5eead4; outline-offset: 2px; }

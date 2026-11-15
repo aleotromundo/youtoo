@@ -248,6 +248,8 @@ async function selectSong(song, sourceIdx) {
         return;
     }
     
+    const infinite = await askInfinitePlayback(song);
+    setContinuousMode(infinite);
     setRadioQueueMode();
     const q = withQid(song);
     queue = [q];
@@ -259,7 +261,61 @@ async function selectSong(song, sourceIdx) {
     // En móvil el grid queda debajo y el video se abría fuera de pantalla.
     playQueueAt(0, { sourceIdx, focusVideo: true });
     void reserveDiscoveredCandidates([song], { context: 'radio', seed: song });
-    growQueueIfNeeded(true);
+    if (infinite) growQueueIfNeeded(true);
+}
+
+// Pregunta al elegir una pista: solo esa, o reproducción infinita (agrega más canciones).
+function askInfinitePlayback(song) {
+    return new Promise((resolve) => {
+        const overlay = document.createElement('div');
+        overlay.className = 'play-mode-overlay';
+        overlay.innerHTML = `<div class="play-mode-dialog" role="dialog" aria-modal="true" aria-label="Modo de reproducción">
+            <p class="play-mode-title">${escapeHtml(song?.title || 'Esta pista')}</p>
+            <p class="play-mode-question">¿Reproducir solo esta o seguir con reproducción infinita?</p>
+            <div class="play-mode-actions">
+                <button type="button" data-mode="single">Solo esta</button>
+                <button type="button" data-mode="infinite" class="primary">Reproducción infinita</button>
+            </div>
+        </div>`;
+        const finish = (value) => {
+            document.removeEventListener('keydown', onKey);
+            overlay.remove();
+            resolve(value);
+        };
+        const onKey = (event) => { if (event.key === 'Escape') finish(false); };
+        overlay.addEventListener('click', (event) => {
+            const button = event.target.closest('button[data-mode]');
+            if (button) finish(button.dataset.mode === 'infinite');
+            else if (event.target === overlay) finish(false);
+        });
+        document.addEventListener('keydown', onKey);
+        document.body.appendChild(overlay);
+        overlay.querySelector('button[data-mode="infinite"]')?.focus();
+    });
+}
+
+function setContinuousMode(on) {
+    continuousPlayback = !!on;
+    localStorage.setItem(CONTINUOUS_PLAYBACK_STORAGE_KEY, String(continuousPlayback));
+    if (!continuousPlayback) {
+        clearAutomaticAdvance();
+        cancelDirectCrossfade();
+    }
+    renderContinuousPlaybackControls();
+}
+
+// Vacía la playlist por completo (queda en cero) y detiene lo que suena.
+function emptyPlaylistFully() {
+    if (!queue.length) return;
+    try { stopAll(); isPlaying = false; updateIcon(); } catch (_) {}
+    queue = [];
+    queueSeenKeys = new Set();
+    queueRound = 0;
+    currentIndex = 0;
+    currentPlayingQid = null;
+    persistQueue();
+    renderQueue();
+    showToast('Playlist vacía', 'fa-trash');
 }
 
 async function resumeSongFromWelcome(song, sourceIdx = 0) {

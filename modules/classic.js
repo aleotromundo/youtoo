@@ -2328,7 +2328,7 @@
             if (typeof setVolume === 'function') setVolume(event.target.value);
         });
         $('retroClearQueue')?.addEventListener('click', () => {
-            if (typeof clearQueue === 'function') clearQueue();
+            if (typeof emptyPlaylistFully === 'function') emptyPlaylistFully();
         });
         $('retroContinuous')?.addEventListener('click', () => {
             if (typeof toggleContinuousPlayback === 'function') toggleContinuousPlayback();
