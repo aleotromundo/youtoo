@@ -76,6 +76,9 @@
             vec3 prev=texture(uPrev,fract(prevUv)).rgb;
             float decay=0.91-0.022*beat-0.012*bass;
             prev*=decay;
+            // Las zonas muy brillantes se apagan más rápido: evita que toda la pantalla quede de un solo color.
+            float lum=dot(prev,vec3(0.3,0.59,0.11));
+            prev*=1.0-0.09*smoothstep(0.22,0.62,lum);
             vec3 ink=palette(clouds+filament*0.17+uTime*0.025+phase,phase);
             float mask=(0.025+0.085*clouds+0.22*filament+0.12*tendrils+0.16*ring)*(0.42+energy*0.92);
             mask*=1.0-smoothstep(0.05,1.32,r);
@@ -83,6 +86,15 @@
             color+=palette(spiral/TAU+clouds+phase,phase)*ring*(0.035+beat*0.24);
             color+=vec3(0.03,0.06,0.12)*pow(max(0.0,1.0-r),3.0)*(0.2+high*0.45);
             color+=palette(clouds+uTime*0.1+phase+tdist,phase)*tfall*0.22;
+            // Capa de contenido: celdas que aparecen y se apagan, y un velo suave para que no quede solo una línea.
+            vec2 cg=q*7.0;
+            vec2 cid=floor(cg);
+            vec2 cf=fract(cg)-0.5;
+            float cseed=hash21(cid+floor(uTime*0.25+mode));
+            float cells=(1.0-smoothstep(0.0,0.2,length(cf)))*step(0.58,cseed)*(0.3+high*1.1+beat*0.6);
+            color+=palette(cseed+spiral/TAU+phase,phase)*cells*(0.05+0.09*energy);
+            float veil=0.5+0.5*sin(spiral*3.0+clouds*6.0-uTime*0.7);
+            color+=ink*veil*(0.012+0.03*energy)*(1.0-smoothstep(0.2,1.1,r));
             // El feedback se almacena en RGBA8: limitarlo evita que la imagen se queme a blanco.
             outColor=vec4(clamp(color,0.0,0.88),1.0);
         }
