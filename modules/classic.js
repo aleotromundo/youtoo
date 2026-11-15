@@ -9,6 +9,44 @@
     const MAX_VISIBLE_TRACKS = 400;
     // Cada preset dura exactamente 30 s; la mezcla empieza al cambiar de preset.
     const PRESET_DWELL_MS = 30000;
+    // Ajustes del visualizador que elige el usuario (se guardan en este navegador).
+    const VISUAL_SETTINGS_KEY = 'youtoo_visual_settings_v1';
+    const visualSettings = (() => {
+        const defaults = { autoPresets: true, dwellMs: PRESET_DWELL_MS, blendScale: 1, sensitivity: 1 };
+        try { return { ...defaults, ...(JSON.parse(localStorage.getItem(VISUAL_SETTINGS_KEY) || '{}')) }; }
+        catch (_) { return defaults; }
+    })();
+    function saveVisualSettings() {
+        try { localStorage.setItem(VISUAL_SETTINGS_KEY, JSON.stringify(visualSettings)); } catch (_) {}
+        if (milkdropEngine) milkdropEngine.sensitivity = visualSettings.sensitivity;
+    }
+    function openVisualSettings() {
+        const existing = document.getElementById('visualSettingsOverlay');
+        if (existing) { existing.remove(); return; }
+        const overlay = document.createElement('div');
+        overlay.id = 'visualSettingsOverlay';
+        overlay.className = 'play-mode-overlay';
+        const dwellOptions = [[15000, '15 s'], [30000, '30 s'], [60000, '1 min'], [120000, '2 min']]
+            .map(([value, label]) => `<option value="${value}"${visualSettings.dwellMs === value ? ' selected' : ''}>${label}</option>`).join('');
+        const blendOptions = [[0.6, 'Rápidas'], [1, 'Normales'], [1.6, 'Lentas']]
+            .map(([value, label]) => `<option value="${value}"${Math.abs(visualSettings.blendScale - value) < 0.01 ? ' selected' : ''}>${label}</option>`).join('');
+        overlay.innerHTML = `<div class="play-mode-dialog" role="dialog" aria-modal="true" aria-label="Ajustes del visualizador">
+            <p class="play-mode-title">Visualizador</p>
+            <label class="visual-setting"><input type="checkbox" id="visAutoPresets"${visualSettings.autoPresets ? ' checked' : ''}> Cambiar de preset solo</label>
+            <label class="visual-setting">Tiempo entre presets <select id="visDwell">${dwellOptions}</select></label>
+            <label class="visual-setting">Transiciones <select id="visBlend">${blendOptions}</select></label>
+            <label class="visual-setting">Sensibilidad al sonido <input type="range" id="visSensitivity" min="0.5" max="2" step="0.1" value="${visualSettings.sensitivity}"></label>
+            <div class="play-mode-actions"><button type="button" data-close="1" class="primary">Listo</button></div>
+        </div>`;
+        const close = () => overlay.remove();
+        overlay.addEventListener('click', (event) => { if (event.target === overlay || event.target.closest('[data-close]')) close(); });
+        overlay.querySelector('#visAutoPresets').addEventListener('change', (e) => { visualSettings.autoPresets = e.target.checked; saveVisualSettings(); });
+        overlay.querySelector('#visDwell').addEventListener('change', (e) => { visualSettings.dwellMs = Number(e.target.value); saveVisualSettings(); });
+        overlay.querySelector('#visBlend').addEventListener('change', (e) => { visualSettings.blendScale = Number(e.target.value); saveVisualSettings(); });
+        overlay.querySelector('#visSensitivity').addEventListener('input', (e) => { visualSettings.sensitivity = Number(e.target.value); saveVisualSettings(); });
+        document.body.appendChild(overlay);
+    }
+    window.openVisualSettings = openVisualSettings;
     const PRESET_HISTORY_MAX = 24;
     // Un blend de MilkDrop ronda los 2-4 s; no se permite cortarlo antes.
     const PRESET_BLEND_MIN = 3.0;
@@ -758,7 +796,7 @@
         const now = performance.now();
         lastPresetChangeAt = now;
         flatFrameChecks = 0;
-        presetDwellMs = PRESET_DWELL_MS;
+        presetDwellMs = visualSettings.dwellMs;
         blendUntil = now + Math.max(1200, (Number(blend) || 0) * 1000);
         blackFrameChecks = 0;
         lastBlackFrameCheckAt = now;
@@ -830,7 +868,7 @@
         try {
             const blend = Number.isFinite(transition)
                 ? transition
-                : PRESET_BLEND_MIN + Math.random() * (PRESET_BLEND_MAX - PRESET_BLEND_MIN);
+                : (PRESET_BLEND_MIN + Math.random() * (PRESET_BLEND_MAX - PRESET_BLEND_MIN)) * visualSettings.blendScale;
             butterchurn.loadPreset(preset, blend);
             activePresetName = nameOrId;
             markPresetStarted(nameOrId, blend);
@@ -1844,7 +1882,7 @@
             updateSpectrum(now);
             drawFallback(now);
             if (now - lastUiSyncAt > 280) syncDeck(false);
-            if (butterchurn && presetNames.length > 1
+            if (butterchurn && presetNames.length > 1 && visualSettings.autoPresets
                 && now >= blendUntil
                 && now - lastPresetChangeAt > presetDwellMs) {
                 musicDirector.lastDecisionAt = now;

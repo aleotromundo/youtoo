@@ -156,6 +156,7 @@
             this.previousSpectrum = null;
             this.bandRanges = null;
             this.audio = new Float32Array([0, 0, 0, 0]);
+            this.peaks = new Float32Array([0.1, 0.1, 0.1]);
             this.smooth = new Float32Array([0, 0, 0]);
             this.previousBands = new Float32Array([0, 0, 0]);
             this.fluxHistory = new Float32Array(48);
@@ -243,6 +244,7 @@
             this.smooth.fill(0);
             this.previousBands.fill(0);
             this.audio.fill(0);
+            this.peaks.fill(0.1);
             // El smoothing alto del AnalyserNode ocultaba transientes; el motor suaviza por separado.
             try { analyser.smoothingTimeConstant = Math.min(Number(analyser.smoothingTimeConstant) || 0.55, 0.55); } catch (_) {}
             this.frequency = new Uint8Array(analyser.frequencyBinCount);
@@ -295,6 +297,15 @@
             let total = 0;
             for (let index = 0; index < this.fluxCount; index += 1) total += this.fluxHistory[index];
             return total / this.fluxCount;
+        }
+
+        // Sensibilidad elegida por el usuario: escala las bandas que recibe el shader.
+        scaledAudio() {
+            const s = Math.max(0.2, Math.min(3, Number(this.sensitivity) || 1));
+            this.audioOut = this.audioOut || new Float32Array(4);
+            for (let i = 0; i < 3; i += 1) this.audioOut[i] = Math.min(1.6, this.audio[i] * s);
+            this.audioOut[3] = Math.min(1.6, this.audio[3] * Math.min(s, 1.6));
+            return this.audioOut;
         }
 
         updateAudio(time, deltaSeconds) {
@@ -375,9 +386,11 @@
 
             if (onset) this.recordOnset(time);
             this.previousBands.set(this.smooth);
-            this.audio[0] = this.smooth[0];
-            this.audio[1] = this.smooth[1];
-            this.audio[2] = this.smooth[2];
+            for (let band = 0; band < 3; band += 1) {
+                // Cada banda se ajusta a su propio nivel reciente: graves, medios y agudos se ven parejos.
+                this.peaks[band] = Math.max(this.smooth[band], this.peaks[band] * Math.exp(-deltaSeconds / 5), 0.1);
+                this.audio[band] = Math.min(1.2, this.smooth[band] / this.peaks[band]);
+            }
             this.audio[3] = Math.max(onset ? 1 : 0, this.audio[3] * Math.exp(-deltaSeconds / 0.16));
 
             if (onset) {
@@ -522,7 +535,7 @@
             gl.uniform2f(this.simUniforms.uResolution, this.width, this.height);
             gl.uniform1f(this.simUniforms.uTime, time * 0.001);
             gl.uniform1f(this.simUniforms.uSeed, this.seed);
-            gl.uniform4fv(this.simUniforms.uAudio, this.audio);
+            gl.uniform4fv(this.simUniforms.uAudio, this.scaledAudio());
             gl.uniform4fv(this.simUniforms.uScene, this.scene);
             gl.uniform4fv(this.simUniforms.uTouch, this.touchState);
             gl.uniform4fv(this.simUniforms.uPush, this.pushState);
@@ -535,7 +548,7 @@
             gl.bindTexture(gl.TEXTURE_2D, write.texture);
             gl.uniform1i(this.displayUniforms.uSceneTex, 0);
             gl.uniform2f(this.displayUniforms.uResolution, this.width, this.height);
-            gl.uniform4fv(this.displayUniforms.uAudio, this.audio);
+            gl.uniform4fv(this.displayUniforms.uAudio, this.scaledAudio());
             gl.drawArrays(gl.TRIANGLES, 0, 3);
             this.readIndex = 1 - this.readIndex;
         }
