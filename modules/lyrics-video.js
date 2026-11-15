@@ -767,15 +767,35 @@ function startProgress(source) {
     }, 500);
 }
 
+// Como Winamp: un clic en el tiempo cambia entre tiempo transcurrido y tiempo que falta (-m:ss).
+let nowarfyShowRemainingTime = false;
+let nowarfyLastTime = { curr: 0, dur: 0 };
+
+function renderElapsedTime() {
+    if (!currTimeEl) return;
+    const { curr, dur } = nowarfyLastTime;
+    currTimeEl.innerText = nowarfyShowRemainingTime && dur ? `-${format(Math.max(0, dur - curr))}` : format(curr);
+}
+
 function updateProgress(curr, dur) {
     if (isSeeking) return;
     if (dur) {
         const pct = (curr / dur) * 100;
         progFill.style.width = `${pct}%`;
         progThumb.style.left = `${pct}%`;
-        currTimeEl.innerText = format(curr);
+        nowarfyLastTime = { curr, dur };
+        renderElapsedTime();
         totalTimeEl.innerText = format(dur);
     }
+}
+
+if (currTimeEl) {
+    currTimeEl.style.cursor = 'pointer';
+    currTimeEl.title = 'Clic para ver el tiempo que falta';
+    currTimeEl.addEventListener('click', () => {
+        nowarfyShowRemainingTime = !nowarfyShowRemainingTime;
+        renderElapsedTime();
+    });
 }
 
 function getDuration() {
