@@ -1186,3 +1186,14 @@
 
 /* El botón de ajustes del visualizador solo existe en el modo Winamp */
 body:not(.mode-classic) #visualSettingsBtn { display: none !important; }
+
+/* Cuenta: circulito arriba a la derecha (reemplaza el botón del menú lateral) */
+.nowarfy-account-circle { position: relative; display: inline-flex; align-items: center; justify-content: center; width: 36px; height: 36px; flex: 0 0 auto; margin-left: auto; border: 1px solid rgba(255,255,255,.18); border-radius: 999px; color: #cfd2e6; background: rgba(20,22,40,.9); cursor: pointer; font: inherit; font-weight: 700; transition: color .15s, border-color .15s, background .15s; }
+.nowarfy-account-circle:hover { color: #eafffb; border-color: rgba(94,234,212,.45); background: rgba(94,234,212,.1); }
+.nowarfy-account-circle:focus-visible { outline: 2px solid #5eead4; outline-offset: 2px; }
+.nowarfy-account-circle i { font-size: .85rem; }
+.nowarfy-account-circle.is-signed-in { color: #0b1020; background: linear-gradient(135deg, #5eead4, #8b8cff); border-color: transparent; }
+.nowarfy-account-circle .nowarfy-account-initial { font-size: .9rem; line-height: 1; }
+.nowarfy-account-circle::after { content: ''; position: absolute; right: -1px; bottom: -1px; width: 10px; height: 10px; border-radius: 50%; border: 2px solid #12142a; background: transparent; }
+.nowarfy-account-circle[data-state="online"]::after { background: #5eead4; }
+.nowarfy-account-circle[data-state="player"]::after { background: #4ade80; }

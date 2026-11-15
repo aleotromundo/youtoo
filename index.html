@@ -114,7 +114,6 @@
                 </button>
             </div>
             <button type="button" class="nowarfy-mobile-action nowarfy-mobile-menu-toggle" id="nowarfyMobileMenuToggle" onclick="toggleNowarfyMobileNav()" aria-label="Abrir menú" aria-expanded="false"><i class="fas fa-bars"></i><span class="nowarfy-mobile-action-text">Menú</span></button>
-            <button type="button" class="nowarfy-mobile-action nowarfy-mobile-account-toggle" onclick="openNowarfyAuth()" aria-label="Abrir cuenta"><i class="fas fa-user"></i><span class="nowarfy-mobile-action-text">Cuenta</span></button>
             
             <div class="nowarfy-nav-groups">
                 <section class="nowarfy-nav-group" aria-label="Descubrir">
@@ -147,7 +146,6 @@
             <div class="nowarfy-side-status" id="nowarfySideStatus" data-state="offline">
                 <strong><i class="fas fa-circle" id="nowarfyConnectionDot"></i> <span id="nowarfyConnectionLabel">Datos en este dispositivo</span></strong>
                 <span id="authDeviceStatus">La cuenta y sincronización se activarán solo si las elegís.</span>
-                <button type="button" id="nowarfyAuthButton" class="nowarfy-account-btn" onclick="openNowarfyAuth()"><i class="fas fa-user"></i> Usar cuenta o continuar anónimo</button>
                 <button type="button" id="pwaInstallBtn" class="nowarfy-install-btn" hidden><i class="fas fa-download"></i> Instalar YouToo®</button>
             </div>
             <button type="button" id="nowarfyQrButton" class="nowarfy-qr-launch" onclick="openNowarfyQr()" aria-haspopup="dialog" aria-controls="nowarfyQrModal" aria-label="Vincular otro dispositivo con código QR">
@@ -185,6 +183,7 @@
                         </button>
                     </div>
                     <button type="button" class="local-music-btn" id="visualSettingsBtn" onclick="openVisualSettings()" title="Ajustes del visualizador" aria-label="Ajustes del visualizador"><i class="fas fa-sliders" aria-hidden="true"></i></button>
+                    <button type="button" id="nowarfyAuthButton" class="nowarfy-account-circle" data-state="offline" onclick="openNowarfyAuth()" aria-haspopup="dialog" aria-label="Cuenta" title="Cuenta"><i class="fas fa-user" aria-hidden="true"></i></button>
                 </div>
             </div>
             <nav class="taste-rail" aria-label="Categorías para descubrir">

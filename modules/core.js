@@ -103,6 +103,8 @@ function updateNowarfyConnectionStatus() {
     const player = connected && nowarfyRemoteIsPlayer;
     const state = player ? 'player' : connected ? 'online' : 'offline';
     panel.dataset.state = state;
+    const accountCircle = document.getElementById('nowarfyAuthButton');
+    if (accountCircle) accountCircle.dataset.state = state;
     if (dot) dot.className = `fas fa-circle connection-dot-${state}`;
     if (label) label.textContent = player ? 'Reproductor conectado' : connected ? 'Sincronización conectada' : 'Sin sincronización';
 }
@@ -140,7 +142,13 @@ function updateNowarfyAuthUI() {
     const userPanel = document.getElementById('nowarfyAuthUserPanel');
     const email = document.getElementById('nowarfyAuthUserEmail');
     if (nowarfyAuthUser) {
-        if (button) button.innerHTML = '<i class="fas fa-user-check"></i> Cuenta: ' + escapeHtml(nowarfyAuthUser.email || 'autenticada');
+        if (button) {
+            const initial = String(nowarfyAuthUser.email || '?').trim().charAt(0).toUpperCase() || '?';
+            button.innerHTML = '<span class="nowarfy-account-initial" aria-hidden="true">' + escapeHtml(initial) + '</span>';
+            button.title = 'Cuenta: ' + (nowarfyAuthUser.email || 'autenticada');
+            button.setAttribute('aria-label', button.title);
+            button.classList.add('is-signed-in');
+        }
         if (deviceStatus) deviceStatus.textContent = 'Cuenta autenticada; este dispositivo ya puede sincronizarse con tus otros dispositivos.';
         if (guest) guest.hidden = true;
         if (userPanel) userPanel.hidden = false;
@@ -158,7 +166,12 @@ function updateNowarfyAuthUI() {
             claimButton.setAttribute('aria-pressed', nowarfyRemoteIsPlayer ? 'true' : 'false');
         }
     } else {
-        if (button) button.innerHTML = '<i class="fas fa-user"></i> Usar cuenta o continuar anónimo';
+        if (button) {
+            button.innerHTML = '<i class="fas fa-user" aria-hidden="true"></i>';
+            button.title = 'Usar cuenta o continuar anónimo';
+            button.setAttribute('aria-label', button.title);
+            button.classList.remove('is-signed-in');
+        }
         if (deviceStatus) deviceStatus.textContent = nowarfyAuthConfigured ? 'Modo anónimo activo en este dispositivo; la cuenta es opcional.' : 'Modo anónimo activo; configurá la clave pública para habilitar cuentas.';
         if (guest) guest.hidden = false;
         if (userPanel) userPanel.hidden = true;
