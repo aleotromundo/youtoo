@@ -52,7 +52,50 @@
                 <div class="vs-label"><strong>Sensibilidad al sonido</strong><span class="vs-value" id="visSensitivityValue">${Number(visualSettings.sensitivity).toFixed(1)}×</span></div>
                 <input type="range" class="vs-range" id="visSensitivity" min="0.5" max="2" step="0.1" value="${visualSettings.sensitivity}">
             </div>
+            <div class="vs-row vs-block">
+                <!-- TEMPORAL: copiar el SQL de Supabase. Quitar cuando la migración esté aplicada. -->
+                <button type="button" class="vs-seg" id="visCopySql"><i class="fas fa-copy" aria-hidden="true"></i> Copiar SQL de Supabase</button>
+            </div>
         </div>`;
+        // TEMPORAL: copia el SQL de la migración del almacenamiento de música para el editor de Supabase.
+        const MUSIC_STORAGE_SQL = `-- Música local en Supabase Storage (YouToo).
+-- Ejecutar en el SQL Editor de Supabase (una sola vez).
+-- Cada usuario sube sus archivos en una carpeta con su id: <user_id>/<archivo>.
+
+insert into storage.buckets (id, name, public)
+values ('nowarfy-music', 'nowarfy-music', false)
+on conflict (id) do nothing;
+
+drop policy if exists "nowarfy_music_select_own" on storage.objects;
+create policy "nowarfy_music_select_own" on storage.objects
+  for select to authenticated
+  using (bucket_id = 'nowarfy-music' and (storage.foldername(name))[1] = auth.uid()::text);
+
+drop policy if exists "nowarfy_music_insert_own" on storage.objects;
+create policy "nowarfy_music_insert_own" on storage.objects
+  for insert to authenticated
+  with check (bucket_id = 'nowarfy-music' and (storage.foldername(name))[1] = auth.uid()::text);
+
+drop policy if exists "nowarfy_music_update_own" on storage.objects;
+create policy "nowarfy_music_update_own" on storage.objects
+  for update to authenticated
+  using (bucket_id = 'nowarfy-music' and (storage.foldername(name))[1] = auth.uid()::text);
+
+drop policy if exists "nowarfy_music_delete_own" on storage.objects;
+create policy "nowarfy_music_delete_own" on storage.objects
+  for delete to authenticated
+  using (bucket_id = 'nowarfy-music' and (storage.foldername(name))[1] = auth.uid()::text);
+`;
+        overlay.querySelector('#visCopySql').addEventListener('click', async (event) => {
+            const button = event.currentTarget;
+            try {
+                await navigator.clipboard.writeText(MUSIC_STORAGE_SQL);
+                button.innerHTML = '<i class="fas fa-check" aria-hidden="true"></i> SQL copiado';
+            } catch (error) {
+                button.textContent = 'No se pudo copiar el SQL';
+                console.error('Error copiando el SQL:', error);
+            }
+        });
         const close = () => overlay.remove();
         overlay.addEventListener('click', (event) => {
             if (event.target === overlay || event.target.closest('[data-close]')) { close(); return; }
