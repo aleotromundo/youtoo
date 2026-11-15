@@ -224,6 +224,28 @@ function handleSearchKeydown(event) {
 }
 let retroSearchScrollPending = false;
 let retroReturnPending = false;
+// Filtro por fuente: muestra solo YouTube, Openverse o Wikimedia (o todas).
+function setSourceFilter(source) {
+    const container = document.getElementById('dynamicSections');
+    if (!container) return;
+    container.dataset.sourceFilter = source === 'all' ? '' : source;
+    document.querySelectorAll('#sourceFilter .source-chip').forEach(chip => {
+        chip.classList.toggle('is-active', chip.dataset.source === source);
+        chip.setAttribute('aria-pressed', String(chip.dataset.source === source));
+    });
+}
+(function initSourceFilterVisibility() {
+    const start = () => {
+        const container = document.getElementById('dynamicSections');
+        const filter = document.getElementById('sourceFilter');
+        if (!container || !filter) return;
+        const sync = () => { filter.hidden = !container.children.length; };
+        new MutationObserver(sync).observe(container, { childList: true });
+        sync();
+    };
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start);
+    else start();
+})();
 function scrollRetroResultsIntoView() {
     if (!retroSearchScrollPending || !document.body.classList.contains('mode-classic')) return;
     const target = document.getElementById('dynamicSections');
@@ -877,6 +899,7 @@ async function fetchCommonsAudioTracks(query, limit = 15, options = {}) {
                 license: clean(meta.LicenseShortName),
                 licenseVersion: '',
                 filetype: info.mime || '',
+                source: 'commons',
                 sourceUrl: info.descriptionurl || ''
             };
         }).filter(Boolean);
@@ -923,6 +946,7 @@ async function fetchOpenverseTracks(query, limit = 20, options = {}) {
             license: track.license || '',
             licenseVersion: track.license_version || '',
             filetype: track.filetype || '',
+            source: 'openverse',
             sourceUrl: track.foreign_landing_url || track.detail_url || ''
         }))
         .sort((a, b) => (b.img ? 1 : 0) - (a.img ? 1 : 0));
@@ -961,10 +985,18 @@ async function fetchFreeMusicCollection(collection) {
 
 function renderOpenverseSearchResults(tracks, query) {
     if (!Array.isArray(tracks) || !tracks.length) return;
-    renderLibraryRail(tracks.slice(0, 20), `Openverse · música de "${query}"`, "<i class='fas fa-headphones'></i>", false, {
+    // Openverse y Wikimedia llegan mezclados: se separan en dos bloques para poder filtrarlos.
+    const commons = tracks.filter(track => track.source === 'commons');
+    const openverse = tracks.filter(track => track.source !== 'commons');
+    if (openverse.length) renderLibraryRail(openverse.slice(0, 20), `Openverse · música de "${query}"`, "<i class='fas fa-headphones'></i>", false, {
         hint: 'Fuente abierta · resultados visibles siempre',
         showControls: true,
-        className: 'free-music-rail openverse-search-rail'
+        className: 'free-music-rail openverse-search-rail source-openverse'
+    });
+    if (commons.length) renderLibraryRail(commons.slice(0, 20), `Wikimedia Commons · audio de "${query}"`, "<i class='fas fa-compact-disc'></i>", false, {
+        hint: 'Audio libre · Wikimedia Commons',
+        showControls: true,
+        className: 'free-music-rail source-commons'
     });
 }
 async function searchOpenverse(query) {
