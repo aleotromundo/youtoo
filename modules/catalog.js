@@ -299,14 +299,13 @@ function handleLocalMusicFiles(files) {
         filetype: file.type || '',
         sourceUrl: ''
     }));
-    const firstNew = queue.length;
     const added = tracks.map(withQid);
     queue = [...queue, ...added];
+    // Las pistas nuevas quedan esperando en la cola: nunca arrancan solas.
+    // La subida a la nube corre en paralelo; es solo para los otros dispositivos.
     added.forEach((item, i) => { void uploadLocalMusicFile(picked[i], item); });
     persistQueue();
     renderQueue();
-    const idle = typeof isActuallyPlaying === 'function' ? !isActuallyPlaying() : true;
-    if (idle) playQueueAt(firstNew, {});
     showToast(`Agregué ${tracks.length} pista(s) a la playlist`, 'fa-list');
 }
 // Arrastrar archivos o carpetas de música sobre la Playlist (modo Winamp y panel moderno).
