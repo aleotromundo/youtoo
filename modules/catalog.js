@@ -2403,6 +2403,7 @@ function startPrebuiltPlaylistPlayback(playlist, tracks, pageInfo = {}, nextPage
     };
     continuousPlayback = true;
     localStorage.setItem(CONTINUOUS_PLAYBACK_STORAGE_KEY, 'true');
+    backupVisibleQueue();
     queue = [];
     queueSeenKeys = new Set();
     queueRound = 0;

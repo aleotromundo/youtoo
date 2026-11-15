@@ -1259,6 +1259,11 @@ function writeQueueBackup(songs) {
     } catch (_) {}
 }
 
+function backupVisibleQueue() {
+    const visible = queue.filter(song => song._qid !== hiddenPlayingQid).map(({ _qid, ...song }) => song);
+    if (visible.length) writeQueueBackup(visible);
+}
+
 function updateQueueRestoreButton() {
     const button = document.getElementById('queueRestoreBtn');
     if (button) button.hidden = !readQueueBackup();
@@ -1274,7 +1279,6 @@ function restoreQueueBackup() {
     const toAdd = backup.filter(song => !visibleKeys.has(songKey(song)) && !(playingHidden && songKey(song) === songKey(playingHidden) && hiddenPlayingQid == null));
     queue.push(...toAdd.map(withQid));
     queueSeenKeys = new Set(queue.map(songKey));
-    writeQueueBackup([]);
     persistQueue();
     renderQueue();
     updateQueueRestoreButton();
@@ -1284,8 +1288,7 @@ function restoreQueueBackup() {
 function clearQueue() {
     if (queue.length === 0) return;
     // Guardar lo que se ve en la lista (sin la pista que suena oculta) antes de vaciar.
-    const visibleSongs = queue.filter(song => song._qid !== hiddenPlayingQid).map(({ _qid, ...song }) => song);
-    if (visibleSongs.length) writeQueueBackup(visibleSongs);
+    backupVisibleQueue();
     const current = currentQueueSong() || queue[currentIndex];
     if (!current) {
         queue = [];

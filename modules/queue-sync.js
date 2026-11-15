@@ -66,6 +66,8 @@ function writeQueueSyncBase(uid, items) {
 // Reemplaza la cola local por la combinada. Conserva los _qid de las canciones que ya
 // estaban y mantiene sonando la pista actual aunque otro dispositivo la haya quitado.
 function applyRemoteQueueSongs(songs) {
+    // Si otro dispositivo vació la lista, esta conserva la copia para poder restaurarla.
+    if (!songs.length) backupVisibleQueue();
     const qidByKey = new Map();
     queue.forEach(song => {
         const key = songKey(song);
