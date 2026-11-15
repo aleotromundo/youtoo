@@ -360,6 +360,19 @@ function readLocalMediaDuration(file) {
     });
 }
 
+const LOCAL_AUDIO_EXT = /\.(mp3|ogg|oga|opus|wav|flac|m4a|aac|wma|aiff?|weba)$/i;
+const LOCAL_VIDEO_EXT = /\.(mp4|m4v|mov|webm|mkv|avi|ogv|3gp|mpe?g)$/i;
+
+// Audio o video, de cualquier formato común. El MIME del navegador manda; si falta, la extensión.
+function localMediaKind(file) {
+    const name = file?.name || '';
+    if (/^audio\//.test(file?.type || '')) return 'audio';
+    if (/^video\//.test(file?.type || '')) return 'video';
+    if (LOCAL_AUDIO_EXT.test(name)) return 'audio';
+    if (LOCAL_VIDEO_EXT.test(name)) return 'video';
+    return null;
+}
+
 function handleLocalMusicFiles(files) {
     const picked = Array.from(files || []).filter(file => localMediaKind(file));
     if (!picked.length) { showToast('No encontré audio ni video en esos archivos', 'fa-circle-exclamation'); return; }
