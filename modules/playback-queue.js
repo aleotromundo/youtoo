@@ -674,6 +674,12 @@ function beginDirectAudioCrossfade() {
 
 function playQueueAt(idx, options = {}) {
     if (idx < 0 || idx >= queue.length) return;
+    if (typeof retroReturnPending !== 'undefined' && retroReturnPending) {
+        retroReturnPending = false;
+        if (document.body.classList.contains('mode-classic')) {
+            document.getElementById('retroStudio')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+    }
     clearAutomaticAdvance();
     playbackStoppedByUser = false;
     const previousSong = currentQueueSong();

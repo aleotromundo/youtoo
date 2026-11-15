@@ -218,7 +218,14 @@ function handleSearchKeydown(event) {
     if (!query) { resetView(); return; }
     channelFilter = null;
     performSmartSearch(query);
+    // En modo Winamp el reproductor tapa los resultados: bajamos a la lista y,
+    // al reproducir una pista, la pantalla vuelve al reproductor.
+    if (document.body.classList.contains('mode-classic')) {
+        retroReturnPending = true;
+        document.getElementById('dynamicSections')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
 }
+let retroReturnPending = false;
 function handleSearchDebounced() { handleSearchInput(); }
 
 function clearSearch() {
