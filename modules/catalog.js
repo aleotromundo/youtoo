@@ -779,15 +779,19 @@ async function performSmartSearch(query, options = {}) {
             return all.findIndex(other => songKey(other) === key) === index;
         });
         const openverseQuery = channelFilter ? query : `${query} music`;
-        const [youtubeResult, openverseResult] = await Promise.allSettled([
+        const [youtubeResult, openverseResult, commonsResult] = await Promise.allSettled([
             channelFilter
                 ? fetchYouTubeSearch(query, 'video,playlist', { channelId: channelFilter.id, maxResults: 50, signal: activeSearchController.signal })
                 : fetchYouTubeSearch(query, 'video,playlist,channel', { maxResults: 50, signal: activeSearchController.signal }),
-            fetchOpenverseTracks(openverseQuery, 20, { page: 1, reserveContext: 'manual', seed: { artist: query, title: query }, signal: activeSearchController.signal })
+            fetchOpenverseTracks(openverseQuery, 20, { page: 1, reserveContext: 'manual', seed: { artist: query, title: query }, signal: activeSearchController.signal }),
+            channelFilter ? Promise.resolve([]) : fetchCommonsAudioTracks(query, 15, { signal: activeSearchController.signal })
         ]);
         if (requestId !== activeSearchRequestId) return;
         const fresh = youtubeResult.status === 'fulfilled' ? youtubeResult.value || [] : [];
-        const openverseTracks = openverseResult.status === 'fulfilled' ? openverseResult.value || [] : [];
+        const openverseTracks = mergeSearchResults([
+            ...(openverseResult.status === 'fulfilled' ? openverseResult.value || [] : []),
+            ...(commonsResult.status === 'fulfilled' ? commonsResult.value || [] : [])
+        ]);
         const merged = mergeSearchResults([...localSongs, ...fresh]);
         activeSearchPagination.youtubeResults = merged;
         activeSearchPagination.youtubeNextPageToken = String(fresh.nextPageToken || '').trim();
@@ -831,6 +835,54 @@ function clearChannelFilter() {
     const q = searchQuery;
     channelFilter = null;
     if (q) performSmartSearch(q); else resetView();
+}
+
+// Wikimedia Commons: audio libre con acceso desde el navegador (origin=*),
+// así el visualizador puede analizar el sonido de estas pistas.
+async function fetchCommonsAudioTracks(query, limit = 15, options = {}) {
+    const text = String(query || '').trim();
+    if (!text) return [];
+    const params = new URLSearchParams({
+        action: 'query',
+        generator: 'search',
+        gsrsearch: `${text} filetype:audio`,
+        gsrnamespace: '6',
+        gsrlimit: String(Math.min(Math.max(limit, 1), 30)),
+        prop: 'imageinfo',
+        iiprop: 'url|mime|extmetadata|size',
+        iiextmetadatafilter: 'Artist|LicenseShortName|ObjectName',
+        format: 'json',
+        origin: '*'
+    });
+    try {
+        const response = await fetch(`https://commons.wikimedia.org/w/api.php?${params.toString()}`, options.signal ? { signal: options.signal } : undefined);
+        if (!response.ok) return [];
+        const data = await response.json();
+        const pages = Object.values(data?.query?.pages || {});
+        const playable = /^audio\/(ogg|mpeg|mp3|mp4|wav|x-wav|flac|webm)$/i;
+        const clean = (field) => String(field?.value || '').replace(/<[^>]+>/g, '').trim();
+        return pages.map((page) => {
+            const info = page.imageinfo && page.imageinfo[0];
+            if (!info || !info.url || !playable.test(String(info.mime || ''))) return null;
+            const meta = info.extmetadata || {};
+            const fallbackTitle = String(page.title || '').replace(/^File:/i, '').replace(/\.[a-z0-9]+$/i, '').replace(/_/g, ' ');
+            return {
+                title: clean(meta.ObjectName) || fallbackTitle,
+                artist: clean(meta.Artist) || 'Wikimedia Commons',
+                img: 'assets/nowarfy-icon-512.png',
+                url: info.url,
+                type: 'mp3',
+                duration: null,
+                genre: 'unknown',
+                license: clean(meta.LicenseShortName),
+                licenseVersion: '',
+                filetype: info.mime || '',
+                sourceUrl: info.descriptionurl || ''
+            };
+        }).filter(Boolean);
+    } catch (error) {
+        return [];
+    }
 }
 
 async function fetchOpenverseTracks(query, limit = 20, options = {}) {
