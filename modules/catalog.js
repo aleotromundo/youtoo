@@ -263,6 +263,22 @@ function setSourceFilter(source) {
 // Archivos de música del propio dispositivo: se reproducen desde una URL local (blob),
 // así que el visualizador puede analizar su sonido sin restricciones de origen.
 const NOWARFY_MUSIC_BUCKET = 'nowarfy-music';
+// URLs temporales (blob:) de los archivos que este dispositivo tiene realmente cargados.
+const nowarfyLiveLocalUrls = new Set();
+
+// Pide un enlace firmado al storage para reproducir la pista desde la nube.
+async function resolveStoredSongUrl(song) {
+    if (!nowarfySupabase || !song?.storagePath) return false;
+    const { data, error } = await nowarfySupabase.storage.from(NOWARFY_MUSIC_BUCKET).createSignedUrl(song.storagePath, 6 * 60 * 60);
+    if (error || !data?.signedUrl) {
+        console.error('No se pudo abrir la pista subida:', error);
+        showToast(`No se pudo abrir "${song.title}"`, 'fa-triangle-exclamation');
+        return false;
+    }
+    song.url = data.signedUrl;
+    song.urlExpiresAt = Date.now() + (6 * 60 * 60 - 300) * 1000;
+    return true;
+}
 
 // Sube un archivo local al bucket de la cuenta para que otros dispositivos puedan descargarlo.
 async function uploadLocalMusicFile(file, item) {
@@ -289,7 +305,7 @@ function handleLocalMusicFiles(files) {
         title: file.name.replace(/\.[^.]+$/, '').replace(/_/g, ' '),
         artist: 'Mi música',
         img: 'assets/nowarfy-icon-512.png',
-        url: URL.createObjectURL(file),
+        url: (() => { const url = URL.createObjectURL(file); nowarfyLiveLocalUrls.add(url); return url; })(),
         type: 'mp3',
         local: true,
         duration: null,

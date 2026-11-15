@@ -757,9 +757,13 @@ function playQueueAt(idx, options = {}) {
     }
     currentIndex = idx;
     const song = queue[idx];
-    if (song?.local && !song.url) {
-        // Pista subida desde otro dispositivo: falta descargarla acá.
-        showToast('Esta pista está en otro dispositivo', 'fa-cloud');
+    // Pista subida que no es de este dispositivo: se reproduce desde la nube con un enlace temporal.
+    if (song?.local && song.storagePath && !nowarfyLiveLocalUrls.has(song.url) && !(song.urlExpiresAt > Date.now())) {
+        setTrackLoading(true);
+        void resolveStoredSongUrl(song).then(ok => {
+            if (!ok) { setTrackLoading(false); return; }
+            if (currentQueueSong()?._qid === song._qid) playQueueAt(queue.indexOf(song), options);
+        });
         return;
     }
     const reuseYouTubePlayer = previousSong?.type === 'yt' && song?.type === 'yt' && ytPlayer?.loadVideoById && !options.forceNewYouTubePlayer;
