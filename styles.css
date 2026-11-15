@@ -1125,3 +1125,9 @@
 .source-chip:focus-visible { outline: 2px solid #5eead4; outline-offset: 2px; }
 .source-chip.is-active { opacity: 1; color: #eafffb; border-color: rgba(94,234,212,.45); background: rgba(94,234,212,.1); }
 
+
+/* Botón para subir tu propia música, al lado del botón de dispositivos */
+.local-music-btn { display: inline-flex; align-items: center; justify-content: center; width: 36px; height: 36px; flex: 0 0 auto; border: 1px solid rgba(255,255,255,.12); border-radius: 999px; color: #cfd2e6; background: rgba(20,22,40,.9); cursor: pointer; transition: color .15s, border-color .15s, background .15s; }
+.local-music-btn:hover { color: #eafffb; border-color: rgba(94,234,212,.45); background: rgba(94,234,212,.1); }
+.local-music-btn:focus-visible { outline: 2px solid #5eead4; outline-offset: 2px; }
+.local-music-btn i { font-size: .8rem; }

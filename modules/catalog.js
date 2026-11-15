@@ -260,6 +260,33 @@ function setSourceFilter(source) {
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start);
     else start();
 })();
+// Archivos de música del propio dispositivo: se reproducen desde una URL local (blob),
+// así que el visualizador puede analizar su sonido sin restricciones de origen.
+function handleLocalMusicFiles(files) {
+    const list = Array.from(files || []).filter(file => /^audio\//.test(file.type || '') || /\.(mp3|ogg|oga|wav|flac|m4a|aac|opus)$/i.test(file.name || ''));
+    if (!list.length) { showToast('No encontré audio en esos archivos', 'fa-circle-exclamation'); return; }
+    const tracks = list.map(file => ({
+        title: file.name.replace(/\.[^.]+$/, '').replace(/_/g, ' '),
+        artist: 'Mi música',
+        img: 'assets/nowarfy-icon-512.png',
+        url: URL.createObjectURL(file),
+        type: 'mp3',
+        local: true,
+        duration: null,
+        genre: 'unknown',
+        license: '',
+        licenseVersion: '',
+        filetype: file.type || '',
+        sourceUrl: ''
+    }));
+    queue = tracks.map(withQid);
+    queueSeenKeys = new Set();
+    queueRound = 0;
+    persistQueue();
+    renderQueue();
+    playQueueAt(0, {});
+    showToast(`Reproduciendo ${tracks.length} archivo(s) de tu música`, 'fa-folder-open');
+}
 function scrollRetroResultsIntoView() {
     if (!retroSearchScrollPending || !document.body.classList.contains('mode-classic')) return;
     const target = document.getElementById('dynamicSections');
