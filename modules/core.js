@@ -616,18 +616,12 @@ function toggleNowarfyDeviceDock(force) {
     else flashNowarfyDeviceDock(2000);
 }
 let nowarfyDeviceDockIdleTimer = null;
-// Muestra el botón completo un rato y después lo reduce a un ícono chico (sigue tocable).
-function flashNowarfyDeviceDock(ms = 4000) {
+// El botón de dispositivos queda siempre visible con su texto completo.
+function flashNowarfyDeviceDock() {
     const dock = document.getElementById('nowarfyDeviceDock');
     if (!dock) return;
     clearTimeout(nowarfyDeviceDockIdleTimer);
     dock.classList.remove('is-idle');
-    if (!ms) return;
-    nowarfyDeviceDockIdleTimer = setTimeout(() => {
-        const panel = document.getElementById('nowarfyDeviceDockPanel');
-        if (panel && !panel.hidden) return;
-        dock.classList.add('is-idle');
-    }, ms);
 }
 document.addEventListener('pointerdown', (event) => {
     const dock = document.getElementById('nowarfyDeviceDock');
