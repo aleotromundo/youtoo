@@ -225,6 +225,18 @@ function handleSearchKeydown(event) {
 let retroSearchScrollPending = false;
 let retroReturnPending = false;
 // Filtro por fuente: muestra solo YouTube, Openverse o Wikimedia (o todas).
+// Se aplica con JS sobre las secciones de resultados, así no depende de selectores CSS.
+function applySourceFilter() {
+    const container = document.getElementById('dynamicSections');
+    if (!container) return;
+    const filter = container.dataset.sourceFilter || '';
+    Array.from(container.children).forEach(section => {
+        if (!(section instanceof HTMLElement) || section.tagName !== 'SECTION') return;
+        const kind = section.classList.contains('source-openverse') ? 'openverse'
+            : section.classList.contains('source-commons') ? 'commons' : 'youtube';
+        section.style.display = (!filter || kind === filter) ? '' : 'none';
+    });
+}
 function setSourceFilter(source) {
     const container = document.getElementById('dynamicSections');
     if (!container) return;
@@ -233,13 +245,14 @@ function setSourceFilter(source) {
         chip.classList.toggle('is-active', chip.dataset.source === source);
         chip.setAttribute('aria-pressed', String(chip.dataset.source === source));
     });
+    applySourceFilter();
 }
 (function initSourceFilterVisibility() {
     const start = () => {
         const container = document.getElementById('dynamicSections');
         const filter = document.getElementById('sourceFilter');
         if (!container || !filter) return;
-        const sync = () => { filter.hidden = !container.children.length; };
+        const sync = () => { filter.hidden = !container.children.length; applySourceFilter(); };
         new MutationObserver(sync).observe(container, { childList: true });
         sync();
     };
