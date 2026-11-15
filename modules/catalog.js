@@ -218,14 +218,20 @@ function handleSearchKeydown(event) {
     if (!query) { resetView(); return; }
     channelFilter = null;
     performSmartSearch(query);
-    // En modo Winamp el reproductor tapa los resultados: bajamos a la lista y,
-    // al reproducir una pista, la pantalla vuelve al reproductor.
-    if (document.body.classList.contains('mode-classic')) {
-        retroReturnPending = true;
-        document.getElementById('dynamicSections')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }
+    // En modo Winamp el reproductor tapa los resultados: cuando aparecen, la página baja
+    // hasta la lista para mostrarla entera, y al reproducir una pista vuelve al reproductor.
+    retroSearchScrollPending = document.body.classList.contains('mode-classic');
 }
+let retroSearchScrollPending = false;
 let retroReturnPending = false;
+function scrollRetroResultsIntoView() {
+    if (!retroSearchScrollPending || !document.body.classList.contains('mode-classic')) return;
+    const target = document.getElementById('dynamicSections');
+    if (!target || !target.children.length) return;
+    retroSearchScrollPending = false;
+    retroReturnPending = true;
+    requestAnimationFrame(() => target.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+}
 function handleSearchDebounced() { handleSearchInput(); }
 
 function clearSearch() {
@@ -681,6 +687,7 @@ function renderSearchResultsPage() {
         if (state.openverseResults.length) renderOpenverseSearchResults(state.openverseResults, state.query);
         renderSearchMoreControl();
     });
+    scrollRetroResultsIntoView();
 }
 function renderSearchMoreControl() {
     const state = activeSearchPagination;
@@ -790,6 +797,7 @@ async function performSmartSearch(query, options = {}) {
         if (merged.length > 0) renderYouTubeSearchResults(merged, query);
         if (openverseTracks.length > 0) renderOpenverseSearchResults(openverseTracks, query);
         renderSearchMoreControl();
+        scrollRetroResultsIntoView();
         if (!channelFilter && localSongs.length > 0 && fresh.length === 0) {
             showToast(cachedSearchIsSufficient ? `Resultados guardados reutilizados para "${query}"` : `YouTube sin resultados nuevos: usando candidatos guardados de ${inferArtistStyle(query, localSongs)}`, 'fa-database');
         }
