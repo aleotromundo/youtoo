@@ -10,7 +10,7 @@ La referencia conceptual es MilkDrop, pero el objetivo es superarlo dentro de la
 
 Repositorio: `https://github.com/aleotromundo/youtoo`
 
-Producción: `https://nowar-rose.vercel.app`
+Producción: `https://youtoofly.vercel.app`
 
 Motor activo actual:
 

@@ -2,7 +2,7 @@
 
 Aplicación web para buscar videos de música, recetas, tutoriales y otros temas en YouTube, además de descubrir música de fuentes abiertas. La PWA guarda el historial localmente y ofrece reproducción continua; se construye como sitio estático (HTML/CSS/JS) con funciones serverless en Vercel.
 
-🔗 **Sitio en producción:** https://nowar-rose.vercel.app
+🔗 **Sitio en producción:** https://youtoofly.vercel.app
 
 ## Stack
 
