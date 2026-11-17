@@ -885,6 +885,8 @@ const CATALOG_CACHE_TTL_MS = Object.freeze({
 });
 const OPENVERSE_RADIO_CACHE_KEY = 'nowarfy_openverse_radio_cache_v1';
 const OPENVERSE_RADIO_CACHE_MAX_AGE_MS = 14 * 24 * 60 * 60 * 1000;
+const FREE_MUSIC_LIBRARY_KEY = 'nowarfy_free_music_library_v1';
+const FREE_MUSIC_LIBRARY_MAX_ITEMS = 160;
 const EMERGENCY_VIDEO_CATALOG = [
     { title: 'Metallica: Nothing Else Matters (Official Music Video)', artist: 'Metallica', channelTitle: 'Metallica', url: 'tAGnKpE4NCI', img: 'https://i.ytimg.com/vi/tAGnKpE4NCI/hqdefault.jpg', type: 'yt', resourceKind: 'youtube#video', description: 'Videoclip oficial de Metallica.' },
     { title: 'Nirvana - Smells Like Teen Spirit (Official Music Video)', artist: 'NirvanaVEVO', channelTitle: 'NirvanaVEVO', url: 'hTWKbfoikeg', img: 'https://i.ytimg.com/vi/hTWKbfoikeg/hqdefault.jpg', type: 'yt', resourceKind: 'youtube#video', description: 'Videoclip oficial de Nirvana.' },
@@ -943,6 +945,29 @@ function writeRemoteCatalogCache(key, data) {
             .slice(0, REMOTE_CATALOG_CACHE_MAX_ITEMS);
         localStorage.setItem(REMOTE_CATALOG_CACHE_KEY, JSON.stringify(Object.fromEntries(freshEntries)));
     } catch (_) {}
+}
+function freeMusicTrackKey(track) {
+    return `${String(track?.source || '').toLowerCase()}:${String(track?.url || '').trim()}`;
+}
+function readFreeMusicLibrary() {
+    try {
+        const saved = JSON.parse(localStorage.getItem(FREE_MUSIC_LIBRARY_KEY) || '[]');
+        return Array.isArray(saved) ? saved.filter(item => item?.url && ['openverse', 'jamendo'].includes(String(item.source || '').toLowerCase())) : [];
+    } catch (_) { return []; }
+}
+function rememberFreeMusicTracks(tracks) {
+    const incoming = (tracks || []).filter(track => track?.url && ['openverse', 'jamendo'].includes(String(track.source || '').toLowerCase()));
+    if (!incoming.length) return readFreeMusicLibrary();
+    const merged = [...incoming, ...readFreeMusicLibrary()];
+    const seen = new Set();
+    const unique = merged.filter(track => {
+        const key = freeMusicTrackKey(track);
+        if (!key || seen.has(key)) return false;
+        seen.add(key);
+        return true;
+    }).slice(0, FREE_MUSIC_LIBRARY_MAX_ITEMS);
+    try { localStorage.setItem(FREE_MUSIC_LIBRARY_KEY, JSON.stringify(unique)); } catch (_) {}
+    return unique;
 }
 
 async function recoverFromTasteHistory(excludeQuery, requestId) {
@@ -1138,7 +1163,7 @@ async function fetchJamendoTracks(query, limit = 15, options = {}) {
         const response = await fetch(`/api/search?type=jamendo&query=${encodeURIComponent(text)}&maxResults=${Math.min(Math.max(limit, 1), 20)}`, options.signal ? { signal: options.signal } : undefined);
         if (!response.ok) return [];
         const data = await response.json();
-        return (data.results || []).filter(item => item && item.url).map(item => ({
+        const tracks = (data.results || []).filter(item => item && item.url).map(item => ({
             title: normalizeSourceText(item.title || 'Sin título'),
             artist: normalizeSourceText(item.artist || 'Jamendo'),
             img: item.thumbnail || 'assets/nowarfy-icon-512.png',
@@ -1152,6 +1177,8 @@ async function fetchJamendoTracks(query, limit = 15, options = {}) {
             source: 'jamendo',
             sourceUrl: item.sourceUrl || ''
         }));
+        rememberFreeMusicTracks(tracks);
+        return tracks;
     } catch (error) {
         return [];
     }
@@ -1212,6 +1239,7 @@ async function fetchOpenverseTracks(query, limit = 20, options = {}) {
     const cached = readRemoteCatalogCache(cacheKey, CATALOG_CACHE_TTL_MS.openverse);
     if (cached && Array.isArray(cached.items)) {
         const restored = cached.items.slice();
+        rememberFreeMusicTracks(restored);
         restored.nextPage = cached.nextPage || null;
         restored.page = page;
         return restored;
@@ -1247,6 +1275,7 @@ async function fetchOpenverseTracks(query, limit = 20, options = {}) {
             sourceUrl: track.foreign_landing_url || track.detail_url || ''
         }))
         .sort((a, b) => (b.img ? 1 : 0) - (a.img ? 1 : 0));
+    rememberFreeMusicTracks(mappedTracks);
     void reserveDiscoveredCandidates(mappedTracks, { context: options.reserveContext || 'manual', seed: options.seed || null, queryContext: `${query} openverse`.trim().toLowerCase() });
     mappedTracks.nextPage = data.pagination?.next || null;
     mappedTracks.page = page;
@@ -2314,11 +2343,18 @@ async function showSection(section, options = {}) {
     if (section === 'music') {
         const expandedFreeMusic = await appendFreeMusicCollections();
         navigateWithTransition(() => {
-            currentList = [...homeMusicVideos, ...homeMusic];
+            const savedFreeMusic = readFreeMusicLibrary();
+            currentList = [...homeMusicVideos, ...homeMusic, ...savedFreeMusic];
             if (homeMusicVideos.length) renderGrid(homeMusicVideos, 'Música de YouTube', "<i class='fab fa-youtube'></i>");
             if (homeMusic.length) renderGrid(homeMusic, 'Música libre complementaria', "<i class='fas fa-headphones'></i>");
-            currentList = uniqueMediaByUrl([...homeMusicVideos, ...homeMusic, ...expandedFreeMusic], 140);
-            if (!homeMusicVideos.length && !homeMusic.length && !expandedFreeMusic.length) renderEmptyState('No hay música disponible ahora', 'Probá buscar un artista o tema.');
+            const freeMusic = uniqueMediaByUrl([...savedFreeMusic, ...expandedFreeMusic], 160);
+            if (freeMusic.length) renderLibraryRail(freeMusic, 'Tu música libre guardada', "<i class='fas fa-bookmark'></i>", false, {
+                hint: 'Openverse y Jamendo · guardada en este dispositivo',
+                showControls: true,
+                className: 'free-music-rail saved-free-music-rail'
+            });
+            currentList = uniqueMediaByUrl([...homeMusicVideos, ...homeMusic, ...freeMusic], 180);
+            if (!homeMusicVideos.length && !homeMusic.length && !freeMusic.length) renderEmptyState('No hay música disponible ahora', 'Probá buscar un artista o tema.');
         });
     }
 }
